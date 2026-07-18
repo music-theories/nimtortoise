@@ -781,6 +781,14 @@ proc createOrRestartNimsuggest*(
   ls: LanguageServer, projectFile: string, uri = ""
 ) {.gcsafe, raises: [].}
 
+proc shouldSpawnNimsuggest*(ls: LanguageServer): Future[bool] {.async.} =
+  let nsCount = ls.getLspStatus().nimsuggestInstances.len
+  let conf = await ls.getWorkspaceConfiguration
+  let maxNimsuggestProcesses = conf.maxNimsuggestProcesses.get(NIM_MAX_NS_PROCESSES)
+  result = maxNimsuggestProcesses == 0 or nsCount < maxNimsuggestProcesses
+  debug "shouldSpawnNimsuggest",
+    result = result, nsCount = nsCount, maxNimsuggestProcesses = maxNimsuggestProcesses
+
 proc initNimsuggestInstances*(ls: LanguageServer, rootPath: string) {.async.} =
   if rootPath == "":
     return
@@ -793,17 +801,26 @@ proc initNimsuggestInstances*(ls: LanguageServer, rootPath: string) {.async.} =
     for entryPoint in ls.entryPoints:
       debug "Starting nimsuggest for entry point ", entry = entryPoint
       if entryPoint notin ls.projectFiles:
-        ls.createOrRestartNimsuggest(entryPoint)
+        let shouldSpawn = await ls.shouldSpawnNimsuggest()
+        if shouldSpawn:
+          ls.createOrRestartNimsuggest(entryPoint)
+        else:
+          debug "Limit reached, skipping entry point", entryPoint = entryPoint
+          break
 
 proc getNimsuggestInner(ls: LanguageServer, uri: string): Future[Nimsuggest] {.async.} =
   assert uri in ls.openFiles, "File not open"
 
   let projectFile = await ls.openFiles[uri].projectFile
   if not ls.projectFiles.hasKey(projectFile):
-    debug "Creating new nimsuggest instance", uri = uri, projectFile = projectFile
-    ls.createOrRestartNimsuggest(projectFile, uri)
-    # Wait a bit to allow nimsuggest to start
-    await sleepAsync(10)
+    let shouldSpawn = await ls.shouldSpawnNimsuggest()
+    if shouldSpawn:
+      debug "Creating new nimsuggest instance", uri = uri, projectFile = projectFile
+      ls.createOrRestartNimsuggest(projectFile, uri)
+      # Wait a bit to allow nimsuggest to start
+      await sleepAsync(10)
+    else:
+      debug "Limit reached, reusing existing nimsuggest", uri = uri
 
   const MaxFails = 10
   if projectFile in ls.failTable and ls.failTable[projectFile] >= MaxFails:
@@ -1194,14 +1211,6 @@ proc stopNimsuggestProcesses*(ls: LanguageServer) {.async.} =
 proc stopNimsuggestProcessesP*(ls: LanguageServer) =
   waitFor stopNimsuggestProcesses(ls)
 
-proc shouldSpawnNimsuggest*(ls: LanguageServer): Future[bool] {.async.} =
-  let nsCount = ls.getLspStatus().nimsuggestInstances.len
-  let conf = await ls.getWorkspaceConfiguration
-  let maxNimsuggestProcesses = conf.maxNimsuggestProcesses.get(NIM_MAX_NS_PROCESSES)
-  result = maxNimsuggestProcesses == 0 or nsCount < maxNimsuggestProcesses
-  debug "shouldSpawnNimsuggest",
-    result = result, nsCount = nsCount, maxNimsuggestProcesses = maxNimsuggestProcesses
-
 proc getProjectFile*(fileUri: string, ls: LanguageServer): Future[string] {.async.} =
   let
     rootPath =
@@ -1224,6 +1233,11 @@ proc getProjectFile*(fileUri: string, ls: LanguageServer): Future[string] {.asyn
       if fileExists(result):
         trace "getProjectFile?",
           project = result, uri = fileUri, matchedRegex = mapping.fileRegex
+        let shouldSpawn = await ls.shouldSpawnNimsuggest()
+        if not shouldSpawn:
+          result = ls.projectFiles.keys.toSeq[0]
+          debug "Reached the maximum instances of nimsuggest (mapping), reusing first instance",
+            project = result
         return result
     else:
       trace "getProjectFile does not match",
