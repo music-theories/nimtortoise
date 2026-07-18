@@ -166,6 +166,7 @@ type
     lastNimsuggest*: Future[Nimsuggest]
     childNimsuggestProcessesStopped*: bool
     isShutdown*: bool
+    outputClosed*: bool   # set in onExit before outStream.close(); guards writeOutput
     storageDir*: string
     cmdLineClientProcessId*: Option[int]
     nimDumpCache*: Table[string, NimbleDumpInfo] #path to NimbleDumpInfo

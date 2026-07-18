@@ -180,6 +180,8 @@ proc wrapContentWithContentLength*(content: string): string =
   &"{CONTENT_LENGTH}{contentLength}{CRLF}{CRLF}{content}\n"
 
 proc writeOutput*(ls: LanguageServer, content: JsonNode) =
+  if ls.outputClosed:
+    return
   let res =
     case ls.serverMode
     of lsp:
@@ -260,6 +262,7 @@ proc initActions*(ls: LanguageServer) =
   let onExit: OnExitCallback = proc() {.async.} =
     case ls.transportMode
     of stdio:
+      ls.outputClosed = true
       ls.outStream.close()
       freeShared(ls.stdinContext)
     of socket:
