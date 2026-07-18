@@ -788,7 +788,7 @@ proc shouldSpawnNimsuggest*(ls: LanguageServer): Future[bool] {.async.} =
   result = maxNimsuggestProcesses == 0 or nsCount < maxNimsuggestProcesses
   debug "shouldSpawnNimsuggest",
     result = result, nsCount = nsCount, maxNimsuggestProcesses = maxNimsuggestProcesses
-
+    
 proc initNimsuggestInstances*(ls: LanguageServer, rootPath: string) {.async.} =
   if rootPath == "":
     return
@@ -1282,6 +1282,11 @@ proc checkFile*(ls: LanguageServer, uri: string): Future[void] {.async.} =
 
   let ns = await ls.tryGetNimsuggest(uri)
   if ns.isSome:
+    # Notify nimsuggest of the unsaved change so it invalidates its module graph
+    # cache before we query diagnostics, hover, or inlay hints. Without this,
+    # nimsuggest serves stale AST data keyed to the last save. The stash file
+    # contains the current editor content written by the didChange handler.
+    discard await ns.get().changed(path, ls.uriToStash(uri))
     let diagnostics = ns.get().chkFile(path, ls.uriToStash(uri)).await()
     ls.progress(token, "end")
     ls.sendDiagnostics(diagnostics, path)
