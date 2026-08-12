@@ -1,15 +1,13 @@
-import std/[options, sets, strutils, tables, os, sequtils, times]
+import std/[options, sets, strutils, tables, os, sequtils, times, json]
 import chronos
 import chronicles
-import ../nimsuggest/[nimsuggest_types, suggestapi_types, nimsuggest_process]
-import ../protocol/types
 import ../nph/formatting
-import ../nimsuggest/nimsuggest_slots
-import ./[configurations, dispatcher_utils, nimsuggest_processes, utils]
+import ../nimsuggest/nimsuggest
+import ../configurations/configurations
+import ../protocol/types
 import ../handlers/request_process
-import ../utils/utils as globalUtils
-import ../configurations/configurations as configParser
-import ./[langserver_types, query_types]
+import ../utils/utils
+import ./[langserver_types, query_types,  dispatcher_utils, langserver_nimsuggest, langserver_utils, capability_configs]
 
 proc consolidateNimsuggestInstances(
   ls: LanguageServer,
@@ -67,12 +65,14 @@ proc createNewSuggestSlotAndConsolidate(
   let newSlot = newSlot(filePath, isEntryPoint = true, workingDir)
   ls.pool.addSlot(newSlot)
   debug "createNewSuggestSlotAndConsolidate: spawn new nimsuggest slot", workingDir = workingDir
-  let successfulSpawn = await execSpawn(newSlot, ls.pool, filePath)
+  let successfulSpawn = await execSpawn(newSlot, ls.pool, filePath, ls.configurations.currentConfig)
   if successfulSpawn:
     debug "createNewSuggestSlotAndConsolidate:add file to open files", filePath = $(filePath)
     ls.addFileToOpenFiles(newSlot, params)
     asyncSpawn processNimsuggestQueries(
-      newSlot, ls.pool, ls.files.openFiles, ls.notify
+      newSlot, ls.pool, ls.files.openFiles, 
+      ls.configurations.currentConfig,
+      ls.notify
     )
     # Consolidation: for each other slot, check if the new slot subsumes it.
     discard await ls.consolidateNimsuggestInstances(newSlot)
@@ -82,6 +82,20 @@ proc createNewSuggestSlotAndConsolidate(
     ls.pool.removeSlot(filePath)
   return newSlot
 
+
+proc waitForLsInitialized*(ls: LanguageServer): Future[void] {.async.} =
+  ## Waits until initNimsuggestInstances has completed (config received, nimble dump
+  ## done, entry-point slots spawned), with a 60-second timeout.
+  ## Uses polling so a timeout does not cancel the shared lsInitialized future.
+  if ls.lsInitialized.finished:
+    return
+  debug "DID_OPEN: waiting for ls initialization (initNimsuggestInstances not yet done)"
+  var elapsed = 0
+  while not ls.lsInitialized.finished and elapsed < 60_000:
+    await sleepAsync(100)
+    inc elapsed, 100
+  if not ls.lsInitialized.finished:
+    warn "initNimsuggestInstances did not complete within timeout; proceeding anyway"
 
 proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
   ## Single coroutine that drains ls.langserverQueue in FIFO order.
@@ -142,6 +156,7 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
             debug "didOpen: known file, calling addFileToOpenFiles", uri = uri
             ls.addFileToOpenFiles(fileIsKnown.get(), q.didOpen.textDocument)
             debug "didOpen: known file, addFileToOpenFiles done", uri = uri
+            discard ls.queryFile(uri, NimsuggestQueryKind.CHECK_FILE)
           else:
             # This file is not known by any running nimsuggest instance.
             # Check there is a free nimsuggest slot
@@ -169,10 +184,12 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
                   workingDir = projectWorkingDir
                 )
                 ls.pool.addSlot(newProjectSlot)
-                let intendedProjectSpawn = await execSpawn(newProjectSlot, ls.pool, intendedProjectPath)
+                let intendedProjectSpawn = await execSpawn(newProjectSlot, ls.pool, intendedProjectPath, ls.configurations.currentConfig)
                 if intendedProjectSpawn:
                   asyncSpawn processNimsuggestQueries(
-                    newProjectSlot, ls.pool, ls.files.openFiles, ls.notify
+                    newProjectSlot, ls.pool, ls.files.openFiles, 
+                    ls.configurations.currentConfig,
+                    ls.notify
                   )
                   let projectKnownQuery = NimsuggestQuery[LspFilePosition](
                     id: 0.uint,
@@ -189,6 +206,7 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
                       #Here is where consolidation is needed.
                     ls.addFileToOpenFiles(newProjectSlot, q.didOpen.textDocument)
                     discard await ls.consolidateNimsuggestInstances(newProjectSlot)
+                    discard ls.queryFile(uri, NimsuggestQueryKind.CHECK_FILE)
                   else:
                     debug "didOpen: The project does not know the current file. Spin up a new standalone orphan."
                     discard await execStop(newProjectSlot, ls.pool)
@@ -249,7 +267,6 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
         file.close()
 
         # We should schedule a changed query, nimsuggets doesn't know it has changed.
-        # ls.files.openFiles[uri].changed = true
         ls.files.openFiles[uri].lastChanged = times.now()
 
         let changedQuery = LangserverQuery(
@@ -267,11 +284,20 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
 
       of FileAccessQueryKind.DID_SAVE:
         let uri = q.didSave.textDocument.uri
-        debug "didSave: enter", uri = uri
+        debug "didSave: file", uri = uri
         if uri in ls.files.openFiles:
           let fileInfo = ls.files.openFiles[uri]
           if uri in fileInfo.slot.crashedUris:
             fileInfo.slot.crashedUris.excl(uri)
+
+          if q.didSave.text.isSome:
+            let stashLocation = ls.uriStorageLocation(uri)
+            let file = open(string(stashLocation), fmWrite)
+            fileInfo.fingerTable = @[]
+            for line in q.didSave.text.get.splitLines:
+              fileInfo.fingerTable.add(line.createUTFMapping())
+              file.writeLine(line)
+            file.close()
 
         debug "didSave: sending CHANGED query", uri = uri
         # Directly query nimsuggest
@@ -282,34 +308,28 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
             id: 0,
             kind: NimsuggestQueryKind.CHANGED,
             uri: uri,
-            dirtyFile: FilePath(""), # NOTE: Maybe this should be empty?
+            dirtyFile: ls.uriStorageLocation(uri),
             saved: true,
             responseFuture: newFuture[seq[Suggest]]("nimsuggestQuery"),
           )
         )
         ls.langserverQueue.addLastNoWait(changedQuery)
 
-        # if config.checkOnSave.get(true):
-        # CHECK PROJECT 
-        # Send chk with the slot's project file, not the saved URI. nimsuggest's chk
-        # command takes the entry-point path it was spawned with; any other file would
-        # cause it to check the wrong scope.
-        
-        # NOTE: IS THIS NECESSARY ANY MORE?
-        # debug "Checking project", uri = uri
-        # let slotForUri = ls.pool.slotForUri(uri)
-        # if slotForUri.isSome:
-        #   let chkQuery = LangserverQuery(
-        #     kind: LangserverQueryKind.NIMSUGGEST,
-        #     nimsuggest: NimsuggestQuery[LspFilePosition](
-        #       id: 0,
-        #       kind: NimsuggestQueryKind.CHECK_PROJECT,
-        #       uri: pathToUri(slotForUri.get().projectFile),
-        #       dirtyFile: FilePath(""),
-        #       responseFuture: newFuture[seq[Suggest]]("checkProject"),
-        #     )
-        #   )
-        #   ls.langserverQueue.addLastNoWait(chkQuery)
+        if ls.configurations.currentConfig.checkOnSave:
+          debug "Checking project", uri = uri
+          let slotForUri = ls.pool.slotForUri(uri)
+          if slotForUri.isSome:
+            let chkQuery = LangserverQuery(
+              kind: LangserverQueryKind.NIMSUGGEST,
+              nimsuggest: NimsuggestQuery[LspFilePosition](
+                id: 0,
+                kind: NimsuggestQueryKind.CHECK_PROJECT,
+                uri: pathToUri(slotForUri.get().projectFile),
+                dirtyFile: FilePath(""),
+                responseFuture: newFuture[seq[Suggest]]("checkProject"),
+              )
+            )
+            ls.langserverQueue.addLastNoWait(chkQuery)
 
       of FileAccessQueryKind.DID_CLOSE:
         let uri = q.didClose.textDocument.uri
@@ -332,12 +352,12 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
 
       of FileAccessQueryKind.WILL_SAVE_WAIT_UNTIL:
         let uri = q.willSave.textDocument.uri
-        let config = ls.getWorkspaceConfiguration()
+        let config = ls.configurations.currentConfig
         let nphPath = getNphPath()
 
         let shouldFormat =
           nphPath.isSome and ls.capabilities.lspServerCapabilities.documentFormattingProvider.get(false) and
-          config.formatOnSave.get(false)
+          config.formatOnSave
 
         if shouldFormat:
           debug "Formatting document before save", uri = uri
@@ -424,17 +444,31 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
 
       of FileAccessQueryKind.DID_CHANGE_CONFIGURATION:
         debug "Changed configuration: "
-        if ls.usePullConfigurationModel:
-          ls.maybeRequestConfigurationFromClient
+        var receivedConfigJson: JsonNode
+        if ls.usePullConfigurationModel():
+          if ls.supportsConfigurationRequest():
+            debug "Requesting configuration from the client"
+            let configurationParams = %*{"items": [{"section": "nimTortoise"}, {"section": "nim"}]}
+            let configFuture = ls.call("workspace/configuration", configurationParams)
+            receivedConfigJson = await configFuture 
+          else:
+            debug "Client does not support workspace/configuration"
+            ls.configurations.configReady.fire()
+            continue
         else:
-          let oldConfiguration = ls.getWorkspaceConfiguration()
-          let newConfiguration = parseWorkspaceConfiguration(q.didChangeConfiguration)
-          ls.configurations.currentConfig = some(newConfiguration)
+          receivedConfigJson = q.didChangeConfiguration
+        
+        let oldConfiguration = ls.configurations.currentConfig
+        let newConfiguration = parseDidChangeConfiguration(receivedConfigJson)
+
+        let newConfigurationIsDifferent = isDifferentFrom(newConfiguration, ls.configurations.currentConfig)
+
+        if newConfigurationIsDifferent:
           clearCompiledRegexCache()
+          ls.configurations.currentConfig = newConfiguration
           ls.configurations.configReady.fire()
-          if configurationChanged(oldConfiguration, newConfiguration):
-            debug "Configuration changed, restarting all nimsuggest instances"
-            ls.restartAllNimsuggestInstances()
+
+          ls.pool.restartAllNimsuggestInstances(newConfiguration)
 
       of FileAccessQueryKind.FORMATTING:
         let uri = q.formatting.textDocument.uri

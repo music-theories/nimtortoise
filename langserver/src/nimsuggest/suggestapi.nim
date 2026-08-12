@@ -230,16 +230,16 @@ proc logNsError(project: Project) {.async.} =
   project.markFailed(err)
 
 proc createNimsuggest*(
-    root: FilePath,
-    nimsuggestPath: string,
-    version: string,
-    timeout: int,
-    timeoutCallback: NimsuggestCallback,
-    errorCallback: ProjectCallback,
-    workingDir = getCurrentDir(),
-    enableLog: bool = false,
-    enableExceptionInlayHints: bool = false,
-    nimPaths: seq[string] = @[],
+  root: FilePath,
+  nimsuggestPath: string,
+  version: string,
+  timeout: int,
+  timeoutCallback: NimsuggestCallback,
+  errorCallback: ProjectCallback,
+  workingDir = getCurrentDir(),
+  enableLog: bool = false,
+  enableExceptionInlayHints: bool = false,
+  nimPaths: seq[string] = @[],
 ): Future[Project] {.async.} =
   result = Project(file: root)
   result.ns = newFuture[NimSuggest]()
@@ -310,17 +310,17 @@ proc createNimsuggest*(
       nimsuggestPath = nimsuggestPath
     result.markFailed fmt "Unable to start nimsuggest. `{nimsuggestPath}` is not present on the PATH"
 
-proc createNimsuggest*(root: FilePath): Future[Project] {.gcsafe.} =
-  result = createNimsuggest(
-    root,
-    "nimsuggest",
-    "",
-    REQUEST_TIMEOUT,
-    proc(ns: Nimsuggest) =
-      discard,
-    proc(pr: Project) =
-      discard,
-  )
+# proc createNimsuggest*(root: FilePath): Future[Project] {.gcsafe.} =
+#   result = createNimsuggest(
+#     root,
+#     "nimsuggest",
+#     "",
+#     REQUEST_TIMEOUT,
+#     proc(ns: Nimsuggest) =
+#       discard,
+#     proc(pr: Project) =
+#       discard,
+#   )
 
 proc toString*(bytes: openarray[byte]): string =
   result = newString(bytes.len)
