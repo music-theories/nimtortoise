@@ -1,50 +1,84 @@
+
 # Nim Tortoise
 
 > *Slow and steady wins the race.*
 
-A Nim language server and VS Code extension that prioritise **correctness** over speed.  In other words, it might work slower than the other nim language servers, but it will give you the correct information and not crash every 10 minutes.
-
-This is a fork and rewrite of [`nimlangserver`](https://github.com/nim-lang/langserver) and [`vscode-nim`](https://github.com/nim-lang/vscode-nim).
-
-
 *NOTE: This repo is in active, heavy development.*
 
----
+*NOTE: All other READMEs are a work in progress*
 
-## The Problem
+## What is it?
 
-On large Nim projects — especially monorepos with multiple packages — the standard tooling frequently:
+A fork and rewrite of [`nimlangserver`](https://github.com/nim-lang/langserver) and [`vscode-nim`](https://github.com/nim-lang/vscode-nim).
 
-- Takes over a minute to start before any highlighting appears
-- Shows stale completions and hover results long after you've edited the file
-- Crashes after 10–15 minutes of use and fails to recover cleanly
-- Ignores the `maxNimsuggestProcesses` limit, spawning one process per open file
-- Breaks language features silently after a file rename
+This is a language server for the programming language `Nim`, and an accompanying VS Code extension.  The language server can act as a drop-in replace for `nimlangserver` for basic functionality or use it with the VS Code Extension.
 
-This repository exists because these problems have architectural roots that can't be fixed incrementally.
+The language server aims to prioritise correctness over speed.  In other words, it might work slower than the other nim language servers, but it will give you the correct information and not crash every 10 minutes.
 
----
+## Motivations: Why Rewrite?
 
-## What's in This Repository
+I have been writing `nim` code since 2022 and have been coding with it daily since 2023.  At no point during this period has the combination of `nimlangserver` + `IDE` worked correctly for any of my projects.  Although I mainly use VS Code, I tried a number of different IDEs, with the same results.  I tried almost every possible configurtion of extension, IDE, and language server - with me eventually deciding to run the official VS Code Extension with `nimsuggest` disabled, so I would get the text coloration but without it continuously rinsing my CPU at 100% for minutes at a time and destroying my battery-life.  
 
-| Directory | What it is |
-|-----------|------------|
-| [`langserver/`](langserver/) | The Nim language server — a ground-up rewrite of `nimlangserver` |
-| [`vscode_extension/`](vscode_extension/) | The VS Code extension — an LSP-only fork of `vscode-nim` |
+These were all inconveniences that I powered through because I enjoyed the language, and the downsides of IDE integration were much outweighed by the benefits of the progress I was making, 
 
-The two components are designed to work together but are independent. The language server speaks standard LSP and will work with any LSP-capable editor.
+Cut to July 2026, when the code base I am working in is over 100,000 lines of `nim` code in a monorepo with 30+ modules and.  I load up this project in VS Code only for it to take 1 minute and 45 secondd of `nimble` running at 100% on my CPU before any aspect of the language server even works, and then, when it does, it manages to correctly give highlights and diagnostics for about 5-10 minutes before irretrievably crashing.  This forced progress on my work to become almost stationary.  So I decided to try and fix things.  
 
----
+My first steps were to correct some low-hanging fruit that was causing bugs with the official `nimlangserver` language server (e.g. there was no code that dealt with the `textDocument/rename` request, meaning that if a file was moved or renamed, `nimsuggest` would have no idea, and nothing would work for that file or the rest of the project).  I made some similar fixes to the `vscode-nim` VS Code Extension, fixing some problems involving placing extra guards to ensure no more `nimsuggest` processes were spawned than the user wanted, and fixing the 100% CPU at startup problem, which was the result of both VS Code not supplying the correct `PATH` information for the programs it spawned in the shell, nor correct configuration information for those programs when they ran, `nimble`'s SAT solver to kick-in because it wasn't being directed to the correct folder.  I made a few pull requests to the main repository and, although I made progress, it still wasn't working _well_.  
 
-## Key Improvements
+I basically needed the language server to do the following things:
+
+- Does not crash after only 10 minutes of use.
+- Does not give incorrect diagnostic or hover infirmation.
+- Gives correct, and up-to-date diagnostics and hover information for any file you have open in your IDE.
+- Go-to definition works.  For the entirety of your session.  And for any file.
+- Is not constantly rinsing the CPU.
+- Respects the maximum number of nimsuggest processes I specify.
+
+These are the aims of Nim Tortoise.
+
+Looking further at the code - and trying to fix the 15th race-condition-related bug - I realised that there were some architectural problems with the code base that necessitated a complete rewrite...
+
+In this rewrite I prioritise three things:
+
+- Correctness > Speed: The information the language server provides about your code should always be correct and up-to-date.  At every point correctness will be picked over speed.  I don't mind having to wait an extra second if it means the that my IDE is going to show me information that is actually right and relevant.  This is more tortoise than hare.
+- Stability: The language server should be stable- not  constantly crashing - I have work to do!
+- Efficiency: The language server does have to deal with a lot of files, but it shouldn't be turning your laptop into a stellar-hot chunk while its working.  I aim for the language server to be CPU light.  
+
+## Problems
+
+There were a number of reasons `nimlangserver` was not working for a lot of people (especially those using VS Code).  These problems are a combination of:
+ 
+- An inelegant split between the responsibilities of the VS Code extension, and those of the language server
+- The language server not waiting for configuration information before initializing.
+- `PATH` information not being properly used or dissemintated to processes running in VS Code.  In the original VS Code extension, there was a problem that could cause the extension to run `nimble` at 100% for over a minute.  It would run `nimble dump` unconditionally on activation with an empty or incorrect `projectFile`/`entryPoint` parameter, causing it to search in vain for a `.nimble` file, fail to find it, and generally spiral as its exponential-time SAT solver kicked-in.
+- Notifications and requests were being passed to `nimsuggest` from many different parts of the code base, resulting in out-of-date information, duplicate and stale requests, and race conditions.
+
+## Nim Tortoise
+
+I have rewritten the extension and language server to focus on doing one thing well:
+
+- Giving correct information back to the IDE from the language server.
+
+This has meant removing some functionality.  What has been removed:
+
+- Test running: To get the information about what tests are running, the tests need to successfully compile using the nim compiler.  This causes big CPU spikes upon launching the IDE while it gets the test, and it will only succeed if the tests compile.  If I open up an IDE, why do I want to add extra wait time to an already slow startup procedure.
+- MCP functionality: I decided to not support this until I can get the language server running correctly and robustly.
+- Using `nim check` for checking files - everything now uses `nimsuggest`.
+- Using `nimsuggest` rather than the full language server - this was a setting in `nimlangserver` but resulted in a lot of duplicated work.
+
+## Improvements
+
+### VS Code Extensionn never does more than necessary
+
+Many of the problems I was experiencing were happening as a result of an imperfect split of responsibilities between the VS Code extension and the Language Server.  In the rewrite, the VS Code Extension is pruned back to being the thinnest wrapper possible around the language server.  Any use of the `nim` compiler, `nimsuggest` or `nimble` is dealt with by the language server - the only aim of the extension is to route information between the IDE and the server.  Previously, any nunmber of executables were spawned by the extension (often with incorrect or incomplete information).
 
 ### Startup performance
 
-Forwarding `nimble.paths` directly to nimsuggest eliminates the need for nimsuggest's internal compiler to call nimble for every unresolved import. Cold-compile time dropped from **~53 seconds to ~11 seconds** in our testing. Subsequent requests are fast (< 1s) because the compiled module graph is cached on disk between sessions.
-
-The VS Code extension no longer runs `nimble dump` unconditionally on activation — a fix that removes the exponential-time SAT solver from VS Code's startup critical path when launched from the Dock.
+Startup performance is around 10-15 seconds for this repository on my 2019 macbook.
 
 ### Correctness through serialisation
+
+One of the major causes for incorrect information was related to the fact that many different parts of the code base could request, mutate or read from key pieces of information with very little care being taken as to whether the actions were being processed in the correct order, or whether duplicate (and superfluous) messages were queued.
 
 All LSP work flows through a two-level queue:
 
@@ -64,11 +98,38 @@ The old architecture tracked file-to-project ownership in two separate tables th
 - Correct re-registration of all open files after a restart, not just the one that triggered it
 - No more infinite crash loops at full CPU
 
-### Live diagnostics
+### Nimsuggest processes
 
-`checkFile` now calls `changed()` before `chkFile`, so nimsuggest always checks the live editor buffer. Diagnostic squiggles update as you type, not only on save.
+- Strictly abide by the `maxNimsuggestProcesses` limit,
+- Consolidation mechanism - multiple nimsuggest instances with be consolidated into one instance if either imports the other's project file.
 
----
+## What's in This Repository
+
+| Directory | What it is |
+|-----------|------------|
+| [`langserver/`](langserver/) | The Nim language server — a ground-up rewrite of `nimlangserver` |
+| [`vscode_extension/`](vscode_extension/) | The VS Code extension — an LSP-only fork of `vscode-nim` |
+
+The two components are designed to work together but are independent. The language server speaks standard LSP and will work with any LSP-capable editor.
+
+You should be able to use `nimtortoise` as a drop-in replacement for `nimlangserver`, but I would recommend using the VS Code extension, as it removes many inefficiencies.
+
+### Correctness in General
+
+- The VS Code LSP stores line and character information as 0-based lines and Utf16 characters.
+- Nimsuggest expects 1-based lines and Utf8 characters.\
+- This results in the use of `fingerTables` to convert between the two.
+- The original repo would always incorrectly convert nimsuggest responses to LSP positions.
+- Highlighting would always be wrong for certain types of code:
+  - Colon-prefix (compiler-internal, never appear in source):
+    - `:anonymous` — lambda/closure procs
+    - `:result` — implicit result variable
+    - `:tmp` — compiler temporaries
+    - `:env` — closure environments
+    - `:iterator` — iterator state
+    = `:objectType` — object type internals
+  - Backtick-gensym (source token exists, name is mangled):
+    - e.g. "procName\`gensym0" — the \`gensymN suffix is added by template/macro expansion. The source token is just everything before the backtick.
 
 ## Getting Started
 
@@ -111,37 +172,6 @@ If omitted, the extension defaults to the `nimlangserver` server, and  searches 
 
 ---
 
-## Project Setup (Essential)
-
-Most tooling problems trace back to the same three configuration mistakes. Get these right and everything else follows.
-
-**1. Set `entryPoints` in every `.nimble` file.**
-The language server needs to know which file to give `nimsuggest` as its compilation root. Without it, every opened file becomes its own root, spawning a new process and giving incomplete results.
-
-```nim
-# mypackage.nimble
-srcDir      = "src"
-entryPoints = @["src/mypackage.nim"]
-```
-
-**2. Use `thisDir()` in `config.nims`, not `$projectDir`.**
-`$projectDir` resolves to the directory of the *file being compiled*, which is different for every file inside `src/`. `thisDir()` always resolves to the directory containing `config.nims`.
-
-```nim
-# config.nims
-switch("path", thisDir() & "/../other_package/src")   # correct
-switch("path", "$projectDir/../other_package/src")    # wrong — breaks for deep files
-```
-
-**3. Declare all transitive path dependencies at the top level.**
-A library's `config.nims` is *not* read when that library is imported by another package. Every `switch("path", ...)` entry needed by the entire transitive import closure must appear in the top-level package's `config.nims`.
-
-**4. Run `nimble setup`** in each project root to generate `nimble.paths`. This pre-computes dependency paths and dramatically reduces startup time.
-
-Full setup documentation, including monorepo configuration and a checklist, is in [langserver/README.md](langserver/README.md).
-
----
-
 ## All Settings Use `nimTortoise.`
 
 This extension uses the `nimTortoise.` prefix for all settings and commands to avoid conflicts with the original `vscode-nim` extension. The two **cannot be installed simultaneously** — this extension replaces the original.
@@ -150,13 +180,22 @@ Key settings at a glance:
 
 | Setting | Default | What it does |
 |---------|---------|--------------|
-| `nimTortoise.lsp.path` | `""` | Path to the language server binary |
+| `nimTortoise.lsp.path` | `""` | Path to the language server binary (falls back to `nimlangserver` in PATH) |
+| `nimTortoise.nimsuggestPath` | `"nimsuggest"` | Path to the nimsuggest binary |
 | `nimTortoise.maxNimsuggestProcesses` | `2` | Max nimsuggest processes (0 = unlimited) |
-| `nimTortoise.nimsuggestIdleTimeout` | `120000` | Idle timeout in ms before stopping a process |
+| `nimTortoise.maxNimsuggestCrashRetries` | `3` | Restart attempts before a crashed nimsuggest is abandoned |
+| `nimTortoise.nimsuggestIdleTimeout` | `120000` | Idle timeout in ms before stopping a nimsuggest process |
 | `nimTortoise.projectMapping` | `[]` | Per-file project mapping via regex |
-| `nimTortoise.inlayHints.typeHints.enable` | `true` | Show inferred type annotations |
+| `nimTortoise.workingDirectoryMapping` | `[]` | Override the working directory used when running nimsuggest for a given project |
+| `nimTortoise.checkOnSave` | `false` | Run project-wide diagnostics on save |
+| `nimTortoise.fileCheckDelay` | `1000` | Quiet period in ms after last edit before per-file diagnostics run |
 | `nimTortoise.formatOnSave` | `false` | Format with `nph` on save |
+| `nimTortoise.inlayHints.typeHints.enable` | `true` | Show inferred type annotations |
+| `nimTortoise.inlayHints.parameterHints.enable` | `true` | Show parameter name hints |
+| `nimTortoise.inlayHints.exceptionHints.enable` | `true` | Show exception inlay hints |
 | `nimTortoise.nimExpandMacro` | `false` | Expand macro calls on hover |
+| `nimTortoise.nimExpandArc` | `false` | Expand ARC on proc definition hover |
+| `nimTortoise.transportMode` | `"stdio"` | Transport to connect to the language server (`stdio` or `socket`) |
 
 Full settings reference is in [vscode_extension/README.md](vscode_extension/README.md).
 

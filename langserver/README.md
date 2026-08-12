@@ -601,3 +601,36 @@ This is safe — the cache is rebuilt automatically on the next build or `nimsug
 - `nimble >= 0.16.1`
 - A `nimsuggest` built with `--v4` support (Nim 1.6+ or devel)
 - Run `nimble setup` in your project root to generate `nimble.paths` (see Best Practices above)
+
+
+
+<!-- ## Project Setup (Essential)
+
+Most tooling problems trace back to the same three configuration mistakes. Get these right and everything else follows.
+
+**1. Set `entryPoints` in every `.nimble` file.**
+The language server needs to know which file to give `nimsuggest` as its compilation root. Without it, every opened file becomes its own root, spawning a new process and giving incomplete results.
+
+```nim
+# mypackage.nimble
+srcDir      = "src"
+entryPoints = @["src/mypackage.nim"]
+```
+
+**2. Use `thisDir()` in `config.nims`, not `$projectDir`.**
+`$projectDir` resolves to the directory of the *file being compiled*, which is different for every file inside `src/`. `thisDir()` always resolves to the directory containing `config.nims`.
+
+```nim
+# config.nims
+switch("path", thisDir() & "/../other_package/src")   # correct
+switch("path", "$projectDir/../other_package/src")    # wrong — breaks for deep files
+```
+
+**3. Declare all transitive path dependencies at the top level.**
+A library's `config.nims` is *not* read when that library is imported by another package. Every `switch("path", ...)` entry needed by the entire transitive import closure must appear in the top-level package's `config.nims`.
+
+**4. Run `nimble setup`** in each project root to generate `nimble.paths`. This pre-computes dependency paths and dramatically reduces startup time.
+
+Full setup documentation, including monorepo configuration and a checklist, is in [langserver/README.md](langserver/README.md).
+
+--- -->
