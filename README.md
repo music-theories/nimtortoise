@@ -44,6 +44,58 @@ The `Nim Tortoise` rewrite prioritises three things:
 - Stability: The language server should be stable- not  constantly crashing - I have work to do!
 - Efficiency: The language server does have to deal with a lot of files, but it shouldn't be turning your laptop into a stellar-hot chunk while its working.  I aim for the language server to be CPU light.  
 
+## What's in This Repository
+
+| Directory | What it is |
+|-----------|------------|
+| [`langserver/`](langserver/) | The Nim language server — a ground-up rewrite of `nimlangserver` |
+| [`vscode_extension/`](vscode_extension/) | The VS Code extension — an LSP-only fork of `vscode-nim` |
+
+The two components are designed to work together but are independent. The language server speaks standard LSP and will work with any LSP-capable editor.
+
+You should be able to use `nimtortoise` as a drop-in replacement for `nimlangserver`, but I would recommend using the VS Code extension, as it removes many inefficiencies.
+
+## Getting Started
+
+### Requirements
+
+- Nim with `nimsuggest` (`--v4` support, i.e. Nim 1.6+)
+- `nimble >= 0.16.1`
+- VS Code `>= 1.99.0` (for the extension)
+
+### Build the language server
+
+```sh
+cd langserver
+nimble build      # produces the nimtortoise binary
+```
+
+### Build and install the VS Code extension
+
+```sh
+cd vscode_extension
+nimble vsix            # packages out/vscode_nim_tortoise-<version>.vsix
+nimble install_vsix    # installs it into VS Code
+```
+
+The extension is written in Nim and compiled to JavaScript. It is not a TypeScript extension.
+
+### Point the extension at the binary
+
+Add to `.vscode/settings.json` in your project:
+
+```json
+{
+  "nimTortoise.lsp.path": "/path/to/your/nimtortoise"
+}
+```
+
+Currently, I haven't set up the extension to automatically compile and use the nimtortoise server, so you'll have to build the server from source, using `nimble build`, store it somewhere, then build the extension, and set up the `settings.json` in your project to point the "nimTortoise.lsp.path" setting to the compiled `nimtortoise` binary.  This will be fixed in later versions.
+
+If omitted, the extension defaults to the `nimlangserver` server, and  searches `~/.vscode-nim-tortoise/nimbledeps/bin/nimlangserver` then `nimlangserver` in `PATH`.
+
+---
+
 ## Problems
 
 What follows is a documented catalogue of the problems in the original `nimlangserver` + `vscode-nim` combination that the rewrite is designed to fix.
@@ -276,56 +328,6 @@ The two-level queue architecture is the rewrite's central success. By funnelling
 
 - **Macro expansion** (`extension/macroExpand`): always returns null. The "Expand Macro" hover action in VS Code produces no output.
 - **`didChangeConfiguration` over-restarts**: any change to the configuration — including toggling a single inlay hint category — triggers a full pool teardown and rebuild, incurring the cold-compile penalty for every slot.
-
-## What's in This Repository
-
-| Directory | What it is |
-|-----------|------------|
-| [`langserver/`](langserver/) | The Nim language server — a ground-up rewrite of `nimlangserver` |
-| [`vscode_extension/`](vscode_extension/) | The VS Code extension — an LSP-only fork of `vscode-nim` |
-
-The two components are designed to work together but are independent. The language server speaks standard LSP and will work with any LSP-capable editor.
-
-You should be able to use `nimtortoise` as a drop-in replacement for `nimlangserver`, but I would recommend using the VS Code extension, as it removes many inefficiencies.
-
-## Getting Started
-
-### Requirements
-
-- Nim with `nimsuggest` (`--v4` support, i.e. Nim 1.6+)
-- `nimble >= 0.16.1`
-- VS Code `>= 1.99.0` (for the extension)
-
-### Build the language server
-
-```sh
-cd langserver
-nimble build      # produces the nimtortoise binary
-```
-
-### Build and install the VS Code extension
-
-```sh
-cd vscode_extension
-nimble vsix            # packages out/vscode_nim_tortoise-<version>.vsix
-nimble install_vsix    # installs it into VS Code
-```
-
-The extension is written in Nim and compiled to JavaScript. It is not a TypeScript extension.
-
-### Point the extension at the binary
-
-Add to `.vscode/settings.json` in your project:
-
-```json
-{
-  "nimTortoise.lsp.path": "/path/to/your/nimtortoise"
-}
-```
-
-Currently, I haven't set up the extension to automatically compile and use the nimtortoise server, so you'll have to build the server from source, using `nimble build`, store it somewhere, then build the extension, and set up the `settings.json` in your project to point the "nimTortoise.lsp.path" setting to the compiled `nimtortoise` binary.  This will be fixed in later versions.
-
-If omitted, the extension defaults to the `nimlangserver` server, and  searches `~/.vscode-nim-tortoise/nimbledeps/bin/nimlangserver` then `nimlangserver` in `PATH`.
 
 ---
 

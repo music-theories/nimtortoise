@@ -68,7 +68,7 @@ proc provideNimbleTasksCodeLenses*(document: VscodeTextDocument, token: VscodeCa
   for lineText in text.split("\n"):
     let taskName = lineAsTask(state, lineText)
     if taskName.isSome:
-      let range = vscode.newRange(line, 0, line, 0)
+      let `range` = vscode.newRange(line, 0, line, 0)
       let command = VscodeCommands()
       let dirPath = path.dirname(document.fileName)
       command.command = "nimTortoise.onNimbleTask"
