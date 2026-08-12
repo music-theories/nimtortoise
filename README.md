@@ -11,21 +11,21 @@
 
 A fork and rewrite of [`nimlangserver`](https://github.com/nim-lang/langserver) and [`vscode-nim`](https://github.com/nim-lang/vscode-nim).
 
-This is a language server for the programming language `Nim`, and an accompanying VS Code extension.  The language server can act as a drop-in replace for `nimlangserver` for basic functionality or use it with the VS Code Extension.
+`Nim Tortoise` is a language server for the programming language `Nim`, and an accompanying VS Code extension.  The language server can act as a drop-in replace for [`nimlangserver`](https://github.com/nim-lang/langserver) for basic functionality or used with the accompanying VS Code Extension.
 
-The language server aims to prioritise correctness over speed.  In other words, it might work slower than the other nim language servers, but it will give you the correct information and not crash every 10 minutes.
+`Nim Tortoise` aims to prioritise correctness over speed.  In other words, it might work slower than the other nim language servers, but it will give you the correct information and not crash every 10 minutes.
 
 ## Motivations: Why Rewrite?
 
-I have been writing `nim` code since 2022 and have been coding with it daily since 2023.  At no point during this period has the combination of `nimlangserver` + `IDE` worked correctly for any of my projects.  Although I mainly use VS Code, I tried a number of different IDEs, with the same results.  I tried almost every possible configurtion of extension, IDE, and language server - with me eventually deciding to run the official VS Code Extension with `nimsuggest` disabled, so I would get the text coloration but without it continuously rinsing my CPU at 100% for minutes at a time and destroying my battery-life.  
+I have been writing `nim` code since 2022 and have been coding with it daily since 2023.  At no point during this period has the combination of `nimlangserver` + `IDE` worked correctly for any of my projects.  Although I mainly use VS Code, I tried a number of different IDEs, with the same results.  I tried almost every possible configurtion of extension, IDE, and language server - with me eventually deciding to run the official VS Code Extension ([`vscode-nim`](https://github.com/nim-lang/vscode-nim)) with `nimsuggest` disabled, so I would get the text coloration but without it continuously rinsing my CPU at 100% for minutes at a time and destroying my battery-life.  
 
 These were all inconveniences that I powered through because I enjoyed the language, and the downsides of IDE integration were much outweighed by the benefits of the progress I was making, 
 
-Cut to July 2026, when the code base I am working in is over 100,000 lines of `nim` code in a monorepo with 30+ modules and.  I load up this project in VS Code only for it to take 1 minute and 45 secondd of `nimble` running at 100% on my CPU before any aspect of the language server even works, and then, when it does, it manages to correctly give highlights and diagnostics for about 5-10 minutes before irretrievably crashing.  This forced progress on my work to become almost stationary.  So I decided to try and fix things.  
+Cut to July 2026, when the code base I am working in is over 100,000 lines of `nim` code in a monorepo with 30+ modules.  I load up this project in VS Code only for it to take 1 minute and 45 second of `nimble` running at 100% on my CPU before any aspect of the language server even works, and then, when it does, it manages to correctly give highlights and diagnostics for about 5-10 minutes before irretrievably crashing.  This forced progress on my work to become almost stationary.  So I decided to try and fix things.  
 
-My first steps were to correct some low-hanging fruit that was causing bugs with the official `nimlangserver` language server (e.g. there was no code that dealt with the `textDocument/rename` request, meaning that if a file was moved or renamed, `nimsuggest` would have no idea, and nothing would work for that file or the rest of the project).  I made some similar fixes to the `vscode-nim` VS Code Extension, fixing some problems involving placing extra guards to ensure no more `nimsuggest` processes were spawned than the user wanted, and fixing the 100% CPU at startup problem, which was the result of both VS Code not supplying the correct `PATH` information for the programs it spawned in the shell, nor correct configuration information for those programs when they ran, `nimble`'s SAT solver to kick-in because it wasn't being directed to the correct folder.  I made a few pull requests to the main repository and, although I made progress, it still wasn't working _well_.  
+My first steps were to correct some low-hanging fruit that was causing bugs with the official `nimlangserver` language server (e.g. there was no code that dealt with the `textDocument/rename` request, meaning that if a file was moved or renamed, `nimsuggest` would have no idea, and nothing would work for that file or the rest of the project).  I made some similar fixes to the `vscode-nim` VS Code Extension, fixing the problem caused the 100% CPU spike at startup.  I made a few pull requests to the main repository with these fixesand, although I made progress, it still wasn't working _well_.  
 
-I basically needed the language server to do the following things:
+I needed the language server to do the following things and, even with the fixes I still hadn't achieved this:
 
 - Does not crash after only 10 minutes of use.
 - Does not give incorrect diagnostic or hover infirmation.
@@ -34,11 +34,11 @@ I basically needed the language server to do the following things:
 - Is not constantly rinsing the CPU.
 - Respects the maximum number of nimsuggest processes I specify.
 
-These are the aims of Nim Tortoise.
+These are the aims of `Nim Tortoise`.  I will be the first to admit that I have not yet achieved all of these aims, but things work a lot better - and I'm actually getting some work done again! 
 
-Looking further at the code - and trying to fix the 15th race-condition-related bug - I realised that there were some architectural problems with the code base that necessitated a complete rewrite...
+As I looked further into the [`nimlangserver`](https://github.com/nim-lang/langserver) code - and fixed the 15th race-condition-related bug - I realised that there were some architectural problems with the codebase that necessitated a complete rewrite...
 
-In this rewrite I prioritise three things:
+The `Nim Tortoise` rewrite prioritises three things:
 
 - Correctness > Speed: The information the language server provides about your code should always be correct and up-to-date.  At every point correctness will be picked over speed.  I don't mind having to wait an extra second if it means the that my IDE is going to show me information that is actually right and relevant.  This is more tortoise than hare.
 - Stability: The language server should be stable- not  constantly crashing - I have work to do!
@@ -46,7 +46,7 @@ In this rewrite I prioritise three things:
 
 ## Problems
 
-What follows is a documented catalogue of the problems in the original `nimlangserver` + `vscode-nim` combination that the rewrite is designed to fix. These are not isolated edge-case bugs: they are systemic issues rooted in architectural decisions that made correctness difficult by construction.
+What follows is a documented catalogue of the problems in the original `nimlangserver` + `vscode-nim` combination that the rewrite is designed to fix.
 
 ### The extension/server split
 
