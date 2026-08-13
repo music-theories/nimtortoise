@@ -1,7 +1,7 @@
 mode = ScriptMode.Verbose
 
 packageName = "nimtortoise"
-version = "0.1.2"
+version = "0.1.3"
 author = "David Pocknee"
 description = "Fork and rewrite of the nim language server for IDEs"
 license = "MIT"
