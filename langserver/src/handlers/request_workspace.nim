@@ -1,4 +1,4 @@
-import std/[json, sequtils, strformat, sets]
+import std/[json, sequtils, strformat, sets, options]
 import chronos
 import chronicles
 import ../protocol/types
@@ -9,56 +9,78 @@ import ../utils/utils
 import ./[queries_nimsuggest, request_text_document]
 
 # === workspace/executeCommand ===
+proc resolveSlot(ls: LanguageServer, projectFile: FilePath): Option[NimsuggestSlot] =
+  ## Find the slot responsible for `projectFile`.
+  ## The extension sends the active editor file, which may not be a pool entry
+  ## point; fall back to the open-files table to find the owning slot.
+  if projectFile in ls.pool.slots:
+    return some(ls.pool.slots[projectFile])
+  let uri = pathToUri(projectFile)
+  if uri in ls.files.openFiles:
+    return some(ls.files.openFiles[uri].slot)
+  return none(NimsuggestSlot)
+
 proc executeCommand*(
   ls: LanguageServer, params: ExecuteCommandParams
 ): Future[JsonNode] {.async.} =
   let projectFile = FilePath(params.arguments[0].getStr)
   case params.command
-  of "nimtortoise.restart": 
+  of "nimtortoise.restart":
     debug "Restarting nimsuggest", projectFile = projectFile
-    if ls.pool != nil and projectFile in ls.pool.slots:
-      let slot = ls.pool.slots[projectFile]
-      slot.crashedUris.clear()
-      # TODO: Make this a command so it goes through the queue?
-      discard await execStop(slot, ls.pool)
-      traceAsyncErrors execSpawn(slot, ls.pool, projectFile, ls.configurations.currentConfig)
-
-  of "nimtortoise.recompile":
-    debug "Checking project", projectFile = projectFile
-    let chkQuery = LangserverQuery(
-      kind: LangserverQueryKind.NIMSUGGEST,
-      nimsuggest: NimsuggestQuery[LspFilePosition](
-        id: 0,
-        kind: NimsuggestQueryKind.CHECK_PROJECT,
-        uri: pathToUri(projectFile),
-        dirtyFile: FilePath(""),
-        responseFuture: newFuture[seq[Suggest]]("checkProject"),
+    let slot = ls.resolveSlot(projectFile)
+    if slot.isSome:
+      let resolvedSlot = slot.get()
+      resolvedSlot.crashedUris.clear()
+      discard await execStop(resolvedSlot, ls.pool)
+      traceAsyncErrors execSpawn(
+        resolvedSlot, ls.pool, 
+        resolvedSlot.projectFile, 
+        ls.configurations.currentConfig
       )
-    )
-    ls.langserverQueue.addLastNoWait(chkQuery)
 
   of "nimtortoise.checkProject":
+    debug "Checking project", projectFile = projectFile
+    let slot = ls.resolveSlot(projectFile)
+    if slot.isSome:
+      let resolvedSlot = slot.get()
+      ls.langserverQueue.addLastNoWait(LangserverQuery(
+        kind: LangserverQueryKind.NIMSUGGEST,
+        nimsuggest: NimsuggestQuery[LspFilePosition](
+          id: 0,
+          kind: NimsuggestQueryKind.CHECK_PROJECT,
+          uri: pathToUri(resolvedSlot.projectFile),
+          dirtyFile: FilePath(""),
+          responseFuture: newFuture[seq[Suggest]]("checkProject"),
+        )
+      ))
+
+  of "nimtortoise.recompile":
     debug "Clean build", projectFile = projectFile
-    if ls.pool != nil and projectFile in ls.pool.slots:
-      let slot = ls.pool.slots[projectFile]
-      if slot.isLive:
-        let token = fmt "Compiling {projectFile}"
+    let slot = ls.resolveSlot(projectFile)
+    if slot.isSome:
+      let resolvedSlot = slot.get()
+      if resolvedSlot.isLive:
+        let entryPoint = resolvedSlot.projectFile
+        let token = fmt "Compiling {entryPoint}"
         ls.workDoneProgressCreate(token)
-        ls.progress(token, "begin", fmt "Compiling project {projectFile}")
-        discard await execStop(slot, ls.pool)
-        traceAsyncErrors execSpawn(slot, ls.pool, projectFile, ls.configurations.currentConfig)
+        ls.progress(token, "begin", fmt "Compiling project {entryPoint}")
+        discard await execStop(resolvedSlot, ls.pool)
+        discard await execSpawn(
+          resolvedSlot, ls.pool, 
+          entryPoint, 
+          ls.configurations.currentConfig
+        )
         ls.progress(token, "end")
-        let chkQuery = LangserverQuery(
+        ls.langserverQueue.addLastNoWait(LangserverQuery(
           kind: LangserverQueryKind.NIMSUGGEST,
           nimsuggest: NimsuggestQuery[LspFilePosition](
             id: 0,
             kind: NimsuggestQueryKind.CHECK_PROJECT,
-            uri: pathToUri(projectFile),
+            uri: pathToUri(entryPoint),
             dirtyFile: FilePath(""),
-            responseFuture: newFuture[seq[Suggest]]("checkProject"),
+            responseFuture: newFuture[seq[Suggest]]("recompile"),
           )
-        )
-        ls.langserverQueue.addLastNoWait(chkQuery)
+        ))
 
   result = newJNull()
 

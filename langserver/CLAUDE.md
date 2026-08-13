@@ -1,12 +1,31 @@
 # CLAUDE.md — nimlangserver fork context
 
-IMPORTANT: Never connect to an MCP server!!
-
 This is a fork of [nimlangserver](https://github.com/nim-lang/langserver). The primary
 goal is to fix severe startup performance problems caused by nimble's exponential SAT
 solver running during VS Code startup. The `dp-rewrite` branch is a ground-up rewrite
 in `src/` with a proper module hierarchy. Historical forensic analysis, per-fix narratives,
 and pre-rewrite architecture notes are in `langserver/rewrite_analysis/OLD_CLAUDE.md`.
+
+## Design philosophy
+
+This rewrite **privileges correctness over speed**. The central mechanism is a single
+FIFO queue (`langserverQueue`) through which all file operations and nimsuggest queries
+flow in arrival order. Waiting and blocking inside the queue drain coroutine are
+**intentional and necessary**:
+
+- A `didChange` stash write must complete before any subsequent hover or inlay-hint
+  query is dispatched, or nimsuggest sees stale content.
+- A nimsuggest slot must be fully spawned (`await execSpawn`) before queries are
+  dispatched to it, or the per-slot mailbox receives items it cannot serve.
+- `DID_OPEN` waits for `lsInitialized` (config + nimble dump + entry-point spawns)
+  so files are routed to pre-existing project slots rather than spawning their own.
+
+These waits freeze processing of later items in the queue for their duration. That is
+the correct behaviour: LSP messages are ordered, and the client can handle temporary
+latency. Violating the ordering to gain speed introduces subtle state corruption that
+is far harder to debug than slow responses.
+
+---
 
 ## Branch structure
 
@@ -59,7 +78,7 @@ Config is in `tests/config.nims`. Fixtures live in `tests/projects/`.
 
 ---
 
-## Test file status (as of 2026-08-08)
+## Test file status (as of 2026-08-08 — verify before relying on)
 
 | File | In `all.nim` | Tests | Status | Notes |
 |---|---|---|---|---|
@@ -95,9 +114,7 @@ Config is in `tests/config.nims`. Fixtures live in `tests/projects/`.
 **Config sequencing**: `doInitialize` advertises `workspace.configuration=true`, so the
 `initialized` handler calls `maybeRequestConfigurationFromClient`. Tests needing specific
 config must set `ls.configurations.currentConfig` and fire `ls.configurations.configReady`
-directly after `notify("initialized")`. The guard in `maybeRequestConfigurationFromClient`
-(`if ls.configurations.currentConfig.isNone`) prevents overwriting test-set config with
-the client auto-response.
+directly after `notify("initialized")`.
 
 ### Fixture projects
 
@@ -137,9 +154,6 @@ in the test setup.
 - **Idle timeout test**: times out because `didOpen` is sent before `initialized`. Same root cause as `textensions.nim`.
 - **`addProjectFileToPendingRequest` test**: SIGSEGV in `getLspStatus` — `pool` is not fully
   initialized when called from a pure unit-test context. Guard `getLspStatus` against nil pool.
-
-If you're working on these, see `rewrite_analysis/2026-08-08_TEST_STATUS.md` for the
-full stack traces.
 
 #### `tprojectsetup.nim` — 2/3 FAIL
 
@@ -182,25 +196,25 @@ src/
 │   └── types.nim               # protocol type definitions
 ├── configurations/
 │   ├── configuration_types.nim # NlsConfig, NlsNimsuggestConfig, NlsInlayHintsConfig, …
-│   └── configurations.nim      # config parsing: parseWorkspaceConfiguration, helpers
+│   ├── configuration_utils.nim # isDifferentFrom; equality helpers for config types
+│   ├── configurations.nim      # config parsing: parseWorkspaceConfiguration, nlsConfigFromJson
+│   ├── init_configurations.nim # initDefaultNlsConfig, parseDidChangeConfiguration
+│   └── constants.nim           # LSP version, timeout, MAX_CRASH_RETRIES
 ├── langserver/
 │   ├── langserver.nim          # LanguageServer init, pool creation, status, tick,
 │   │                           #   getNimbleDumpInfo, nsCapabilities, nsProtocolVersion
 │   ├── langserver_types.nim    # LanguageServer, NlsFileInfo, LanguageServerCapabilities,
 │   │                           #   LanguageServerFiles, LanguageServerMessaging,
 │   │                           #   LanguageServerTransport, CommandLineParams, …
-│   ├── constants.nim           # LSP version, timeout, MAX_CRASH_RETRIES
 │   ├── transports.nim          # RPC transport layer (stdio / socket)
-│   ├── utils.nim               # URI handling, UTF-8/UTF-16 conversion, stash paths
-│   ├── configurations.nim      # getWorkspaceConfiguration, waitForWorkspaceConfiguration,
-│   │                           #   getAndWaitForWorkspaceConfiguration
-│   ├── diagnostics.nim         # sendDiagnostics, publishDiagnostics helpers
+│   ├── langserver_utils.nim    # URI handling, UTF-8/UTF-16 conversion, stash paths
 │   ├── dispatcher.nim          # processLangserverQueue — drains ls.langserverQueue in FIFO;
 │   │                           #   handles NIMSUGGEST and FILE_ACCESS branches
 │   ├── dispatcher_utils.nim    # isKnownByANimsuggestSlot, addFileToOpenFiles, queryFile,
 │   │                           #   nimsuggestSlotToEvict, getLeastRecentlyUsedNimsuggestSlotInFullPool
-│   ├── nimsuggest_processes.nim # getIntendedProject, getWorkingDir, getNimSuggestPathAndVersion,
-│   │                           #   idleSlots, stopNimsuggestProcesses, initNimsuggestInstances
+│   ├── langserver_nimsuggest.nim # getIntendedProject, getWorkingDir, getNimSuggestPathAndVersion,
+│   │                           #   initNimsuggestInstances, stopNimsuggestProcesses
+│   ├── capability_configs.nim  # usePullConfigurationModel, supportsConfigurationRequest
 │   └── query_types.nim         # LangserverQuery (NIMSUGGEST | FILE_ACCESS variant),
 │                               #   FileAccessQuery, FileAccessQueryKind
 ├── handlers/
@@ -227,11 +241,9 @@ src/
 │   ├── nimble_types.nim        # NimbleDumpInfo
 │   ├── nimscript_utils.nim     # nimscript helper utilities
 │   └── nimscriptapi.nim        # nimscript API template
-├── nim_check/
-│   └── nim_check.nim           # nim check runner (nimCheck proc)
 ├── nim_compiler/
 │   ├── nim_compiler.nim        # getNimPath, getNimVersion
-│   ├── nimexpand.nim           # macro/ARC expansion
+│   ├── nim_expand.nim          # macro/ARC expansion
 │   └── testrunner.nim          # test discovery and execution
 ├── nph/
 │   └── formatting.nim          # nph-based document formatting
@@ -242,12 +254,7 @@ src/
 ```
 
 **Import path convention**: all inter-module imports use relative paths from each file's
-own directory. There is no `nim_tools/` directory — that prefix in some files is a stale
-WIP artifact. Correct paths:
-- `../nimble/nimble` (not `../nim_tools/nimble/nimble`)
-- `../nimsuggest/[suggestapi, nimsuggest_types]` (not `../nim_tools/nimsuggest/…`)
-- `../nim_check/nimcheck` (not `../nim_tools/nimcheck/nimcheck`)
-- `../nim_compiler/nim_compiler` (not `../nim_tools/compiler/nim_compiler`)
+own directory.
 
 ---
 
@@ -275,6 +282,9 @@ LanguageServer* = ref object
   cmdLineClientProcessId*: Option[int]
   testRunProcess*:  Option[AsyncProcessRef]
   lsInitialized*:   Future[void]
+  ## Completed after initNimsuggestInstances finishes (config + nimble dump +
+  ## entry-point spawns). DID_OPEN waits on this before the spawn path so files
+  ## are routed to the correct pre-spawned entry-point slot.
 ```
 
 `pool` is created synchronously in `initLanguageServer` (before the event loop starts)
@@ -289,7 +299,7 @@ cannot be mixed at the type level.
 guaranteeing that a `didChange` stash write is applied before any subsequent hover query
 is dispatched to the per-slot mailbox.
 
-### `NlsFileInfo` (current actual fields)
+### `NlsFileInfo`
 
 Defined in `src/nimsuggest/nimsuggest_types.nim`:
 
@@ -301,11 +311,6 @@ NlsFileInfo* = ref object of RootObj
   lastChecked*:   DateTime         # set when chkFile or checkProject runs for this URI
   textDocument*:  TextDocumentItem
 ```
-
-Note: `changed: bool` was removed. Whether to pass the stash is now decided by `uriToStash`
-(in `langserver/utils.nim`), which always returns the stash path for any file present in
-`openFiles`. The stash file is written on every `DID_CHANGE`; `DID_SAVE` sends a `CHANGED`
-query with an empty `dirtyFile` to tell nimsuggest to switch back to the disk file.
 
 The slot ref is resolved synchronously during `addFileToOpenFiles` (in `dispatcher_utils.nim`)
 and stored directly.
@@ -329,7 +334,6 @@ NimsuggestPool* = ref object
 Key points:
 - `pool.slots` contains only canonical entries — no redirect alias pattern from the old architecture
 - Each slot has a `queryMailbox: AsyncQueue[NimsuggestQuery]`; `processNimsuggestQueries` (in `nimsuggest_process.nim`) drains it and dispatches to TCP
-- There is no separate `commandMailbox`; slot lifecycle (spawn/stop) is handled directly by callers
 - `slot.crashCount` is incremented on `execSpawn` failure; after `MAX_CRASH_RETRIES` the slot gives up and notifies the user
 - `execSpawn` backs off exponentially between retries (`1_000 * (1 shl crashCount)` ms, capped at 30s)
 
@@ -344,7 +348,7 @@ Key points:
 - `nimsuggest/suggestapi.nim` — `createNimsuggest`, raw TCP protocol (sug/def/hover/chk/…).
 - `langserver/dispatcher.nim` — `processLangserverQueue` (FIFO queue drain).
 - `langserver/dispatcher_utils.nim` — `isKnownByANimsuggestSlot`, `addFileToOpenFiles`, `queryFile`, `nimsuggestSlotToEvict`.
-- `langserver/nimsuggest_processes.nim` — `getIntendedProject`, `idleSlots`, `initNimsuggestInstances`, `stopNimsuggestProcesses`.
+- `langserver/langserver_nimsuggest.nim` — `getIntendedProject`, `initNimsuggestInstances`, `stopNimsuggestProcesses`.
 - `langserver/langserver.nim` — `initLanguageServer`, `tick`, `getLspStatus`, `nsCapabilities`, `nsProtocolVersion`, `getNimbleDumpInfo`.
 - `handlers/` — LSP request/notification handlers; enqueue work onto `ls.langserverQueue`.
 
@@ -376,17 +380,16 @@ a `NimsuggestQuery`, enqueues it on `fileInfo.slot.queryMailbox`, returns the
    - Does NOT spawn nimsuggest
 2. VS Code → `initialized`
    - Requests config from client (`workspace/configuration`)
-   - Waits for config (with timeout — see `waitForWorkspaceConfiguration`)
+   - Waits for config response
    - `initNimsuggestInstances(rootPath)` — with real config; runs nimble dump to get
-     `entryPoints`
+     `entryPoints`; completes `lsInitialized`
 3. VS Code → `textDocument/didOpen <file>`
+   - Waits for `lsInitialized` (polls, 60s timeout) — intentional blocking; see design philosophy
    - `isKnownByANimsuggestSlot(pool, uri)` — checks all live slots; returns first that knows the file
    - If known → `addFileToOpenFiles(slot, textDocument)`
    - If unknown → `getIntendedProject(ls, uri)` (projectMapping regex, falls back to file itself)
-   - If `pool.canSpawn` → create new `NimsuggestSlot`, `execSpawn`, then
-     `asyncSpawn processNimsuggestQueries(slot, pool)`
-   - If pool at capacity → `nimsuggestSlotToEvict(pool)` (LRU), drain and clear pending
-     queries, `execStop`, then spawn new slot
+   - `execSpawn` is `await`-ed inline — intentional; slot must be live before queries reach it
+   - `asyncSpawn processNimsuggestQueries(slot, pool)` — starts draining the slot mailbox
 
 ---
 
@@ -420,22 +423,18 @@ mutating the set while the iterator is live. **Always snapshot first**: `for uri
 
 ## The stash (dirtyfile) mechanism
 
-1. `textDocument/didChange` → DID_CHANGE writes the new content to
-   `storageDir/(sha1(uri) & ".nim")` (the stash), updates `fileInfo.lastChanged`.
-2. When `processLangserverQueue` dispatches any nimsuggest query, it sets `q.dirtyFile`
+1. `textDocument/didOpen` → `addFileToOpenFiles` writes the full initial file content to
+   `storageDir/(sha1(uri) & ".nim")` (the stash) immediately and synchronously.
+2. `textDocument/didChange` → DID_CHANGE overwrites the stash with new content and updates
+   `fileInfo.lastChanged`.
+3. When `processLangserverQueue` dispatches any nimsuggest query, it sets `q.dirtyFile`
    at dispatch time (not at query-creation time):
    - If `q.kind == CHANGED and q.saved`: `q.dirtyFile = ""` (use disk)
    - Otherwise: `q.dirtyFile = ls.uriToStash(q.uri)` — which returns the stash path for
      any file currently in `openFiles`, or `""` if the file is closed.
-3. `textDocument/didSave` → enqueues a `CHANGED` query with `saved=true` and `dirtyFile=""`,
-   telling nimsuggest to switch back to the on-disk file. After the `CHANGED` completes,
-   `CHECK_FILE` is enqueued automatically (no stash).
-
-**⚠ Known bug**: after `didSave`, the stash file still exists on disk. Subsequent HOVER /
-INLAY_HINTS queries pass the stash path (because `uriToStash` always returns it for open
-files), so nimsuggest uses the pre-save stash content instead of the saved disk content.
-The `CHANGED` command cleared nimsuggest's dirty-file state, but then HOVER re-sets it.
-Fix: delete (or overwrite) the stash file in `DID_SAVE` so `uriToStash` returns `""`.
+4. `textDocument/didSave` → enqueues a `CHANGED` query with `saved=true`, directing
+   nimsuggest back to the on-disk file. After `CHANGED` completes, `CHECK_FILE` is
+   enqueued automatically at the front of the slot mailbox.
 
 In v4, nimsuggest calls `msgs.setDirtyFile(fileIndex, dirtyfile)` before any command logic,
 so position commands always use the stash content when one is provided.
@@ -466,8 +465,6 @@ in a sync proc — which is a correctness property worth preserving.
 
 **Currently sync** (de-asynced from the original):
 - `addProjectFileToPendingRequest` — pure table mutation
-- `didCloseFile` — uses `asyncSpawn ls.checkFile`, not `await`
-- `makeIdleFile` — calls sync `didCloseFile`
 - `addFileToOpenFiles` — stash write + table mutation + slot assignment
 - `queryFile` — enqueue only, returns `Future[seq[Suggest]]` for caller to await
 
@@ -480,43 +477,38 @@ entire chain resolves — which for an infinite loop means never (ORC heap corru
 
 ## Unknown-file routing / DID_OPEN branch
 
-The old `warnIfUnknown` family is replaced by inline logic in `processLangserverQueue`'s
-`DID_OPEN` branch (`dispatcher.nim`). On open:
+`DID_OPEN` in `processLangserverQueue` (`dispatcher.nim`). On open:
 
-1. `isKnownByANimsuggestSlot(pool, uri)` — checks all live slots concurrently; returns
-   the first slot that knows this file, or none.
-2. If known → `addFileToOpenFiles(slot, textDocument)` — assign directly.
-3. If unknown → determine `projectFile` via `getIntendedProject(ls, uri)` (projectMapping
+1. Wait for `lsInitialized` — blocks the queue until config + entry-point spawns are done.
+2. `isKnownByANimsuggestSlot(pool, uri)` — checks all live slots; returns the first that
+   knows this file, or none.
+3. If known → `addFileToOpenFiles(slot, textDocument)` — assign directly.
+4. If unknown → determine `projectFile` via `getIntendedProject(ls, uri)` (projectMapping
    regex lookup, falling back to the file itself as orphan entry point).
-4. If `pool.canSpawn` → create new `NimsuggestSlot`, `execSpawn`, then
-   `asyncSpawn processNimsuggestQueries(slot, pool)`.
-5. If pool at capacity → `nimsuggestSlotToEvict(pool)` (LRU among CRASHED→STOPPING→READY→SPAWNING),
-   drain and clear its pending queries, `execStop`, then spawn new slot as in step 4.
-
-> **⚠ Known bugs in the DID_OPEN branch (2026-08-07)**:
-> - (a) `execSpawn` is called with `await` inline in the queue drain coroutine, blocking
->   all other queued items for the full cold-compile time (~11s). Must be offloaded via
->   `asyncSpawn`.
-> - (b) After the async `isKnownByANimsuggestSlot` call, the newly created `newSlot` is
->   not used in `addFileToOpenFiles` — the pre-spawn check result is passed instead.
-> - (c) No re-entry guard exists after `await isKnownByANimsuggestSlot` returns; concurrent
->   DID_OPENs for the same URI can split ownership between two slots.
->
-> See `rewrite_analysis/2026-08-07_STATE_OF_THE_REPO.md` P0/P1 for full details.
+5. `await execSpawn(newSlot, ...)` — blocks the queue until nimsuggest is live. Intentional;
+   see design philosophy.
+6. `asyncSpawn processNimsuggestQueries(slot, pool)` — starts the per-slot drain loop.
+7. Consolidation: query other slots via `known` to detect if the new slot subsumes them;
+   transfer ownership and stop subsumed slots.
 
 ---
 
-## `getWorkspaceConfiguration` behaviour
+## Configuration changes
 
-Three procs, different semantics:
-- `getWorkspaceConfiguration()` — returns current state immediately, empty if not yet received
-- `getAndWaitForWorkspaceConfiguration()` — directly awaits the shared future (deadlock risk in sync)
-- `waitForWorkspaceConfiguration()` — polls with 50ms intervals, 30s timeout, safe in async;
-  does NOT cancel the shared future
+`workspace/didChangeConfiguration` notifications are processed in the `DID_CHANGE_CONFIGURATION`
+branch of the dispatcher. When received:
 
-**Never pass `ls.configurations.configReady` (or `ls.workspaceConfiguration` in older code)
-to `utils.withTimeout`** — that proc cancels the future on timeout. Cancelling a shared
-future breaks all other awaiters.
+1. If using the pull model (`usePullConfigurationModel()`), call `workspace/configuration`
+   to fetch the current config from the client.
+2. Compare to the stored config via `isDifferentFrom`. If different, update
+   `ls.configurations.currentConfig` and clear the compiled regex cache.
+3. Fire `ls.configurations.configReady` unconditionally (unblocks any startup waiters).
+
+**Nimsuggest instances are never automatically restarted on config change.** Most config
+fields (checkOnSave, inlayHints, logNimsuggest, etc.) take effect on the next request
+without a restart, since `currentConfig` is read at call time. If a user changes
+`nimsuggestPath` or `projectMapping` and needs new instances to reflect the change, they
+should use the "Restart nimsuggest" code action.
 
 ---
 
@@ -548,13 +540,13 @@ structure above).
 | `textDocument/declaration` | `request_text_document.nim` | `declaration` | yes |
 | `textDocument/typeDefinition` | `request_text_document.nim` | `type` | yes |
 | `textDocument/documentSymbol` | `request_text_document.nim` | `outline` | yes |
-| `textDocument/hover` | `request_text_document.nim` | `highlight`, `expand`? | yes |
+| `textDocument/hover` | `request_text_document.nim` | `highlight` | yes |
 | `textDocument/references` | `request_text_document.nim` | `use` | no |
 | `textDocument/prepareRename` | `request_text_document.nim` | `def` | yes |
 | `textDocument/rename` | `request_text_document.nim` | `use` | yes |
 | `textDocument/inlayHint` | `request_text_document.nim` | `inlayHints` | yes |
 | `textDocument/signatureHelp` | `request_text_document.nim` | `con` | yes |
-| `textDocument/formatting` | `request_text_document.nim` | none (nimpretty) | yes |
+| `textDocument/formatting` | `request_text_document.nim` | none (nph) | yes |
 | `textDocument/documentHighlight` | `request_text_document.nim` | `highlight` | yes |
 | `textDocument/codeAction` | `request_text_document.nim` | none (static list) | no |
 | `workspace/executeCommand` | `request_workspace.nim` | `recompile`, `chk` | no |
@@ -583,7 +575,7 @@ structure above).
 | `textDocument/didClose` | `notification_files.nim` → `dispatcher.nim` | none | `openFiles`, `slot.ownedUris` |
 | `workspace/didRenameFiles` | `notification_files.nim` | `recompile` | `openFiles`, `slot.ownedUris` |
 | `workspace/didDeleteFiles` | `notification_files.nim` | `recompile` | `openFiles`, `slot.ownedUris` |
-| `workspace/didChangeConfiguration` | `notification_files.nim` | none/restart all | config — **incomplete** |
+| `workspace/didChangeConfiguration` | `notification_files.nim` | none | config updated in-place |
 | `$/cancelRequest` | `notification_process.nim` | none | `pendingRequests` |
 | `$/setTrace` | `notification_process.nim` | none | — |
 
@@ -608,124 +600,54 @@ when it detects the file is unknown to the running instance (fix #18).
 
 ### P1 — Runtime bugs
 
-1. **DID_OPEN blocks the queue**: `await execSpawn(...)` inline in `processLangserverQueue`
-   blocks all subsequent queued items for ~11s cold-compile time. Must be offloaded via
-   `asyncSpawn`; assign slot to `openFiles` optimistically with pending state.
-2. **DID_OPEN re-entry race**: no guard after `await isKnownByANimsuggestSlot` returns;
-   concurrent DID_OPENs for the same URI can split ownership between two slots.
-3. **Stash persists after save** (`dispatcher.nim` DID_SAVE): the stash file is written on
-   `didChange` but never deleted on `didSave`. `uriToStash` always returns the stash path
-   for open files, so post-save HOVER/INLAY_HINTS pass the pre-save stash to nimsuggest.
-   Fix: delete the stash file in the DID_SAVE path so `uriToStash` returns `""`.
-4. **Slot eviction mailbox drain race** (`dispatcher.nim`): futures completed with `@[]`
+1. **Slot eviction mailbox drain race** (`dispatcher.nim`): futures completed with `@[]`
    while `processNimsuggestQueries` may be completing the same futures — violates
    single-write invariant.
 
 ### P1 — Stub features (not yet implemented)
 
-5. **`extension/macroExpand`** — stub; macro expansion completely unavailable.
-6. **`extension/suggest` (restart action)** — stub; no manual nimsuggest restart button.
-7. **`extension/status` / `extension/capabilities`** — stubs; VS Code status bar empty.
-8. **Per-file diagnostics only triggered by save**: `tickFileChecks` and `checking.nim` no
-   longer exist. Diagnostics (`CHECK_FILE`) are only enqueued after a `CHANGED` command
-   completes in `processNimsuggestQueries`. Files that are open but not explicitly saved
-   receive no periodic re-check; `lastChanged`/`lastChecked` exist on `NlsFileInfo` but
-   are not currently used to drive any background polling loop.
-9. **`didChangeConfiguration` incomplete** (`dispatcher.nim`): config changes to
-   `nimsuggestIdleTimeout`, `projectMapping`, etc. are silently ignored.
+2. **`extension/macroExpand`** — stub; macro expansion completely unavailable.
+3. **`extension/suggest` (restart action)** — stub; no manual nimsuggest restart button.
+4. **`extension/status` / `extension/capabilities`** — stubs; VS Code status bar empty.
+5. **Per-file diagnostics only triggered by save**: Diagnostics (`CHECK_FILE`) are only
+   enqueued after a `CHANGED` command completes in `processNimsuggestQueries`. Files that
+   are open but not explicitly saved receive no periodic re-check.
 
 ---
 
 ## Consolidated invariants
 
-These constraints must hold in all future code. Learned from hard-to-debug crashes.
+These constraints must hold in all future code.
 
-1. **Clear `errorCallback` before `project.stop()`** — any intentional stop must set
-   `project.errorCallback = none(ProjectCallback)` first. Otherwise in-flight TCP commands
-   trigger `onErrorCallback` on the killed process, adding spurious entries to `crashedFiles`
-   and launching a competing auto-restart. Established by fix #13/14; currently upheld in
-   the `restart` template and `warnIfUnknown`. Any new code that stops a project must do the same.
-
-2. **Snapshot `slot.ownedUris` before async iteration** — `for uri in slot.ownedUris.toSeq:` not
+1. **Snapshot `slot.ownedUris` before async iteration** — `for uri in slot.ownedUris.toSeq:` not
    `for uri in slot.ownedUris:`. Any `await` inside the loop body allows `didCloseFile` to call
-   `unassignUri`, mutating the set while the iterator is live (fix #14).
+   `unassignUri`, mutating the set while the iterator is live.
 
-3. **`didSave` must unblock `crashedFiles` before `tryGetNimsuggest`** — `tryGetNimsuggest`
-   returns early if `project.failed`. Unblocking must come first so the save triggers recovery,
-   not a silent no-op (fix #12 Bug C).
+2. **Never cancel `ls.configurations.configReady`** — it is a shared `AsyncEvent`; any
+   waiter blocked on it will never unblock if the event is cancelled. Do not pass it to
+   `utils.withTimeout` or any proc that cancels on timeout. Use polling loops with
+   `sleepAsync` instead.
 
-4. **Never pass `ls.workspaceConfiguration` to `utils.withTimeout`** — `withTimeout` cancels
-   the future on timeout. `ls.workspaceConfiguration` is a shared future; cancelling it breaks
-   all other awaiters (all `waitForWorkspaceConfiguration` callers). Use the polling approach in
-   `waitForWorkspaceConfiguration` instead.
-
-5. **`var p: AsyncProcessRef` in try blocks must check `if p != nil:` in `finally`** — if
+3. **`var p: AsyncProcessRef` in try blocks must check `if p != nil:` in `finally`** — if
    `startProcess` raises before assigning `p`, the `finally` block runs with `p = nil`.
-   `shutdownChildProcess(nil)` immediately dereferences the nil ref → SIGSEGV (fix #15).
+   `shutdownChildProcess(nil)` immediately dereferences the nil ref → SIGSEGV.
 
-6. **`createOrRestartNimsuggest` reserves the slot before the first `await`** — the initial
-   `ls.projectFiles[pf] = Project(ns: pending)` is synchronous and must remain so. Moving it
-   past an `await` would allow concurrent callers to each spawn a new process for the same project.
-
-7. **`warnIfUnknown` is fire-and-forget** — it must not block `didOpenFile`. Use
-   `traceAsyncErrors` or `asyncSpawn`, not `await`. Blocking here would delay the `didOpen`
-   response and prevent VS Code from sending subsequent requests.
-
-8. **`projectErrors` in `extension/statusUpdate` shows commands that failed *after* the crash**,
+4. **`projectErrors` in `extension/statusUpdate` shows commands that failed *after* the crash**,
    not the one that caused it. To find the triggering command, look for the last `DBG Started...`
    with no matching `DBG CPU Time` line.
 
-9. **Use `.file` to distinguish a redirect alias from a real project entry** — after
-   `ls.projectFiles[A] = ls.projectFiles[B]`, the entry at key `A` has `.file = B.file`.
-   Any guard that checks "is there a good nimsuggest for key `K`?" must also verify
-   `ls.projectFiles[K].file == K`. A redirect alias satisfying `ns.finished and not ns.failed`
-   does not mean there is a running nimsuggest for project `K` — it means some other project
-   is running and was aliased there. Violating this causes guards to falsely skip needed
-   restarts (fix #18 cascade bug, `error_trace25.txt`, `error_trace26.txt`).
+5. **Stash path uses SHA-1** (`langserver/langserver_utils.nim`: `uriStorageLocation`) —
+   `secureHash(string(uri)) & ".nim"` gives ~2^-80 collision probability, acceptable.
+   Do not revert to `hash(uri).toHex` (64-bit, collision-prone).
 
-10. **Cascade prevention in standalone restarts** — cascade prevention only applies to the
-    "kill and replace" path (redirect aliases exist only there). Check whether the project
-    slot is a redirect alias (`ls.projectFiles[projectFile].file != projectFile`). If so,
-    another standalone restart is already active for a different file; return early unless
-    `path == projectFile`. The "spawn alongside" path never creates redirect aliases and
-    does not need this guard — `shouldSpawnNimsuggest()` already prevents over-spawning.
+6. **Guard `fileInfo.slot` before use in `didClose`/`didSave` paths** — `slot` in
+   `NlsFileInfo` may be nil if `didClose` fires for a URI whose `didOpen` has not yet
+   completed slot assignment. Always check `if fileInfo.slot != nil:` before accessing
+   `fileInfo.slot.queryMailbox` or calling `slot.unassignUri`.
 
-11. **Snapshot `ls.projectFiles.keys` before iterating in `restartAllNimsuggestInstances`**
-    — `createOrRestartNimsuggest` creates a sentinel entry in `ls.projectFiles` synchronously
-    before the first `await`. Iterating the live key set while it mutates causes entries to
-    be skipped or the iterator to observe unexpected keys. Always `for k in ls.projectFiles.keys.toSeq:`
-    in any loop that calls `createOrRestartNimsuggest` inside it.
-
-12. **Reassign `uri`'s projectFile future BEFORE calling `createOrRestartNimsuggest` in
-    the "spawn alongside" path** — the addCallback re-registration loop inside
-    `createOrRestartNimsuggest` checks `fileInfo.projectFile.read() == projectFile`
-    (where `projectFile` is the new standalone path). If the reassignment happens AFTER the
-    call, the callback may fire before the future is updated and miss adding `uri` to the
-    new slot's `ownedUris`. Reassign first, then spawn.
-
-*(Invariants 13–16 apply to the `dp-rewrite` branch architecture only.)*
-
-13. **`execSpawn` must not be `await`-ed inline in `processLangserverQueue`** — the queue
-    drain coroutine is the single FIFO serialization point for all LSP work. Blocking it
-    with `await execSpawn(...)` during cold-compile (~11s) freezes hover/completion/definition
-    for all already-open files for the full duration. Always offload spawns via `asyncSpawn`
-    and assign the file to `openFiles` optimistically with a pending slot state.
-
-14. **Re-entry guard required after every `await` in DID_OPEN** — between
-    `isKnownByANimsuggestSlot` (async) and `addFileToOpenFiles`, another coroutine can open
-    the same URI. After every `await` in the DID_OPEN path, re-check `if uri in
-    ls.files.openFiles` before proceeding. A single guard before the first `await` is
-    insufficient.
-
-15. **Stash path uses SHA-1** (`langserver/utils.nim`: `uriStorageLocation`) — fixed.
-    `secureHash(string(uri)) & ".nim"` gives ~2^-80 collision probability, acceptable.
-    Previous versions used `hash(uri).toHex` (64-bit, collision-prone); that is gone.
-
-16. **Guard `fileInfo.slot` before use in `didClose`/`didSave` paths** — `slot` in
-    `NlsFileInfo` may be nil if `didClose` fires for a URI whose `didOpen` has not yet
-    completed slot assignment (nimsuggest still cold-compiling). Always check
-    `if fileInfo.slot != nil:` before `fileInfo.slot.unassignUri(uri)` or accessing
-    `fileInfo.slot.queryMailbox`.
+7. **Infinite loops must use `while true` + `await sleepAsync`**, never tail recursion
+   (`await self()`). Each tail call creates a new Future that is never freed until the
+   chain resolves — for an infinite loop, never — corrupting the heap under ORC.
 
 ---
 

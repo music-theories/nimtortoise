@@ -461,14 +461,13 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
         let oldConfiguration = ls.configurations.currentConfig
         let newConfiguration = parseDidChangeConfiguration(receivedConfigJson)
 
-        let newConfigurationIsDifferent = isDifferentFrom(newConfiguration, ls.configurations.currentConfig)
+        let newConfigurationIsDifferent = isDifferentFrom(newConfiguration, oldConfiguration)
 
         if newConfigurationIsDifferent:
           clearCompiledRegexCache()
           ls.configurations.currentConfig = newConfiguration
-          ls.configurations.configReady.fire()
 
-          ls.pool.restartAllNimsuggestInstances(newConfiguration)
+        ls.configurations.configReady.fire()
 
       of FileAccessQueryKind.FORMATTING:
         let uri = q.formatting.textDocument.uri
