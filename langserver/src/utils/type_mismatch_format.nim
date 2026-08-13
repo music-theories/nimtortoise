@@ -267,7 +267,7 @@ proc formatTypeMismatch*(msg: string): string =
     let idxLabel = "[" & $arg.index & "]"
     if arg.index == p.mismatchPos:
       if p.expectedType.len > 0:
-        output.add("✗  " & idxLabel & " `" & p.expectedType & "` should be `" & arg.actualType & "`")
+        output.add("✗  " & idxLabel & " `" & arg.actualType & "` should be `" & p.expectedType & "`")
       else:
         output.add("✗  " & idxLabel & " " & arg.actualType)
     else:
