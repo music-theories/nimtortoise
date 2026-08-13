@@ -750,6 +750,7 @@ proc newCodeLens*(
 ): VscodeCodeLens {.importcpp: "(new #.CodeLens(@))".}
 
 proc uriFile*(vscode: Vscode, file: cstring): VscodeUri {.importcpp: "(#.Uri.file(@))".}
+proc uriParse*(vscode: Vscode, uri: cstring): VscodeUri {.importcpp: "(#.Uri.parse(@))".}
 proc newWorkspaceFolderLike*(
   uri: VscodeUri, name: cstring, index: cint
 ): VscodeWorkspaceFolder {.importcpp: "({uri:#, name:#, index:#})".}

@@ -61,6 +61,23 @@ proc displayStatusInWebview(status: NimLangServerStatus) =
   )
   panel.webview.html = getWebviewContent(status)
 
+proc toRelPath(absolutePathOrUri: cstring): cstring =
+  ## Returns path relative to the first workspace folder, or the original
+  ## value if no workspace is open or the value is not under the workspace root.
+  ## Accepts both plain file paths and file:// URIs.
+  let fsPath =
+    if ($absolutePathOrUri).startsWith("file://"):
+      vscode.uriParse(absolutePathOrUri).fsPath
+    else:
+      absolutePathOrUri
+  if vscode.workspace.workspaceFolders.toJs().to(bool) and
+      vscode.workspace.workspaceFolders.len > 0:
+    let root = vscode.workspace.workspaceFolders[0].uri.fsPath
+    let rel = path.relative(root, fsPath)
+    if rel.len > 0:
+      return rel
+  fsPath
+
 
 proc newLspItem*(
     label: cstring,
@@ -329,161 +346,122 @@ proc newCheckProjectItem(): LspItem =
 proc getChildrenImpl(
     self: NimLangServerStatusProvider, element: LspItem = nil
 ): seq[LspItem] =
-  if element.isNil: #Root
-    var rootItems =  @[
+  # --- Root ---
+  if element.isNil:
+    let pendingCount =
+      if self.status.isSome: self.status.get.pendingRequests.len else: 0
+    let pendingDesc = if pendingCount > 0: cstring($pendingCount) else: "".cstring
+    var rootItems = @[
       newLspItem("LSP Status", "", "", TreeItemCollapsibleState_Collapsed),
+      newLspItem("Pending Requests", pendingDesc, "", TreeItemCollapsibleState_Collapsed),
+      newLspItem("Nimsuggest Pool", "", "", TreeItemCollapsibleState_Expanded),
     ]
     if excNimbleTask in ext.lspExtensionCapabilities:
       rootItems.add(newLspItem("Nimble Tasks", "", "", TreeItemCollapsibleState_Expanded))
-    
     rootItems.add(newLspItem("LSP Notifications", "", "", TreeItemCollapsibleState_Expanded))
     return rootItems
+
+  # --- Notifications (no status needed) ---
   elif element.label == "LSP Notifications":
-    return
-      globalNotificationActionItems() & self.notifications.mapIt(
-        newNotificationItem(it)
-      )
+    return globalNotificationActionItems() &
+      self.notifications.mapIt(newNotificationItem(it))
   elif element.isNotificationItem:
     return notificationActionItems(element)
+
+  # --- Nimble Tasks (no status needed) ---
+  elif element.label == "Nimble Tasks":
+    var seen: seq[cstring]
+    var groupItems: seq[LspItem] = @[newRefreshNimbleTasksItem()]
+    for task in ext.nimbleTasks:
+      if task.projectDir notin seen:
+        seen.add(task.projectDir)
+        groupItems.add(newNimbleProjectItem(task.projectDir))
+    return groupItems
+  elif cast[LspItem](element).nimbleProjectDir != "":
+    let dir = cast[LspItem](element).nimbleProjectDir
+    return ext.nimbleTasks.filterIt(it.projectDir == dir).mapIt(newNimbleTaskItem(it))
+
+  # --- Everything else requires status ---
   else:
     if self.status.isNone:
-      return
-        @[
-          newLspItem(
-            "Waiting for nimlangserver to init", "", "", TreeItemCollapsibleState_None
-          )
-        ]
+      return @[newLspItem("Waiting for nimlangserver to init", "", "", TreeItemCollapsibleState_None)]
+
+    let status = self.status.get
+
     if element.label == "LSP Status":
-      var topElements =
-        @[
-          newCheckProjectItem(),
-          newLspItem("Langserver",  self.status.get.lspPath),
-          newLspItem("Version", self.status.get.version),
-          newLspItem("NimSuggest Instances", "", "", TreeItemCollapsibleState_Expanded),
-        ] &
-        self.status.get.openFiles.mapIt(
-          newLspItem("Open File:", it, "", TreeItemCollapsibleState_Collapsed)
-        )
-      if excRestartSuggest in ext.lspExtensionCapabilities:
-        topElements.insert(
-          newRestartItem("Restart All nimsuggest", "", "restartAll"),
-          topElements.len - 2,
-        )
-      if self.status.get.pendingRequests.len > 0:
-        topElements.add(
-          newLspItem(
-            &"Pending Requests ({self.status.get.pendingRequests.len})",
-            "",
-            "",
-            TreeItemCollapsibleState_Expanded,
-          )
-        )
-      if self.status.get.projectErrors.len > 0:
-        let iconPath = some vscode.themeIcon(
-          "error", vscode.themeColor("notificationsErrorIcon.foreground")
-        )
-        topElements.add(
-          newLspItem(
-            &"Project Errors ({self.status.get.projectErrors.len})",
-            "",
-            "",
-            TreeItemCollapsibleState_Expanded,
-            iconPath = iconPath,
-          )
-        )
-      return topElements
-    elif element.label == "Open File:" and
-        excRestartSuggest in ext.lspExtensionCapabilities:
-      return @[newRestartItem("Restart", $element.description, "restart")]
-    elif ($element.label).contains("Project Errors"):
-      let projectErrors = self.status.get.projectErrors
-      return projectErrors.mapIt(
-        newLspItem(
-          it.projectFile,
-          "",
-          "",
-          TreeItemCollapsibleState_Expanded,
-          projectError = some it,
-        )
-      )
-    elif element.projectError.to(Option[ProjectError]).isSome:
-      let pe = element.projectError.to(Option[ProjectError]).get()
-      return
-        @[
-          newLspItem(
-            "Nimsuggest instance", pe.projectFile, "", TreeItemCollapsibleState_None
-          ),
-          newLspItem("Error:", pe.errorMessage, "", TreeItemCollapsibleState_None),
-          newLspItem(
-            "Last Known Ns Cmd:", pe.lastKnownCmd, "", TreeItemCollapsibleState_None
-          ),
-        ]
-    elif ($element.label).contains("Pending Requests"):
-      let pendingRequests = self.status.get.pendingRequests
-      return pendingRequests.mapIt(
-        newLspItem(
-          it.name, "", "", TreeItemCollapsibleState_Expanded, pendingRequest = some it
-        )
+      return @[
+        newLspItem("Langserver", status.lspPath),
+        newLspItem("Version", status.version),
+      ]
+
+    elif element.label == "Pending Requests":
+      let reqs = status.pendingRequests
+      if reqs.len == 0:
+        return @[newLspItem("None", "", "", TreeItemCollapsibleState_None)]
+      return reqs.mapIt(
+        newLspItem(it.name, "", "", TreeItemCollapsibleState_Expanded, pendingRequest = some it)
       )
     elif element.pendingRequest.to(Option[PendingRequestStatus]).isSome:
       let pr = element.pendingRequest.to(Option[PendingRequestStatus]).get()
-      let timeTitle = if pr.state == "OnGoing": "Waiting for " else: "Took"
-      var prElements =
-        @[
-          newLspItem(timeTitle.cstring, pr.time, "", TreeItemCollapsibleState_None),
-          newLspItem("State", (pr.state).cstring, "", TreeItemCollapsibleState_None),
-        ]
+      let timeTitle = if pr.state == "OnGoing": "Waiting for" else: "Took"
+      var prItems = @[
+        newLspItem(timeTitle.cstring, pr.time, "", TreeItemCollapsibleState_None),
+        newLspItem("State", pr.state.cstring, "", TreeItemCollapsibleState_None),
+      ]
       if pr.projectFile != "":
-        prElements.add(
-          newLspItem("NimSuggest", pr.projectFile, "", TreeItemCollapsibleState_None)
-        )
-      return prElements
-    elif element.label == "NimSuggest Instances":
-      # Children of Nim Suggest Instances
-      var instances = self.status.get.nimsuggestInstances.mapIt(
-        newLspItem(it.projectFile, "", "", TreeItemCollapsibleState_Collapsed, some it)
-      )
-      return instances
-    elif element.label == "Open Files": #come from below
-      return element.instance.get.openFiles.mapIt(
-        newLspItem("File:", it, "", TreeItemCollapsibleState_None)
-      )
-    elif element.instance.isSome:
-      # Children of a specific instance
-      let instance = element.instance.get
-      var nsItems =
-        @[
-          newLspItem("Project File", instance.projectFile),
-          newLspItem("Capabilities", instance.capabilities.join(", ").cstring),
-          newLspItem("Version", instance.version),
-          newLspItem("Path", instance.path),
-          newLspItem("Port", cstring($instance.port)),
-          newLspItem(
-            "Open Files",
-            "",
-            "",
-            TreeItemCollapsibleState_Collapsed,
-            instance = element.instance,
-          ),
-          newLspItem("Unknown Files", instance.unknownFiles.join(", ").cstring),
-        ]
+        prItems.add(newLspItem("NimSuggest", pr.projectFile, "", TreeItemCollapsibleState_None))
+      return prItems
+
+    elif element.label == "Nimsuggest Pool":
+      var items: seq[LspItem]
       if excRestartSuggest in ext.lspExtensionCapabilities:
-        let restartItem = newRestartItem("Restart", $instance.projectFile, "restart")
-        nsItems.insert(restartItem, 0)
+        items.add(newRestartItem("Restart All Nimsuggest", "", "restartAll"))
+      items &= status.nimsuggestInstances.mapIt(
+        newLspItem(toRelPath(it.projectFile), "", "", TreeItemCollapsibleState_Collapsed, some it)
+      )
+      return items
+
+    elif element.label == "Open Files" and element.instance.isSome:
+      let files = element.instance.get.openFiles
+      if files.len == 0:
+        return @[newLspItem("None", "", "", TreeItemCollapsibleState_None)]
+      return files.mapIt(newLspItem(toRelPath(it), "", "", TreeItemCollapsibleState_None))
+
+    elif ($element.label).startsWith("Project Errors") and element.instance.isSome:
+      let projectFile = element.instance.get.projectFile
+      let errors = status.projectErrors.filterIt(it.projectFile == projectFile)
+      if errors.len == 0:
+        return @[newLspItem("None", "", "", TreeItemCollapsibleState_None)]
+      return errors.mapIt(
+        newLspItem(toRelPath(it.projectFile), "", "", TreeItemCollapsibleState_Expanded, projectError = some it)
+      )
+    elif element.projectError.to(Option[ProjectError]).isSome:
+      let pe = element.projectError.to(Option[ProjectError]).get()
+      return @[
+        newLspItem("Error:", pe.errorMessage, "", TreeItemCollapsibleState_None),
+        newLspItem("Last Known Cmd:", pe.lastKnownCmd, "", TreeItemCollapsibleState_None),
+      ]
+
+    elif element.instance.isSome:
+      # Per-instance children
+      let instance = element.instance.get
+      let errorCount = status.projectErrors.filterIt(it.projectFile == instance.projectFile).len
+      let errorLabel =
+        if errorCount > 0: cstring(&"Project Errors ({errorCount})")
+        else: "Project Errors".cstring
+      var nsItems = @[
+        newCheckProjectItem(),
+        newLspItem("Capabilities", instance.capabilities.join(", ").cstring),
+        newLspItem("Version", instance.version),
+        newLspItem("Path", instance.path),
+        newLspItem("Port", cstring($instance.port)),
+        newLspItem("Open Files", "", "", TreeItemCollapsibleState_Collapsed, instance = element.instance),
+        newLspItem(errorLabel, "", "", TreeItemCollapsibleState_Collapsed, instance = element.instance),
+      ]
+      if excRestartSuggest in ext.lspExtensionCapabilities:
+        nsItems.insert(newRestartItem("Restart", $instance.projectFile, "restart"), 1)
       return nsItems
-    elif element.label == "Nimble Tasks":
-      # One collapsible group per distinct projectDir, preceded by the refresh button.
-      var seen: seq[cstring]
-      var groupItems: seq[LspItem] = @[newRefreshNimbleTasksItem()]
-      for task in ext.nimbleTasks:
-        if task.projectDir notin seen:
-          seen.add(task.projectDir)
-          groupItems.add(newNimbleProjectItem(task.projectDir))
-      return groupItems
-    elif cast[LspItem](element).nimbleProjectDir != "":
-      # Children of a project group: all tasks belonging to this projectDir.
-      let dir = cast[LspItem](element).nimbleProjectDir
-      return ext.nimbleTasks.filterIt(it.projectDir == dir).mapIt(newNimbleTaskItem(it))
+
     return @[]
 
 proc getTreeItemImpl(

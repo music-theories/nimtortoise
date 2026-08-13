@@ -15,6 +15,60 @@ A fork and rewrite of [`nimlangserver`](https://github.com/nim-lang/langserver) 
 
 `Nim Tortoise` aims to prioritise correctness over speed.  In other words, it might work slower than the other nim language servers, but it will give you the correct information and not crash every 10 minutes.
 
+
+## What's in This Repository
+
+| Directory | What it is |
+|-----------|------------|
+| [`langserver/`](langserver/) | The Nim language server — a ground-up rewrite of `nimlangserver` |
+| [`vscode_extension/`](vscode_extension/) | The VS Code extension — an LSP-only fork of `vscode-nim` |
+
+The two components are designed to work together but are independent. The language server speaks standard LSP and will work with any LSP-capable editor.
+
+You should be able to use `nimtortoise` as a drop-in replacement for `nimlangserver`, but I would recommend using the VS Code extension, as it removes many inefficiencies.  Note: The extension is written in Nim and compiled to JavaScript. It is not a TypeScript extension.
+
+## Getting Started
+
+### Requirements
+
+- Nim with `nimsuggest` (`--v4` support, i.e. Nim 1.6+)
+- `nimble >= 0.16.1`
+- VS Code `>= 1.99.0` (for the extension)
+
+Currently, I haven't set up the extension to automatically compile and use the nimtortoise server, so you'll have to build the server from source, store it somewhere, then build the extension, and set up the `settings.json` in your project to point the `"nimTortoise.lsp.path"` setting to the compiled `nimtortoise` binary.  
+
+## To Use
+
+### 1. Build the language server
+
+```sh
+cd langserver
+nimble build      # produces the nimtortoise binary in `bin`
+```
+
+### 2. Build the VS Code extension
+
+```sh
+cd vscode_extension
+nimble vsix            # packages out/vscode_nim_tortoise-<version>.vsix
+```
+
+### 3. Point the extension at the binary
+
+Add to `.vscode/settings.json` in your project:
+
+```json
+{
+  "nimTortoise.lsp.path": "/path/to/your/nimtortoise"
+}
+```
+
+If omitted, the extension defaults to the `nimlangserver` server, and  searches `~/.vscode-nim-tortoise/nimbledeps/bin/nimlangserver` then `nimlangserver` in `PATH`.
+
+### 4. Install the VS Code Extension
+
+Uninstall or disable any other Nim Language extensions, as they will conflict with `Nim Tortoise`.  Then, in VS Code, find your compiled `.vsix` file in the file explorer (it will be in the `vscode_extension/out` folder), right click on it, and choose `Install Extension VSIX`.
+
 ## Motivations: Why Rewrite?
 
 I have been writing `nim` code since 2022 and have been coding with it daily since 2023.  At no point during this period has the combination of `nimlangserver` + `IDE` worked correctly for any of my projects.  Although I mainly use VS Code, I tried a number of different IDEs, with the same results.  I tried almost every possible configurtion of extension, IDE, and language server - with me eventually deciding to run the official VS Code Extension ([`vscode-nim`](https://github.com/nim-lang/vscode-nim)) with `nimsuggest` disabled, so I would get the text coloration but without it continuously rinsing my CPU at 100% for minutes at a time and destroying my battery-life.  
@@ -43,56 +97,6 @@ The `Nim Tortoise` rewrite prioritises three things:
 - Correctness > Speed: The information the language server provides about your code should always be correct and up-to-date.  At every point correctness will be picked over speed.  I don't mind having to wait an extra second if it means the that my IDE is going to show me information that is actually right and relevant.  This is more tortoise than hare.
 - Stability: The language server should be stable- not  constantly crashing - I have work to do!
 - Efficiency: The language server does have to deal with a lot of files, but it shouldn't be turning your laptop into a stellar-hot chunk while its working.  I aim for the language server to be CPU light.  
-
-## What's in This Repository
-
-| Directory | What it is |
-|-----------|------------|
-| [`langserver/`](langserver/) | The Nim language server — a ground-up rewrite of `nimlangserver` |
-| [`vscode_extension/`](vscode_extension/) | The VS Code extension — an LSP-only fork of `vscode-nim` |
-
-The two components are designed to work together but are independent. The language server speaks standard LSP and will work with any LSP-capable editor.
-
-You should be able to use `nimtortoise` as a drop-in replacement for `nimlangserver`, but I would recommend using the VS Code extension, as it removes many inefficiencies.
-
-## Getting Started
-
-### Requirements
-
-- Nim with `nimsuggest` (`--v4` support, i.e. Nim 1.6+)
-- `nimble >= 0.16.1`
-- VS Code `>= 1.99.0` (for the extension)
-
-### Build the language server
-
-```sh
-cd langserver
-nimble build      # produces the nimtortoise binary
-```
-
-### Build and install the VS Code extension
-
-```sh
-cd vscode_extension
-nimble vsix            # packages out/vscode_nim_tortoise-<version>.vsix
-nimble install_vsix    # installs it into VS Code
-```
-
-The extension is written in Nim and compiled to JavaScript. It is not a TypeScript extension.
-
-### Point the extension at the binary
-
-Add to `.vscode/settings.json` in your project:
-
-```json
-{
-  "nimTortoise.lsp.path": "/path/to/your/nimtortoise"
-}
-```
-
-Currently, I haven't set up the extension to automatically compile and use the nimtortoise server, so you'll have to build the server from source, using `nimble build`, store it somewhere, then build the extension, and set up the `settings.json` in your project to point the "nimTortoise.lsp.path" setting to the compiled `nimtortoise` binary.  This will be fixed in later versions.
-
-If omitted, the extension defaults to the `nimlangserver` server, and  searches `~/.vscode-nim-tortoise/nimbledeps/bin/nimlangserver` then `nimlangserver` in `PATH`.
 
 ---
 
@@ -187,19 +191,6 @@ Several LSP notifications had no handler at all:
 ### Nim check and nimsuggest running in parallel
 
 The original codebase used both `nim check` and `nimsuggest` for diagnostics, depending on settings. When both were active, they ran concurrently against the same files, producing duplicate or contradictory diagnostic sets. `nim check` also added full compiler invocations on every save, contributing to the CPU spikes at startup and after edits.
-
-## Nim Tortoise
-
-I have rewritten the extension and language server to focus on doing one thing well:
-
-- Giving correct information back to the IDE from the language server.
-
-This has meant removing some functionality.  What has been removed:
-
-- Test running: To get the information about what tests are running, the tests need to successfully compile using the nim compiler.  This causes big CPU spikes upon launching the IDE while it gets the test, and it will only succeed if the tests compile.  If I open up an IDE, why do I want to add extra wait time to an already slow startup procedure.
-- MCP functionality: I decided to not support this until I can get the language server running correctly and robustly.
-- Using `nim check` for checking files - everything now uses `nimsuggest`.
-- Using `nimsuggest` rather than the full language server - this was a setting in `nimlangserver` but resulted in a lot of duplicated work.
 
 ## Improvements
 
@@ -317,9 +308,9 @@ The configuration layer was rewritten from a state machine of `Option[T]` fields
 
 ## Reflections (by Claude)
 
-Nim Tortoise started as a collection of targeted bug fixes — a renamed-file handler here, a `PATH` guard there — and grew into a ground-up rewrite once it became clear that the underlying architecture could not be patched into correctness. The core insight driving everything is simple: a language server is a concurrent system serving a single logical resource (the nimsuggest process), and that resource must be accessed under strict ordering guarantees, not optimistic concurrency.
+> "Nim Tortoise started as a collection of targeted bug fixes — a renamed-file handler here, a `PATH` guard there — and grew into a ground-up rewrite once it became clear that the underlying architecture could not be patched into correctness. The core insight driving everything is simple: a language server is a concurrent system serving a single logical resource (the nimsuggest process), and that resource must be accessed under strict ordering guarantees, not optimistic concurrency.
 
-The two-level queue architecture is the rewrite's central success. By funnelling every file event and every nimsuggest query through the same FIFO before anything reaches nimsuggest, the entire class of race-condition bugs — stale hover responses, duplicate diagnostics, incorrect highlights after a rename — is eliminated structurally rather than patched case by case. The same queue enables the deduplication and throttling that keeps CPU usage low: the processor simply inspects what is already waiting in the mailbox before committing to a query.
+> The two-level queue architecture is the rewrite's central success. By funnelling every file event and every nimsuggest query through the same FIFO before anything reaches nimsuggest, the entire class of race-condition bugs — stale hover responses, duplicate diagnostics, incorrect highlights after a rename — is eliminated structurally rather than patched case by case. The same queue enables the deduplication and throttling that keeps CPU usage low: the processor simply inspects what is already waiting in the mailbox before committing to a query."
 
 
 ## Known Limitations
@@ -328,6 +319,17 @@ The two-level queue architecture is the rewrite's central success. By funnelling
 
 - **Macro expansion** (`extension/macroExpand`): always returns null. The "Expand Macro" hover action in VS Code produces no output.
 - **`didChangeConfiguration` over-restarts**: any change to the configuration — including toggling a single inlay hint category — triggers a full pool teardown and rebuild, incurring the cold-compile penalty for every slot.
+
+I have rewritten the extension and language server to focus on doing one thing well:
+
+- Giving correct information back to the IDE from the language server.
+
+This has meant removing some functionality.  What has been removed:
+
+- Test running: To get the information about what tests are running, the tests need to successfully compile using the nim compiler.  This causes big CPU spikes upon launching the IDE while it gets the test, and it will only succeed if the tests compile.  If I open up an IDE, why do I want to add extra wait time to an already slow startup procedure.
+- MCP functionality: I decided to not support this until I can get the language server running correctly and robustly.
+- Using `nim check` for checking files - everything now uses `nimsuggest`.
+- Using `nimsuggest` rather than the full language server - this was a setting in `nimlangserver` but resulted in a lot of duplicated work.
 
 ---
 

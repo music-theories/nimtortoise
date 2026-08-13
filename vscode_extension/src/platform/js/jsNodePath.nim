@@ -29,5 +29,6 @@ proc extname*(p: Path, path: cstring): cstring {.importcpp.}
 proc isAbsolute*(p: Path, path: cstring): bool {.importcpp.}
 proc parse*(p: Path, str: cstring): ParsedPath {.importcpp.}
 proc normalize*(p: Path, str: cstring): cstring {.importcpp.}
+proc relative*(p: Path, fromPath: cstring, toPath: cstring): cstring {.importcpp.}
 
 var path*: Path = require("path").to(Path)
