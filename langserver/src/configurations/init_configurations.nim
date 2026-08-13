@@ -1,4 +1,4 @@
-import std/[json, options]
+import std/[json, options, times]
 import chronos
 import chronicles
 import ./[configuration_types]
@@ -15,13 +15,14 @@ proc initDefaultNlsConfig*(): NlsConfig =
     checkOnSave: false,
     formatOnSave: false,
     # --- Langserver settings --- 
-    langserverTimeout: 120_000, # in MS
+    # langserverTimeout: 1_800_000, # in MS - This is 30 mins
     fileCheckDelay: 1000, # in MS
     # -- Nimsuggest Settings ---
     maxNimsuggestProcesses: 2, # max number of nimsuggest processes to keep alive. 0 means unlimited.
     maxNimsuggestCrashRetries: 3, # auto-restart attempts before giving up on a crashed slot
     nimsuggestPath: "nimsuggest",
-    nimsuggestIdleTimeout: 60_000, #idle timeout in ms,
+    nimsuggestIdleTimeout: initDuration(seconds = 1800), 
+    nimsuggestRequestTimeout: initDuration(seconds = 30), 
     logNimsuggest: true, # TODO - check createNimuggest function
     inlayHints: NlsInlayHintsConfig(
       typeHints: NlsInlayTypeHintsConfig(
@@ -58,8 +59,8 @@ proc nlsConfigFromJson*(json: JsonNode): NlsConfig =
     result.checkOnSave = json["checkOnSave"].getBool()
   if json.hasKey("formatOnSave"):
     result.formatOnSave = json["formatOnSave"].getBool()
-  if json.hasKey("langserverTimeout"):
-    result.langserverTimeout = json["langserverTimeout"].getInt()
+  # if json.hasKey("langserverTimeout"):
+  #   result.langserverTimeout = json["langserverTimeout"].getInt()
   if json.hasKey("fileCheckDelay"):
     result.fileCheckDelay = json["fileCheckDelay"].getInt()
   if json.hasKey("maxNimsuggestProcesses"):
@@ -69,7 +70,9 @@ proc nlsConfigFromJson*(json: JsonNode): NlsConfig =
   if json.hasKey("nimsuggestPath"):
     result.nimsuggestPath = json["nimsuggestPath"].getStr()
   if json.hasKey("nimsuggestIdleTimeout"):
-    result.nimsuggestIdleTimeout = json["nimsuggestIdleTimeout"].getInt()
+    result.nimsuggestIdleTimeout = initDuration(seconds = json["nimsuggestIdleTimeout"].getInt())
+  if json.hasKey("nimsuggestRequestTimeout"):
+    result.nimsuggestRequestTimeout = initDuration(seconds = json["nimsuggestRequestTimeout"].getInt())
   if json.hasKey("logNimsuggest"):
     result.logNimsuggest = json["logNimsuggest"].getBool()
   if json.hasKey("nimExpandArc"):

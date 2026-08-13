@@ -318,11 +318,6 @@
                     "description": "Format the file on save using nph.",
                     "scope": "resource"
                 },
-                "nimTortoise.langserverTimeout": {
-                    "type": "integer",
-                    "default": 120000,
-                    "description": "Timeout in milliseconds for language server requests."
-                },
                 "nimTortoise.fileCheckDelay": {
                     "type": "integer",
                     "default": 1000,
@@ -372,8 +367,13 @@
                 },
                 "nimTortoise.nimsuggestIdleTimeout": {
                     "type": "integer",
-                    "default": 120000,
-                    "description": "Timeout in ms after which an idle nimsuggest process is stopped."
+                    "default": 1800,
+                    "description": "Timeout in seconds after which an idle nimsuggest process is stopped."
+                },
+                "nimTortoise.nimsuggestRequestTimeout": {
+                    "type": "integer",
+                    "default": 30,
+                    "description": "Timeout in seconds to wait for nimsuggest to respond to a request."
                 },
                 "nimTortoise.inlayHints.typeHints.enable": {
                     "type": "boolean",

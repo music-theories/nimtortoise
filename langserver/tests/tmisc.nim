@@ -62,7 +62,7 @@ suite "Nimlangserver misc":
           {"window": {"workDoneProgress": true}, "workspace": {"configuration": true}},
       }
     let initializeResult = waitFor client.initialize(initParams)
-    client.setWorkspaceConfig(%*[{"nimsuggestIdleTimeout": 1000}])
+    client.setWorkspaceConfig(%*[{"nimsuggestIdleTimeout": 1 }]) # This is in seconds
     client.notify("initialized", newJObject())
 
     let helloWorldFile = "projects/hw/hw.nim"
@@ -101,7 +101,7 @@ suite "Nimlangserver idle nimsuggest cleanup":
           {"window": {"workDoneProgress": true}, "workspace": {"configuration": true}},
       }
     discard waitFor client.initialize(initParams)
-    client.setWorkspaceConfig(%*[{"nimsuggestIdleTimeout": 1000}])
+    client.setWorkspaceConfig(%*[{"nimsuggestIdleTimeout": 1}])
     client.notify("initialized", newJObject())
 
     let helloWorldFile = "projects/hw/hw.nim"

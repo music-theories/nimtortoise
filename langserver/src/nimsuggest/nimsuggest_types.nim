@@ -116,7 +116,7 @@ type
     fileCheckDelay*: times.Duration # int   ## Quiet-period threshold in ms before per-file diagnostics run. Set in initNimsuggestInstances.
     nimsuggestPath*: string  ## Path to nimsuggest binary. Set in initNimsuggestInstances.
     nimVersion*: string      ## Nim version string for logging.
-    timeout*: int            ## Per-request timeout in ms.
+    # timeout*: int            ## Per-request timeout in ms.
     notifyProc*: NotifyProc
       ## Sends a JSON-RPC notification to the client (e.g. window/showMessage).
       ## Set by initLanguageServer. May be nil — check before calling.

@@ -60,7 +60,7 @@ proc initLanguageServer*(params: CommandLineParams, storageDir: string): Languag
     slots: initTable[FilePath, NimsuggestSlot](), 
     maxSlots: currentConfig.maxNimsuggestProcesses, 
     fileCheckDelay: initDuration(milliseconds = currentConfig.fileCheckDelay),
-    timeout: currentConfig.langserverTimeout,
+    # timeout: currentConfig.langserverTimeout,
     nimsuggestPath: currentConfig.nimsuggestPath, # Set in initNimsuggestInstances
     nimVersion: "", # Set in initNimsuggestInstances
     notifyProc: proc(meth: string, params: JsonNode) {.gcsafe, raises: [].} =

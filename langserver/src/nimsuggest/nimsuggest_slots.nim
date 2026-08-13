@@ -95,7 +95,7 @@ proc execSpawn*(
         projectFile,
         pool.nimsuggestPath,
         pool.nimVersion,
-        pool.timeout,
+        int(inMilliseconds(config.nimsuggestRequestTimeout)),
         proc(self: Nimsuggest) {.gcsafe, raises: [].} = discard,
         proc(self: Project) {.gcsafe, raises: [].} = discard,
         workingDir = slot.workingDir,
@@ -222,7 +222,7 @@ proc idleSlots*(
   ## Return slots that have exceeded the idle timeout and have no recently-active
   ## open files. The caller (langserver.nim tick) handles file eviction and
   ## notification, since it has access to files.nim procs.
-  let cutoff = times.now() - initDuration(milliseconds = config.nimsuggestIdleTimeout)
+  let cutoff = times.now() - config.nimsuggestIdleTimeout
   for slot in pool.slots.values.toSeq:
     if slot.isLive == false:
       continue

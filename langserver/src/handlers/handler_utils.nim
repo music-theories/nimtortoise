@@ -4,7 +4,7 @@ import regex
 import ../protocol/types
 import ../langserver/[langserver_types]
 import ../nimsuggest/[suggestapi_types, diagnostics, nimsuggest_types]
-import ../utils/utils as globalUtils
+import ../utils/[utils as globalUtils, type_mismatch_format]
 
 proc toUtf8Col*(
   ls: LanguageServer, uri: FileUri, line: int, character: int
@@ -42,7 +42,7 @@ proc toMarkupContent*(suggest: Suggest): MarkupContent =
 
   if suggest.doc.len != 0:
     result.value.add "\n\n---\n"
-    result.value.add toMdLinks(suggest.doc)
+    result.value.add toMdLinks(formatTypeMismatch(suggest.doc))
 
 proc initJsonRange*(startLine, startCharacter, endLine, endCharacter: int): Range =
   return

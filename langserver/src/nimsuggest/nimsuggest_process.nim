@@ -199,6 +199,7 @@ proc processNimsuggestQueries*(
           # === RUNNING NIMSUGGEST QUERY ===
           let queryResponse: seq[Suggest] = await runNimsuggestQuery(slot.ns.read(), q)
           q.responseFuture.complete(queryResponse)
+          slot.lastCmdTime = now()
           # HERE IS WHERE YOU NEED TO SEND THE DIAGNOSTICS!
           case q.kind
           of NimsuggestQueryKind.CHANGED: 

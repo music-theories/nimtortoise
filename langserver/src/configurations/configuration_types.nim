@@ -1,3 +1,4 @@
+import std/[times]
 import chronos
 
 type
@@ -40,13 +41,14 @@ type
     checkOnSave*: bool
     formatOnSave*: bool
     # --- Langserver settings --- 
-    langserverTimeout*: int
+    # langserverTimeout*: int
     fileCheckDelay*: int
     # -- Nimsuggest Settings ---
     maxNimsuggestProcesses*: int
     maxNimsuggestCrashRetries*: int
     nimsuggestPath*: string
-    nimsuggestIdleTimeout*: int
+    nimsuggestIdleTimeout*: times.Duration # In seconds
+    nimsuggestRequestTimeout*: times.Duration # In seconds
     logNimsuggest*: bool
     inlayHints*: NlsInlayHintsConfig
     notificationVerbosity*: NlsNotificationVerbosity

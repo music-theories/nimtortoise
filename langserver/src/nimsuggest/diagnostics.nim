@@ -2,6 +2,7 @@ import std/[sequtils, sugar, json, options, strutils]
 import chronicles
 
 import ../utils/utils as globalUtils
+import ../utils/type_mismatch_format
 import ./[suggestapi_types, nimsuggest_types]
 import ../protocol/[types, enums]
 
@@ -84,7 +85,7 @@ proc toDiagnosticJson*(
         of "Warning": DiagnosticSeverity.Warning.int
         else: DiagnosticSeverity.Error.int
       ,
-      "message": suggest.doc,
+      "message": formatTypeMismatch(suggest.doc),
       "source": "nim",
       "code": "nimsuggest chk",
     }
