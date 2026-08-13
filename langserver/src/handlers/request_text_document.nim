@@ -217,8 +217,12 @@ proc hover*(
     params.position.line,
     params.position.character
   )
+  debug "There is a hover query " #, query = %*(query)
   let response = await ls.addQueryToQueue(query)
-  return await processHoverQuery(ls, query, response)
+  debug "There is a hover response ", reponse = %*(response)
+  let hoverProcess = await processHoverQuery(ls, query, response)
+  debug "There is a hover process ", process = %*(hoverProcess)
+  return hoverProcess
 
 # === textDocument/documentHighlight ===
 proc processDocumentHighlightResponses(

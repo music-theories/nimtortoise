@@ -115,7 +115,7 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
     # (a) config is available for getIntendedProject, and
     # (b) entry-point slots are in the pool so we can assign to them.
     await ls.waitForLsInitialized()
-
+    # TODO: Check all paths through the dispatcher result in any pending futures being completed.
     debug "processLangserverQueue: dequeued item", kind = $query.kind
     case query.kind
     of LangserverQueryKind.NIMSUGGEST:
@@ -136,6 +136,7 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
 
       else:
         debug "processLangserverQueue: Could not add message to mailbox, file is no longer open. ", uri = q.uri, kind = $q.kind
+        q.responseFuture.complete(@[])
 
     of LangserverQueryKind.FILE_ACCESS:
       let q = query.fileAccess
@@ -145,6 +146,8 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
         # Check if file is already open
         if uri in ls.files.openFiles:
           debug "didOpenFile: URI already tracked, skipping", uri = uri
+          # TODO/NOTE: Do I have to complete the future here?
+          # q.responseFuture.complete(@[])
 
         else:
           # Check if file is known to any nimsuggest instance
@@ -268,19 +271,19 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
 
         # We should schedule a changed query, nimsuggets doesn't know it has changed.
         ls.files.openFiles[uri].lastChanged = times.now()
-
-        let changedQuery = LangserverQuery(
-          kind: LangserverQueryKind.NIMSUGGEST,
-          nimsuggest: NimsuggestQuery[LspFilePosition](
-            id: 0, # NOTE: Check that this doesn't get cancelled accidentally
-            kind: NimsuggestQueryKind.CHANGED,
-            uri: uri,
-            dirtyFile: stashLocation, #ls.uriToStash(uri),
-            responseFuture: newFuture[seq[Suggest]]("nimsuggestQuery"),
-            saved: false
-          )
+        
+        let changedQuery = NimsuggestQuery[LspFilePosition](
+          id: 0, # NOTE: Check that this doesn't get cancelled accidentally
+          kind: NimsuggestQueryKind.CHANGED,
+          uri: uri,
+          dirtyFile: stashLocation, #ls.uriToStash(uri),
+          responseFuture: newFuture[seq[Suggest]]("nimsuggestQuery"),
+          saved: false
         )
-        ls.langserverQueue.addLastNoWait(changedQuery)
+        
+        debug "processLangserverQueue: DID_CHANGE dispatcher adding CHANGED message to slot mailbox", uri = uri
+
+        ls.files.openFiles[uri].slot.queryMailbox.addLastNoWait(changedQuery)
 
       of FileAccessQueryKind.DID_SAVE:
         let uri = q.didSave.textDocument.uri
@@ -299,12 +302,9 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
               file.writeLine(line)
             file.close()
 
-        debug "didSave: sending CHANGED query", uri = uri
-        # Directly query nimsuggest
-        # WHy do we call this, if it has been saved?  It is not changed, no?
-        let changedQuery = LangserverQuery(
-           kind: LangserverQueryKind.NIMSUGGEST,
-          nimsuggest: NimsuggestQuery[LspFilePosition](
+          debug "didSave: sending CHANGED query", uri = uri
+          # Directly query nimsuggest
+          let changedQuery = NimsuggestQuery[LspFilePosition](
             id: 0,
             kind: NimsuggestQueryKind.CHANGED,
             uri: uri,
@@ -312,24 +312,21 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
             saved: true,
             responseFuture: newFuture[seq[Suggest]]("nimsuggestQuery"),
           )
-        )
-        ls.langserverQueue.addLastNoWait(changedQuery)
+          fileInfo.slot.queryMailbox.addLastNoWait(changedQuery)
 
         if ls.configurations.currentConfig.checkOnSave:
           debug "Checking project", uri = uri
           let slotForUri = ls.pool.slotForUri(uri)
           if slotForUri.isSome:
-            let chkQuery = LangserverQuery(
-              kind: LangserverQueryKind.NIMSUGGEST,
-              nimsuggest: NimsuggestQuery[LspFilePosition](
-                id: 0,
-                kind: NimsuggestQueryKind.CHECK_PROJECT,
-                uri: pathToUri(slotForUri.get().projectFile),
-                dirtyFile: FilePath(""),
-                responseFuture: newFuture[seq[Suggest]]("checkProject"),
-              )
+            let slotToUse = slotForUri.get()
+            let chkQuery = NimsuggestQuery[LspFilePosition](
+              id: 0,
+              kind: NimsuggestQueryKind.CHECK_PROJECT,
+              uri: pathToUri(slotToUse.projectFile),
+              dirtyFile: FilePath(""),
+              responseFuture: newFuture[seq[Suggest]]("checkProject"),
             )
-            ls.langserverQueue.addLastNoWait(chkQuery)
+            slotToUse.queryMailbox.addLastNoWait(chkQuery)
 
       of FileAccessQueryKind.DID_CLOSE:
         let uri = q.didClose.textDocument.uri

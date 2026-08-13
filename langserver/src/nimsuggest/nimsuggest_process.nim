@@ -135,6 +135,10 @@ proc processNimsuggestQueries*(
         debug "processNimsuggestQueries: skipping stale query (CHANGED pending)", kind = $originalQuery.kind, uri = originalQuery.uri
         originalQuery.responseFuture.complete(@[])
         continue
+
+        # debug "processNimsuggestQueries: re-queuing query after pending CHANGED", kind = $originalQuery.kind, uri = originalQuery.uri
+        # slot.queryMailbox.addLastNoWait(originalQuery)
+        # continue
       elif mailboxHasQueryOfKind(
         slot, originalQuery.kind, originalQuery.uri
       ):
@@ -233,6 +237,7 @@ proc processNimsuggestQueries*(
               let diagnosticsJson = convertNimSuggestResponseToDiagnostics(
                 groupedSuggests, pathToUri(path), openFiles
               )
+              debug "processQueries: sending diagnostics to file ",uri = pathToUri(path),  projectFile = slot.projectFile, kind = $q.kind
               notifyProc("textDocument/publishDiagnostics", diagnosticsJson)
               
           else:

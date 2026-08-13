@@ -222,7 +222,7 @@ proc idleSlots*(
   ## Return slots that have exceeded the idle timeout and have no recently-active
   ## open files. The caller (langserver.nim tick) handles file eviction and
   ## notification, since it has access to files.nim procs.
-  let cutoff = times.now() - initDuration(minutes = config.nimsuggestIdleTimeout)
+  let cutoff = times.now() - initDuration(milliseconds = config.nimsuggestIdleTimeout)
   for slot in pool.slots.values.toSeq:
     if slot.isLive == false:
       continue
