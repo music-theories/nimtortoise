@@ -66,7 +66,7 @@ The `editorLangId == 'nim'` when-clause in `package.json` is **correct as-is** â
 
 The LSP binary path is resolved in order:
 1. `nimTortoise.lsp.path` setting (user-specified full path)
-2. `~/.vscode-nim-tortoise/nimbledeps/bin/nimlangserver` (local install)
+2. `~/nimbledeps/bin/nimlangserver` (local install)
 3. `nimlangserver` in PATH (global install)
 
 The default binary name `nimlangserver` is intentional â€” it is the standard Nim language server. Users who want a different binary should set `nimTortoise.lsp.path`.
@@ -157,7 +157,7 @@ OS/arch), which is the recommended approach for native binaries.
 `getLspPath` in `src/language_server/language_server.nim` resolves in this order:
 
 1. `nimTortoise.lsp.path` setting (user-specified)
-2. `~/.vscode-nim-tortoise/nimbledeps/bin/nimlangserver` (local install)
+2. local install
 3. `nimlangserver` in PATH (global install)
 
 ### Adding a bundled-binary step

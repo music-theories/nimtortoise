@@ -42,7 +42,7 @@ The following VS Code settings are available for the extension. Set them in user
 
 ### Language server
 
-* `nimTortoise.lsp.path` — explicit path to the Nim language server binary. If empty, the extension searches `~/.vscode-nim-tortoise/nimbledeps/bin/nimlangserver`, then `nimlangserver` in `PATH`.
+* `nimTortoise.lsp.path` — explicit path to the Nim language server binary. If empty, the extension searches for local installs, then `nimlangserver` in `PATH`.
 * `nimTortoise.lsp.trace.server` — trace LSP communication between VS Code and the language server (`off` / `messages` / `verbose`). Useful for debugging.
 * `nimTortoise.transportMode` — transport between extension and language server (`stdio` (default) or `socket`).
 * `nimTortoise.lspPort` — when `transportMode` is `socket`, the port to connect to. `0` means the extension starts the socket server itself. Useful for attaching an external debugger to the language server.

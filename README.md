@@ -3,6 +3,8 @@
 
 > *Slow and steady wins the race.*
 
+> *...writing the code to make the tools to write the code...*
+
 *NOTE: This repo is in active, heavy development.*
 
 *NOTE: All other READMEs are a work in progress*
@@ -63,7 +65,7 @@ Add to `.vscode/settings.json` in your project:
 }
 ```
 
-If omitted, the extension defaults to the `nimlangserver` server, and  searches `~/.vscode-nim-tortoise/nimbledeps/bin/nimlangserver` then `nimlangserver` in `PATH`.
+If omitted, the extension defaults to the `nimlangserver` server in `PATH`.
 
 ### 4. Install the VS Code Extension
 
