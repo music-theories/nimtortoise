@@ -1,22 +1,27 @@
+import os, std/asyncnet, strutils, chronos, chronos/asyncproc, options
+
+import unittest2
+
+import ../src/nimsuggest/nimsuggest
+import ../src/protocol/types
+
 ## tsuggestapi.nim — rewrite-compatible port of tests/tsuggestapi.nim
 ##
 ## The suggestapi layer is largely unchanged; only the import path moves.
 ## createNimsuggest still returns Future[Project]; Project.ns is Future[NimSuggest].
 ## project.process and project.errorCallback still exist on Project.
-
-import ../src/nimsuggest/suggestapi
-import ../src/nimsuggest/[nimsuggest_types, suggestapi_types]
-import ../src/protocol/types
-import os, std/asyncnet, strutils, chronos, chronos/asyncproc, options
-import unittest2
-
+## 
 const inputLine = "def	skProc	hw.a	proc (){.noSideEffect, gcsafe.}	hw/hw.nim	1	5	\"\"	100"
 const inputLineWithEndLine = "outline	skEnumField	system.bool.true	bool	basic_types.nim	46	15	\"\"	100	4	11"
 
 suite "Nimsuggest tests":
   let
     helloWorldFile = FilePath(getCurrentDir() / "tests/projects/hw/hw.nim")
-    nimSuggest = createNimsuggest(helloWorldFile).waitFor.ns.waitFor
+    nimSuggest = createNimsuggest(
+      helloWorldFile, "nimsuggest", "", 120_000,
+      proc(self: Nimsuggest) {.gcsafe, raises: [].} = discard,
+      proc(self: Project) {.gcsafe, raises: [].} = discard,
+    ).waitFor.ns.waitFor
 
   test "Parsing qualified path":
     echo "    >> Parsing qualified path"
@@ -85,7 +90,11 @@ suite "Nimsuggest error handling":
     # command so the command is in flight when the process is killed and both
     # paths run deterministically.
     let helloWorldFile = FilePath(getCurrentDir() / "tests/projects/hw/hw.nim")
-    let project = createNimsuggest(helloWorldFile).waitFor
+    let project = createNimsuggest(
+      helloWorldFile, "nimsuggest", "", 120_000,
+      proc(self: Nimsuggest) {.gcsafe, raises: [].} = discard,
+      proc(self: Project) {.gcsafe, raises: [].} = discard,
+    ).waitFor
     let ns = project.ns.waitFor
     var errorCount = 0
     project.errorCallback = some(

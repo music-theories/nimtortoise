@@ -1,15 +1,16 @@
 ## LSP socket client for tests — identical to tests/lspsocketclient.nim but
 ## updated import paths for the new src/ module hierarchy.
 
-import ../src/langserver/[transports, utils]
-import ../src/utils/utils
-import ../src/utils/process_utils
-export process_utils.getNextFreePort
-import ../src/langserver/langserver_types
-import ../src/protocol/types
 import std/[options, unittest, json, os, jsonutils, tables, strutils, sequtils, sugar]
 import json_rpc/[rpcclient]
 import chronicles
+
+import ../src/configurations/configurations
+import ../src/langserver/langserver
+import ../src/nimsuggest/nimsuggest
+import ../src/protocol/[types]
+import ../src/utils/utils
+import ../src/nimtortoise
 
 # fixture paths are still under tests/ (shared with original test suite)
 proc fixtureUri*(path: string): FileUri =
@@ -187,6 +188,13 @@ proc notificationHandle*(
   except CatchableError:
     discard
   result = newFuture[void]("notificationHandle")
+
+proc setWorkspaceConfig*(client: LspSocketClient, configJson: JsonNode) =
+  ## Override the workspace/configuration response sent to the server.
+  ## Call BEFORE notify("initialized") so the server reads the right config.
+  ## configJson must be a JArray: [{"maxNimsuggestProcesses": 1, ...}]
+  client.routes["workspace/configuration"] = proc(params: JsonNode): Future[JsonNode] {.async.} =
+    return configJson
 
 proc registerNotification*(client: LspSocketClient, names: varargs[string]) =
   for name in names:

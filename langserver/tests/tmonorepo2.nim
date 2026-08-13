@@ -1,22 +1,18 @@
-import ./fixhelpers
-import ../src/utils/utils
 import std/[os, strformat, strutils, sequtils, json, options]
+
 import chronos
 import unittest2
+
+import ../src/utils/utils
+import ./fixhelpers
 
 suite "Fix #7 and #11 — workspace/didRenameFiles":
   generateSimpleNimblePaths()
   let (cmdParams, ls, client) = startServer("tests/projects/simple")
-  ls.configurations.currentConfig = some(NlsConfig(
-    maxNimsuggestProcesses: some 1,
-    projectMapping: some @[
-      NlsNimsuggestConfig(
-        fileRegex: "tests/projects/simple/src/.*\\.nim",
-        projectFile: simpleProjectFile()
-      )
-    ]
-  ))
-  ls.configurations.configReady.fire()
+  client.setWorkspaceConfig(%*[{
+    "maxNimsuggestProcesses": 1,
+    "projectMapping": [{"fileRegex": "tests/projects/simple/src/.*\\.nim", "projectFile": simpleProjectFile()}]
+  }])
   doInitialize(client, "tests/projects/simple")
   client.notify("initialized", newJObject())
 
@@ -30,7 +26,7 @@ suite "Fix #7 and #11 — workspace/didRenameFiles":
     sendDidRename(client, widgetFile, "tests/projects/simple/src/widget_renamed.nim")
     waitFor sleepAsync(500)
 
-    discard sendHover(client, widgetFile, 7, 5)
+    let hoverBackGirl = sendHover(client, widgetFile, 7, 5)
     check true
     echo "    >> DONE: server does not crash after workspace/didRenameFiles"
 
@@ -48,8 +44,7 @@ suite "Fix #7 and #11 — workspace/didRenameFiles":
 suite "Fix #12A — openFiles sync on didClose":
   generateSimpleNimblePaths()
   let (cmdParams, ls, client) = startServer("tests/projects/simple")
-  ls.configurations.currentConfig = some(NlsConfig(maxNimsuggestProcesses: some 1))
-  ls.configurations.configReady.fire()
+  client.setWorkspaceConfig(%*[{"maxNimsuggestProcesses": 1}])
   doInitialize(client, "tests/projects/simple")
   client.notify("initialized", newJObject())
 

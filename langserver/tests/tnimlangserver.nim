@@ -1,18 +1,24 @@
+import std/[options, json, os, jsonutils, sequtils, strutils, sugar, strformat]
+
+import json_rpc/[rpcclient]
+import chronicles
+import lspsocketclient
+import unittest2
+
+import ../src/configurations/configurations
+import ../src/langserver/langserver
+import ../src/nimsuggest/nimsuggest
+import ../src/protocol/[types]
+import ../src/utils/utils
+import ../src/utils/process_utils
+import ../src/nimtortoise
+
+
 ## tnimlangserver.nim — rewrite-compatible port of tests/tnimlangserver.nim
 ##
 ## API changes from original:
 ##   ls.isShutdown         — unchanged (field on LanguageServer)
 ##   main(cmdParams)       — unchanged (from src/nimtortoise)
-
-import ../src/nimtortoise
-import ../src/langserver/[langserver, langserver_types, utils]
-import ../src/utils/utils
-import ../src/protocol/[enums, types]
-import std/[options, json, os, jsonutils, sequtils, strutils, sugar, strformat]
-import json_rpc/[rpcclient]
-import chronicles
-import lspsocketclient
-import unittest2
 
 suite "Nimlangserver":
   let cmdParams = CommandLineParams(mode: some lsp, transport: some socket, port: getNextFreePort())

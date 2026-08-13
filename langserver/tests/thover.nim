@@ -1,13 +1,17 @@
 import std/[options, json, os, jsonutils, sequtils, strutils, sugar, strformat]
 
-import ../src/nimtortoise
-import ../src/langserver/[langserver, langserver_types, utils]
-import ../src/utils/utils
-import ../src/protocol/[enums, types]
 import json_rpc/[rpcclient]
 import chronicles
 import lspsocketclient
 import unittest2
+
+import ../src/configurations/configurations
+import ../src/langserver/langserver
+import ../src/nimsuggest/nimsuggest
+import ../src/protocol/[types]
+import ../src/utils/utils
+import ../src/utils/process_utils
+import ../src/nimtortoise
 
 suite "LSP features (failing)":
   let helloWorldUri = fixtureUri("projects/hw/hw.nim")

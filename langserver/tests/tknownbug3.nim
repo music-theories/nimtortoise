@@ -1,3 +1,6 @@
+import unittest2
+import ./tbughelpers
+
 ## tknownbug3.nim — Documents Known Bug 3: assume-known-when-busy, no retry.
 ##
 ## EXPECTED TO FAIL. Excluded from all.nim. Run manually to confirm the bug
@@ -21,9 +24,6 @@
 ## This bug exists in both the old ls.nim architecture and the new dp-rewrite
 ## architecture. It is documented here so that a fix can be verified by making
 ## this test pass.
-
-import ./tbughelpers
-import unittest2
 
 suite "Known Bug 3 — assume-known-when-busy: no retry [EXPECTED FAIL]":
   # maxNs=1 ensures the orphan.nim didOpen arrives while simple's checkFile

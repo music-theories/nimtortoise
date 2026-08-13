@@ -1,3 +1,11 @@
+import std/[os, osproc, strscans, tables, sequtils, enumerate, strutils, options]
+import chronos
+import unittest2
+
+import ../src/langserver/langserver_types
+import ../src/nim_compiler/testrunner
+
+import ./testhelpers
 ## ttestrunner.nim — rewrite-compatible port of tests/ttestrunner.nim
 ##
 ## API changes from original:
@@ -10,13 +18,6 @@
 ##                        )
 ##   runTests(entryPoint, "nim", none(string), @[], "", ls)
 ##     — signature unchanged in new code
-
-import std/[os, osproc, strscans, tables, sequtils, enumerate, strutils, options]
-import ../src/langserver/langserver_types
-import ../src/nim_compiler/testrunner
-import testhelpers
-import chronos
-import unittest2
 
 suite "Test Parser":
   test "should be able to list tests from an entry point":
@@ -55,7 +56,7 @@ suite "Test Runner":
       capabilities: LanguageServerCapabilities(serverMode: lsp),
       transport: LanguageServerTransport(transportMode: stdio),
     )
-    let testProjectResult = waitFor runTests(entryPoint, "nim", none(string), @[], "", ls)
+    let testProjectResult = waitFor runTests(entryPoint, "nim", "", @[], "", ls)
     check testProjectResult.suites.len == 4
     check testProjectResult.suites[0].name == "Sample Tests"
     check testProjectResult.suites[0].tests == 1

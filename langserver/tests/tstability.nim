@@ -1,3 +1,6 @@
+import unittest2
+import ./tbughelpers
+
 ## tstability.nim — rewrite-compatible port of test_fixes/tstab1+2+3.nim
 ##
 ## Three stability suites combined:
@@ -12,9 +15,6 @@
 ##
 ## Infrastructure: imports test_fixes/tbughelpers for startCombinedServer and
 ## 7-file path constants. That module already uses new src/ APIs.
-
-import ./tbughelpers
-import unittest2
 
 suite "Stability — sequential open + hover, maxNs=2":
   let (cmdParams, ls, client) = startCombinedServer(2)

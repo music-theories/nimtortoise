@@ -1,9 +1,10 @@
 ## Shared helpers for tbugs* test files.
 
-import fixhelpers
 import std/[os, json, options]
 import chronos
-export fixhelpers, os, json, options, chronos
+
+import ./fixhelpers
+export fixhelpers
 
 # rootUri = tests/projects, so tryRelativeTo strips that prefix.
 # Regexes are relative to that root.
@@ -27,19 +28,19 @@ proc startCombinedServer*(maxNs: int): (CommandLineParams, LanguageServer, LspSo
   generateSimpleNimblePaths()
   generateMonorepoNimblePaths()
   let (cmdParams, ls, client) = startServer("tests/projects")
+  # Build config JSON and register it so the server receives it via
+  # workspace/configuration when it processes the initialized notification.
+  var mappingArr = newJArray()
+  for m in combinedMapping():
+    mappingArr.add(%* {"fileRegex": m.fileRegex, "projectFile": m.projectFile})
+  let configObj = newJObject()
+  configObj["maxNimsuggestProcesses"] = %maxNs
+  configObj["projectMapping"] = mappingArr
+  let configJson = newJArray()
+  configJson.add(configObj)
+  client.setWorkspaceConfig(configJson)
   doInitialize(client, "tests/projects")
   client.notify("initialized", newJObject())
-  # The initialized handler calls maybeRequestConfigurationFromClient, which
-  # replaces ls.workspaceConfiguration with a new pending future from
-  # ls.call("workspace/configuration"). The test client never answers that call.
-  # Give the handler time to fire, then complete the new future ourselves.
-  waitFor sleepAsync(200)
-  if ls.configurations.currentConfig.isNone:
-    ls.configurations.currentConfig = some(NlsConfig(
-      maxNimsuggestProcesses: some maxNs,
-      projectMapping: some combinedMapping()
-    ))
-    ls.configurations.configReady.fire()
   (cmdParams, ls, client)
 
 const

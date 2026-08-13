@@ -1,3 +1,20 @@
+import std/[options, json, os, jsonutils, sequtils, strutils, sugar, strformat]
+
+import json_rpc/[rpcclient]
+import chronos/asyncproc
+import chronicles
+import unittest2
+
+import ../src/configurations/configurations
+import ../src/langserver/langserver
+import ../src/nimsuggest/nimsuggest
+import ../src/protocol/[types]
+import ../src/utils/utils
+import ../src/utils/process_utils
+import ../src/nimtortoise
+
+import ./[lspsocketclient, testhelpers]
+
 ## textensions.nim — rewrite-compatible port of tests/textensions.nim
 ##
 ## API changes from original:
@@ -8,20 +25,6 @@
 ##   ls.workspaceConfiguration.complete(% @[NlsConfig()])
 ##     → ls.configurations.currentConfig = some(NlsConfig())
 ##       ls.configurations.configReady.fire()
-
-import ../src/nimtortoise
-import ../src/langserver/[langserver, langserver_types, utils, configurations]
-import ../src/utils/utils
-import ../src/configurations/configuration_types
-import ../src/nimsuggest/nimsuggest_slots
-import ../src/protocol/[enums, types]
-import std/[options, json, os, jsonutils, sequtils, strutils, sugar, strformat]
-import json_rpc/[rpcclient]
-import chronicles
-import lspsocketclient
-import chronos/asyncproc
-import testhelpers
-import unittest2
 
 suite "Nimlangserver extensions":
   let cmdParams = CommandLineParams(mode: some lsp, transport: some socket, port: getNextFreePort())
@@ -43,8 +46,6 @@ suite "Nimlangserver extensions":
           {"window": {"workDoneProgress": true}, "workspace": {"configuration": true}},
       }
     let initializeResult = waitFor client.initialize(initParams)
-    ls.configurations.currentConfig = some(NlsConfig())
-    ls.configurations.configReady.fire()
     client.notify("initialized", newJObject())
 
     check initializeResult.capabilities.textDocumentSync.isSome
@@ -238,4 +239,4 @@ suite "Nimlangserver extensions":
     check runTestsRes.suites[0].tests == 2
     check runTestsRes.suites[0].failures == 1
     check runTestsRes.suites[0].testResults[0].name == "Failing Test"
-    check runTestsRes.suites[0].testResults[0].failure.isSome
+    check runTestsRes.suites[0].testResults[0].failure.len > 0

@@ -1,3 +1,11 @@
+import std/[os, strformat, strutils, sequtils, json, options]
+
+import chronos
+import unittest2
+
+import ../src/utils/utils
+import ./fixhelpers
+
 ## tmonorepo.nim — rewrite-compatible port of test_fixes/tmonorepo.nim
 ##
 ## Covers fix regression suites: #10, #16, #17, #18, #19 (cascade + LRU),
@@ -6,17 +14,10 @@
 ## Infrastructure: imports test_fixes/fixhelpers directly (it already uses
 ## new src/ APIs). The only change from the original is this import line.
 
-import ./fixhelpers
-import ../src/utils/utils
-import std/[os, strformat, strutils, sequtils, json, options]
-import chronos
-import unittest2
-
 suite "Fix #10 — nimble.paths forwarded to nimsuggest":
   generateSimpleNimblePaths()
   let (cmdParams, ls, client) = startServer("tests/projects/simple")
-  ls.configurations.currentConfig = some(NlsConfig(maxNimsuggestProcesses: some 1))
-  ls.configurations.configReady.fire()
+  client.setWorkspaceConfig(%*[{"maxNimsuggestProcesses": 1}])
   doInitialize(client, "tests/projects/simple")
   client.notify("initialized", newJObject())
 
@@ -34,8 +35,6 @@ suite "Fix #10 — nimble.paths forwarded to nimsuggest":
 suite "Fix #16 — listTests with no entryPoint":
   generateSimpleNimblePaths()
   let (cmdParams, ls, client) = startServer("tests/projects/simple")
-  ls.configurations.currentConfig = some(NlsConfig())
-  ls.configurations.configReady.fire()
   doInitialize(client, "tests/projects/simple")
   client.notify("initialized", newJObject())
 
@@ -57,16 +56,10 @@ suite "Fix #16 — listTests with no entryPoint":
 suite "Fix #17 — in-flight commands complete with [] not error":
   generateSimpleNimblePaths()
   let (cmdParams, ls, client) = startServer("tests/projects/simple")
-  ls.configurations.currentConfig = some(NlsConfig(
-    maxNimsuggestProcesses: some 1,
-    projectMapping: some @[
-      NlsNimsuggestConfig(
-        fileRegex: "tests/projects/simple/src/.*\\.nim",
-        projectFile: simpleProjectFile()
-      )
-    ]
-  ))
-  ls.configurations.configReady.fire()
+  client.setWorkspaceConfig(%*[{
+    "maxNimsuggestProcesses": 1,
+    "projectMapping": [{"fileRegex": "tests/projects/simple/src/.*\\.nim", "projectFile": simpleProjectFile()}]
+  }])
   doInitialize(client, "tests/projects/simple")
   client.notify("initialized", newJObject())
 
@@ -94,20 +87,13 @@ suite "Fix #17 — in-flight commands complete with [] not error":
 suite "Fix #19 — LRU eviction at process limit":
   generateMonorepoNimblePaths()
   let (cmdParams, ls, client) = startServer("tests/projects/monorepo")
-  ls.configurations.currentConfig = some(NlsConfig(
-    maxNimsuggestProcesses: some 1,
-    projectMapping: some @[
-      NlsNimsuggestConfig(
-        fileRegex: "tests/projects/monorepo/pkgb/src/.*\\.nim",
-        projectFile: pkgbProjectFile()
-      ),
-      NlsNimsuggestConfig(
-        fileRegex: "tests/projects/monorepo/pkga/src/.*\\.nim",
-        projectFile: pkgaProjectFile()
-      )
+  client.setWorkspaceConfig(%*[{
+    "maxNimsuggestProcesses": 1,
+    "projectMapping": [
+      {"fileRegex": "tests/projects/monorepo/pkgb/src/.*\\.nim", "projectFile": pkgbProjectFile()},
+      {"fileRegex": "tests/projects/monorepo/pkga/src/.*\\.nim", "projectFile": pkgaProjectFile()}
     ]
-  ))
-  ls.configurations.configReady.fire()
+  }])
   doInitialize(client, "tests/projects/monorepo")
   client.notify("initialized", newJObject())
 
@@ -130,20 +116,13 @@ suite "Fix #19 — LRU eviction at process limit":
 suite "Fix #13 — opening pkgb while pkga nimsuggest runs":
   generateMonorepoNimblePaths()
   let (cmdParams, ls, client) = startServer("tests/projects/monorepo")
-  ls.configurations.currentConfig = some(NlsConfig(
-    maxNimsuggestProcesses: some 1,
-    projectMapping: some @[
-      NlsNimsuggestConfig(
-        fileRegex: "tests/projects/monorepo/pkga/src/.*\\.nim",
-        projectFile: pkgaProjectFile()
-      ),
-      NlsNimsuggestConfig(
-        fileRegex: "tests/projects/monorepo/pkgb/src/.*\\.nim",
-        projectFile: pkgbProjectFile()
-      )
+  client.setWorkspaceConfig(%*[{
+    "maxNimsuggestProcesses": 1,
+    "projectMapping": [
+      {"fileRegex": "tests/projects/monorepo/pkga/src/.*\\.nim", "projectFile": pkgaProjectFile()},
+      {"fileRegex": "tests/projects/monorepo/pkgb/src/.*\\.nim", "projectFile": pkgbProjectFile()}
     ]
-  ))
-  ls.configurations.configReady.fire()
+  }])
   doInitialize(client, "tests/projects/monorepo")
   client.notify("initialized", newJObject())
 

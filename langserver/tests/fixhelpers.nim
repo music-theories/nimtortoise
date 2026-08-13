@@ -1,9 +1,12 @@
 import std/[os, strutils, times, options, json, tables, sequtils, sugar]
-import ../src/langserver/[langserver_types, utils, configurations]
+import ../src/configurations/configurations
+import ../src/langserver/langserver
+import ../src/nimsuggest/nimsuggest
+import ../src/protocol/[types]
 import ../src/utils/utils
-import ../src/configurations/configuration_types
-import ../src/protocol/types
+import ../src/utils/process_utils
 import ../src/nimtortoise
+
 import ../tests/lspsocketclient  # import without alias so we can selectively re-export
 import chronos
 import unittest2
@@ -13,8 +16,9 @@ export LspSocketClient, NotificationRpc, Rpc
 export newLspSocketClient, notify, call, connect
 export waitForNotification, waitForNotificationMessage
 export registerNotification, positionParams, initialize, notificationHandle
+export setWorkspaceConfig
 
-export langserver_types, utils, configurations, configuration_types,
+export langserver_types, utils, process_utils, configurations, configuration_types,
   types, options, json, tables, sequtils, times, os, strutils, chronos
 
 # fixtureUri that resolves from repo root, NOT tests/ (overrides lspsocketclient version)
@@ -64,7 +68,8 @@ proc doInitialize*(client: LspSocketClient, rootRelPath: string) =
     "processId": %getCurrentProcessId(),
     "rootUri": fixtureUri(rootRelPath),
     "capabilities": {
-      "window": {"workDoneProgress": true}
+      "window": {"workDoneProgress": true},
+      "workspace": {"configuration": true}
     }
   }
   discard waitFor client.initialize(initParams)

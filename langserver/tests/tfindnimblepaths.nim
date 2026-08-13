@@ -1,3 +1,8 @@
+import std/[os, options]
+import unittest2
+
+import ../src/nimble/nimble
+
 ## tfindnimblepaths.nim
 ## Unit tests for findNimblePaths in src/nimble/nimble.nim.
 ##
@@ -5,10 +10,6 @@
 ## No running server required — findNimblePaths is a pure filesystem walk.
 ##
 ## Run with: nim c --path:. -r tests_rewrite/tfindnimblepaths.nim
-
-import ../src/nimble/nimble
-import std/[os, options]
-import unittest2
 
 suite "findNimblePaths":
   let tmpRoot = getTempDir() / "nimble_paths_test_" & $getCurrentProcessId()

@@ -1,22 +1,17 @@
-import ./fixhelpers
-import ../src/utils/utils
 import std/[os, strformat, strutils, sequtils, json, options]
 import chronos
 import unittest2
 
+import ../src/utils/utils
+import ./fixhelpers
+
 suite "Fix #19 — cascade prevention at maxNimsuggestProcesses=1":
   generateSimpleNimblePaths()
   let (cmdParams, ls, client) = startServer("tests/projects/simple")
-  ls.configurations.currentConfig = some(NlsConfig(
-    maxNimsuggestProcesses: some 1,
-    projectMapping: some @[
-      NlsNimsuggestConfig(
-        fileRegex: "tests/projects/simple/src/.*\\.nim",
-        projectFile: simpleProjectFile()
-      )
-    ]
-  ))
-  ls.configurations.configReady.fire()
+  client.setWorkspaceConfig(%*[{
+    "maxNimsuggestProcesses": 1,
+    "projectMapping": [{"fileRegex": "tests/projects/simple/src/.*\\.nim", "projectFile": simpleProjectFile()}]
+  }])
   doInitialize(client, "tests/projects/simple")
   client.notify("initialized", newJObject())
 

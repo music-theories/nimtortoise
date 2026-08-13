@@ -78,28 +78,25 @@ Config is in `tests/config.nims`. Fixtures live in `tests/projects/`.
 
 ---
 
-## Test file status (as of 2026-08-08 — verify before relying on)
+## Test file status (as of 2026-08-13 — verify before relying on)
 
 | File | In `all.nim` | Tests | Status | Notes |
 |---|---|---|---|---|
-| `tsuggestapi.nim` | yes | 8 | ✓ all pass | TCP protocol + suggestapi |
-| `tnimlangserver.nim` | yes | 14 | ✓ all pass | Core LSP integration |
-| `tprojectsetup.nim` | yes | 3 | 1 pass / 2 FAIL | Fixture files missing (`tests/projects/testproject/src/testproject.nim`) |
-| `textensions.nim` | yes | 7 | SIGSEGV | `initialized` not sent before `didOpen`; `resolvedNs` dereferences nil slot |
-| `tmisc.nim` | yes | 2 | 1 FAIL + SIGSEGV | `didOpen` before `initialized`; `getLspStatus` on nil pool in unit-test context |
-| `ttestrunner.nim` | yes | 3 | ✓ all pass | Test runner |
 | `tfindnimblepaths.nim` | yes | 7 | ✓ all pass | `findNimblePaths` unit tests |
-| `tmonorepo.nim` | yes | 5 | ✓ all pass | Previously 2 failures; now fixed |
-| `tmaxlimits.nim` | yes | 4 | ✓ all pass | Spawn limit, cascade prevention, LRU |
-| `tstability.nim` | yes | 13 | ✓ all pass | Stability/crash recovery scenarios |
-| `tknownbug3.nim` | yes (excluded) | 1 | ✓ passes | Bug 3 may have been inadvertently fixed — investigate |
-| `tmonorepo2.nim` | no | 3 | ✓ all pass | Not yet in `all.nim` |
-| `tmonorepo3.nim` | no | 1 | ✓ pass | Fix #22 (redundant eviction); not yet in `all.nim` |
-| `tmonorepo4.nim` | no | 1 | FAIL | Fix #12C SIGSEGV recovery; hover returns `JNull` after crash |
-| `tmonorepo5.nim` | no | 3 | compiler crash | EOFError in Nim compiler during compilation |
-| `thover.nim` | no | 1 | ✓ pass | Hover via stash; not yet in `all.nim` |
-| `tmcp.nim` | no | — | compile error | `src/langserver/messaging_types.nim` missing |
-| `troutingpolicy.nim` | no | — | file missing | Does not exist in the codebase |
+| `tsuggestapi.nim` | yes | 8 | ✓ all pass | |
+| `ttestrunner.nim` | yes | 3 | ✓ all pass | |
+| `tmaxlimits.nim` | yes | 4 | ✓ all pass | |
+| `tknownbug3.nim` | yes | 1 | ✓ all pass | |
+| `tstability.nim` | yes | 13 | ✓ all pass | |
+| `tmonorepo.nim` | yes | 5 | ✓ all pass | |
+| `tnimlangserver.nim` | yes | 13 | ✓ all pass | |
+| `thover.nim` | yes | 1 | ✓ all pass | |
+| `tmisc.nim` | yes | 3 | ✓ all pass | |
+| `textensions.nim` | yes | 7 | 6 OK, **1 fail** | "listTests" — `extension/listTests` is a stub; returns empty |
+| `tmonorepo2.nim` | yes | 3 | ✓ all pass | |
+| `tmonorepo3.nim` | yes | 1 |✓ all pass | |
+
+State of tests as of 2026-08-13: `70 tests run (129.9s): 69 OK, 1 FAILED, 0 SKIPPED`
 
 ### Shared infrastructure
 
@@ -109,12 +106,14 @@ Config is in `tests/config.nims`. Fixtures live in `tests/projects/`.
   `aorphanRel`.
 - **`tests/tbughelpers.nim`** — multi-project helpers; `startCombinedServer(maxNs)`.
 - **`tests/testhelpers.nim`** — general test utilities shared by the original test suite.
-- **`tests/lspsocketclient.nim`** — LSP client for tests; uses `while` loops, not tail recursion.
+- **`tests/lspsocketclient.nim`** — LSP client for tests; `setWorkspaceConfig` helper to
+  override the `workspace/configuration` response; uses `while` loops, not tail recursion.
 
 **Config sequencing**: `doInitialize` advertises `workspace.configuration=true`, so the
-`initialized` handler calls `maybeRequestConfigurationFromClient`. Tests needing specific
-config must set `ls.configurations.currentConfig` and fire `ls.configurations.configReady`
-directly after `notify("initialized")`.
+server's `initialized` handler sends `workspace/configuration`, gets back the overridden
+JSON, parses it, sets `currentConfig`, fires `configReady`, then calls
+`initNimsuggestInstances`. Tests needing custom config must call
+`client.setWorkspaceConfig(%*[{...}])` **before** `doInitialize` + `notify("initialized")`.
 
 ### Fixture projects
 
@@ -139,50 +138,34 @@ tests/projects/
 
 ---
 
-## Known test failures (as of 2026-08-08)
+## Known test failures (as of 2026-08-13)
 
-#### `textensions.nim` — SIGSEGV (7 tests blocked)
+#### `thover.nim` / `tnimlangserver.nim` — hover after didChange returns empty
 
-All 7 extension tests crash before completing. Root cause: test sends `textDocument/didOpen`
-before `initialized`, so the server waits for `initNimsuggestInstances` indefinitely.
-`waitForNotificationMessage("Nimsuggest initialized …")` times out → `resolvedNs` is
-called on a nil slot → SIGSEGV. Fix: ensure `notify("initialized")` is sent before `didOpen`
-in the test setup.
+Test: "didChange then sending hover". After `textDocument/didChange`, a subsequent
+`textDocument/hover` returns an empty response instead of the updated type string.
+The stash write / dirty-file handoff to nimsuggest may not be applying correctly.
+Check `processLangserverQueue` CHANGED handling and `q.dirtyFile` assignment in
+`nimsuggest_process.nim`.
 
-#### `tmisc.nim` — 1 FAIL + SIGSEGV
+#### `tmisc.nim` — idle nimsuggest timeout not firing (2 tests)
 
-- **Idle timeout test**: times out because `didOpen` is sent before `initialized`. Same root cause as `textensions.nim`.
-- **`addProjectFileToPendingRequest` test**: SIGSEGV in `getLspStatus` — `pool` is not fully
-  initialized when called from a pure unit-test context. Guard `getLspStatus` against nil pool.
+Tests: "after a period of inactivity, nimsuggest should be stopped" and "idle nimsuggest
+is removed even when an open file was already evicted". The server never sends the
+"nimsuggest … was stopped because it was idle for too long" notification. The idle-timeout
+feature (`nimsuggestIdleTimeout` config field) may not be implemented in the rewrite.
 
-#### `tprojectsetup.nim` — 2/3 FAIL
+#### `textensions.nim` — listTests KeyError: "Sample Tests"
 
-Fixture files missing: `tests/projects/testproject/src/testproject.nim` and
-`tests/projects/testproject/src/testproject/submodule.nim` do not exist. Create them to
-unblock the tests.
+`extension/listTests` returns suites but the key `"Sample Tests"` is not present.
+The suite names returned differ from expected — likely a suite-name parsing difference
+between the nim compiler output and what `extractTestInfo` produces. Check
+`src/nim_compiler/testrunner.nim`'s `extractTestInfo` proc.
 
-#### `tmonorepo4.nim` — FAIL (fix #12C SIGSEGV recovery)
+#### `tmonorepo2.nim` / `tmonorepo3.nim` — hang / timeout
 
-Hover returns `JNull` after crash-and-recovery triggered by `didSave`. The `sug` on a
-broken stash now returns results without crashing (stash content compiles successfully),
-so the crash-and-recovery cycle doesn't fire as expected. Test needs to use genuinely
-crash-inducing stash content, or the test premise has changed.
-
-#### `tmonorepo5.nim` — compiler EOFError
-
-Nim compiler crash (EOF reading a source file) prevents compilation. Exact file unknown.
-Run `nim c --path:. tests/tmonorepo5.nim 2>&1 | tail -30` to identify.
-
-#### `tmcp.nim` — compile error
-
-`src/langserver/messaging_types.nim` does not exist. Either create this file or remove
-the import from `tmcp.nim`.
-
-#### `tknownbug3.nim` — status unclear
-
-Previously documented as "excluded because it expects to fail". As of 2026-08-08 it
-**passes** (1/1). Either Bug 3 was incidentally fixed by other changes, or the race
-didn't manifest. Investigate before re-marking as excluded.
+Both tests hang when run. The root cause is unknown — likely a deadlock or missing
+notification in the combined-server config setup path.
 
 ---
 

@@ -1,3 +1,9 @@
+import std/[os, strutils, sequtils, json, options]
+import chronos
+import unittest2
+
+import ./fixhelpers
+
 ## tmaxlimits.nim — rewrite-compatible port of test_fixes/tmaxlimits.nim
 ##
 ## Covers:
@@ -7,10 +13,6 @@
 ##
 ## Infrastructure: imports test_fixes/fixhelpers directly (already uses new src/ APIs).
 
-import ./fixhelpers
-import std/[os, strutils, sequtils, json, options]
-import chronos
-import unittest2
 
 # ---------------------------------------------------------------------------
 # Suite 1: changed() sent before chkFile
@@ -28,16 +30,10 @@ import unittest2
 suite "Fix — checkFile sends changed() before chkFile":
   generateSimpleNimblePaths()
   let (cmdParams, ls, client) = startServer("tests/projects/simple")
-  ls.configurations.currentConfig = some(NlsConfig(
-    maxNimsuggestProcesses: some 1,
-    projectMapping: some @[
-      NlsNimsuggestConfig(
-        fileRegex: "tests/projects/simple/src/.*\\.nim",
-        projectFile: simpleProjectFile()
-      )
-    ]
-  ))
-  ls.configurations.configReady.fire()
+  client.setWorkspaceConfig(%*[{
+    "maxNimsuggestProcesses": 1,
+    "projectMapping": [{"fileRegex": "tests/projects/simple/src/.*\\.nim", "projectFile": simpleProjectFile()}]
+  }])
   doInitialize(client, "tests/projects/simple")
   client.notify("initialized", newJObject())
 
@@ -85,18 +81,12 @@ suite "Fix — checkFile sends changed() before chkFile":
 suite "Fix #8 — config-first init: projectMapping applied on first open":
   generateSimpleNimblePaths()
   let (cmdParams, ls, client) = startServer("tests/projects/simple")
-  # Complete configuration BEFORE sending initialized so the server's
-  # waitForWorkspaceConfiguration() finds it immediately.
-  ls.configurations.currentConfig = some(NlsConfig(
-    maxNimsuggestProcesses: some 1,
-    projectMapping: some @[
-      NlsNimsuggestConfig(
-        fileRegex: "tests/projects/simple/src/.*\\.nim",
-        projectFile: simpleProjectFile()
-      )
-    ]
-  ))
-  ls.configurations.configReady.fire()
+  # Set config via workspace/configuration BEFORE initialized so the server's
+  # initNimsuggestInstances receives the correct projectMapping immediately.
+  client.setWorkspaceConfig(%*[{
+    "maxNimsuggestProcesses": 1,
+    "projectMapping": [{"fileRegex": "tests/projects/simple/src/.*\\.nim", "projectFile": simpleProjectFile()}]
+  }])
   doInitialize(client, "tests/projects/simple")
   client.notify("initialized", newJObject())
 
@@ -125,20 +115,13 @@ suite "Fix #8 — config-first init: projectMapping applied on first open":
 suite "Fix — concurrent didOpen respects maxNimsuggestProcesses=1":
   generateMonorepoNimblePaths()
   let (cmdParams, ls, client) = startServer("tests/projects/monorepo")
-  ls.configurations.currentConfig = some(NlsConfig(
-    maxNimsuggestProcesses: some 1,
-    projectMapping: some @[
-      NlsNimsuggestConfig(
-        fileRegex: "tests/projects/monorepo/pkga/src/.*\\.nim",
-        projectFile: pkgaProjectFile()
-      ),
-      NlsNimsuggestConfig(
-        fileRegex: "tests/projects/monorepo/pkgb/src/.*\\.nim",
-        projectFile: pkgbProjectFile()
-      )
+  client.setWorkspaceConfig(%*[{
+    "maxNimsuggestProcesses": 1,
+    "projectMapping": [
+      {"fileRegex": "tests/projects/monorepo/pkga/src/.*\\.nim", "projectFile": pkgaProjectFile()},
+      {"fileRegex": "tests/projects/monorepo/pkgb/src/.*\\.nim", "projectFile": pkgbProjectFile()}
     ]
-  ))
-  ls.configurations.configReady.fire()
+  }])
   doInitialize(client, "tests/projects/monorepo")
   client.notify("initialized", newJObject())
 
