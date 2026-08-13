@@ -100,7 +100,9 @@ The `Nim Tortoise` rewrite prioritises three things:
 - Stability: The language server should be stable- not  constantly crashing - I have work to do!
 - Efficiency: The language server does have to deal with a lot of files, but it shouldn't be turning your laptop into a stellar-hot chunk while its working.  I aim for the language server to be CPU-light.  
 
-This is done by having a strict First-In-First-Out queuing system for any request to the language server.  These requests are read one-at-a-time in order by a dispatcher which then routes them to the appropriate `nimsuggest` instance, each of which has its own First-In-First-Out queue.  The language server deals with how many instances of `nimsuggest` are running, spawns or removes instances from its "pool" and consolidates instances which share the same files, so the fewest instances possibel are running at any one time. 
+This is done by having a strict First-In-First-Out queuing system for any request to the language server.  These requests are read one-at-a-time in order by a dispatcher which then routes them to the appropriate `nimsuggest` instance, each of which has its own First-In-First-Out queue.  The language server deals with how many instances of `nimsuggest` are running, spawns or removes instances from its "pool" and consolidates instances which share the same files, so the fewest instances possible are running at any one time.   `nimsuggest` is designed to crash if it cannot process a file, which means that care must be taken in handling exceptions so that the entire language server does not crash.  Finally, because of the queue system, it is possible to reduce the amount of work `nimsuggest` has to do by removing duplicate requests for the same file, limiting how frequently a file is `check`ed, and removing any requests in the queue that will be out-of-date because the file they are for has already changed (e.g. if the user is rapidly typing).
+
+I am now using this tool daily and I hope it is helpful for other `nim` users. 
 
 ---
 
