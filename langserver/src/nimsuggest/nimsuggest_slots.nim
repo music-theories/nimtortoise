@@ -179,7 +179,12 @@ proc attemptCrashRespawn*(
     else: 0
     if backoffMs > 0:
       await sleepAsync(backoffMs)
-    discard await execStop(slot, pool)
+    # Do NOT call execStop here: execStop adds a CLOSE_MAILBOX sentinel to the
+    # slot's mailbox, which would cause the processNimsuggestQueries drain loop
+    # (our caller) to exit after respawn, leaving the newly-live slot without a
+    # consumer. The nimsuggest process is already dead (project.failed was true),
+    # so we just reset state directly — no sentinel needed.
+    slot.state = SlotState.STOPPED
     slot.crashedUris.clear() # explicit restart = clean slate
     return await execSpawn(slot, pool, slot.projectFile, config)
     

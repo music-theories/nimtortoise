@@ -173,8 +173,11 @@ proc queryFile*(ls: LanguageServer, uri: FileUri, kind: NimsuggestQueryKind): Fu
   if fileInfo == nil:
     result.complete(@[])
     return
+  if fileInfo.slot.state in {SlotState.STOPPED, SlotState.CRASHED}:
+    result.complete(@[])
+    return
   let dirtyFile = ls.uriToStash(uri)
-  
+
   fileInfo.slot.queryMailbox.addLastNoWait(NimsuggestQuery[LspFilePosition](
     kind: kind,
     uri: uri,

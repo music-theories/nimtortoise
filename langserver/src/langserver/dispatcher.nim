@@ -136,7 +136,7 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
       if q.uri in ls.files.openFiles:
         let fileInfo = ls.files.openFiles[q.uri]
 
-        if fileInfo.slot.state == SlotState.STOPPED:
+        if fileInfo.slot.state == SlotState.STOPPED and q.kind == NimsuggestQueryKind.CHANGED:
           # Guard: if pool is at capacity and all slots are live, re-spawning
           # would immediately evict another live slot, causing circular eviction.
           let maxSlots = ls.configurations.currentConfig.maxNimsuggestProcesses
@@ -319,7 +319,15 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
         
         debug "processLangserverQueue: DID_CHANGE dispatcher adding CHANGED message to slot mailbox", uri = uri
 
-        ls.files.openFiles[uri].slot.queryMailbox.addLastNoWait(changedQuery)
+        let slot = ls.files.openFiles[uri].slot
+        if slot.state in {SlotState.STOPPED, SlotState.CRASHED}:
+          # Slot was evicted or permanently crashed. Complete the future immediately
+          # so it doesn't accumulate in a dead mailbox. The NIMSUGGEST CHANGED branch
+          # handles re-spawn via synthetic DID_OPEN injection; DID_CHANGE goes direct-
+          # to-mailbox and does not have that logic, so we just discard the query.
+          changedQuery.responseFuture.complete(@[])
+        else:
+          slot.queryMailbox.addLastNoWait(changedQuery)
 
       of FileAccessQueryKind.DID_SAVE:
         let uri = q.didSave.textDocument.uri
@@ -370,8 +378,7 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
         if uri notin ls.files.openFiles:
           continue
         let fileInfo = ls.files.openFiles[uri]
-        # if fileInfo.changed:
-        let checkQuery = await ls.queryFile(uri, NimsuggestQueryKind.CHECK_FILE)
+        discard ls.queryFile(uri, NimsuggestQueryKind.CHECK_FILE)
 
         fileInfo.slot.unassignUri(uri)
         # If the slot has no remaining tracked files, shut it down — important for standalone orphan slots.
