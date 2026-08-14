@@ -57,6 +57,8 @@ proc runNimsuggestQuery*(
     return await ns.recompile()
   of NimsuggestQueryKind.KNOWN:
     return await ns.known(path)
+  of NimsuggestQueryKind.CLOSE_MAILBOX:
+    doAssert false, "CLOSE_MAILBOX must not reach runNimsuggestQuery"
 
 proc processNimsuggestQueries*(
   slot: NimsuggestSlot, 
@@ -70,6 +72,10 @@ proc processNimsuggestQueries*(
     debug "processNimsuggestQueries: waiting for query", projectFile = slot.projectFile, mailboxLen = slot.queryMailbox.len
 
     let originalQuery = await slot.queryMailbox.popFirst()
+
+    if originalQuery.kind == NimsuggestQueryKind.CLOSE_MAILBOX:
+      debug "processNimsuggestQueries: received CLOSE_MAILBOX, exiting loop", projectFile = slot.projectFile
+      break
 
     debug "processNimsuggestQueries: running query", kind = $originalQuery.kind, projectFile = slot.projectFile, uri = originalQuery.uri
 
@@ -146,14 +152,15 @@ proc processNimsuggestQueries*(
         originalQuery.responseFuture.complete(@[])
         continue
 
-    of 
+    of
       NimsuggestQueryKind.DEFINITION,
       NimsuggestQueryKind.DECLARATION,
       NimsuggestQueryKind.TYPE_DEFINITION,
       NimsuggestQueryKind.REFERENCES,
       NimsuggestQueryKind.WORKSPACE_SYMBOLS,
       NimsuggestQueryKind.EXPAND,
-      NimsuggestQueryKind.KNOWN:
+      NimsuggestQueryKind.KNOWN,
+      NimsuggestQueryKind.CLOSE_MAILBOX:
       discard
 
     # Wait for spawning slot

@@ -18,16 +18,18 @@ requires "nim >= 2.0.8",
   "."
 
 task test, "run tests":
-  --silent
-  --run
-  setCommand "c", "tests/all.nim"
+  exec "nim c -r -o:bin/tests_all tests/all.nim"
+  
+  # # --silent
+  # --run
+  # setCommand "c", "tests/all.nim"
 
-task book, "Generate book":
-  exec "mdbook build book -d ../docs"
+# task book, "Generate book":
+#   exec "mdbook build book -d ../docs"
 
-task apidocs, "Generate API docs":
-  exec "nimble doc --outdir:docs/apidocs --project --index:on --git.url:https://github.com/nim-lang/langserver--git.commit:master --git.devel:master nimtortoise.nim"
+# task apidocs, "Generate API docs":
+#   exec "nimble doc --outdir:docs/apidocs --project --index:on --git.url:https://github.com/nim-lang/langserver--git.commit:master --git.devel:master nimtortoise.nim"
 
-task docs, "Generate docs":
-  exec "nimble book"
-  exec "nimble apidocs"
+# task docs, "Generate docs":
+#   exec "nimble book"
+#   exec "nimble apidocs"

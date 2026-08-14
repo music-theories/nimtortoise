@@ -118,6 +118,11 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
     # TODO: Check all paths through the dispatcher result in any pending futures being completed.
     debug "processLangserverQueue: dequeued item", kind = $query.kind
     case query.kind
+    of LangserverQueryKind.SHUTDOWN:
+      await ls.pool.stopNimsuggestProcesses()
+      query.shutdown.complete(true)
+      ls.isShutdown = true
+      return 
     of LangserverQueryKind.NIMSUGGEST:
       let q = query.nimsuggest
       # Refresh dirtyFile at dispatch time. The query was constructed in the LSP
@@ -130,8 +135,41 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
       # First, check if the current file is owned by a nimsuggest instance
       if q.uri in ls.files.openFiles:
         let fileInfo = ls.files.openFiles[q.uri]
+
+        if fileInfo.slot.state == SlotState.STOPPED:
+          # Guard: if pool is at capacity and all slots are live, re-spawning
+          # would immediately evict another live slot, causing circular eviction.
+          let maxSlots = ls.configurations.currentConfig.maxNimsuggestProcesses
+          let atCapacity = maxSlots > 0 and ls.pool.slots.len >= maxSlots
+          let allSlotsLive = atCapacity and ls.pool.slots.values.toSeq.allIt(it.state == SlotState.READY)
+          if allSlotsLive:
+            debug "processLangserverQueue: pool at capacity with all slots live, cannot re-spawn without eviction cycle",
+              uri = q.uri
+            if not q.responseFuture.finished:
+              q.responseFuture.complete(@[])
+            continue
+          # The slot was evicted. Remove the stale openFiles entry and inject a
+          # synthetic DID_OPEN at the front of the queue so the full spawn /
+          # consolidation / eviction machinery re-establishes the slot. Re-queue
+          # the original query behind it so it runs once the slot is live again.
+          debug "processLangserverQueue: slot is STOPPED, injecting synthetic DID_OPEN",
+            uri = q.uri, projectFile = fileInfo.slot.projectFile
+          fileInfo.slot.unassignUri(q.uri)
+          ls.files.openFiles.del(q.uri)
+          ls.langserverQueue.addFirstNoWait(LangserverQuery(
+            kind: LangserverQueryKind.NIMSUGGEST,
+            nimsuggest: q
+          ))
+          ls.langserverQueue.addFirstNoWait(LangserverQuery(
+            kind: LangserverQueryKind.FILE_ACCESS,
+            fileAccess: FileAccessQuery(
+              kind: FileAccessQueryKind.DID_OPEN,
+              didOpen: DidOpenTextDocumentParams(textDocument: fileInfo.textDocument)
+            )
+          ))
+          continue
+
         fileInfo.slot.queryMailbox.addLastNoWait(q)
-        
         debug "processLangserverQueue: dispatcher added message to slot mailbox", uri = q.uri, kind = $q.kind, fileInfoIsNil = (fileInfo == nil), projectFile = fileInfo.slot.projectFile
 
       else:
@@ -146,8 +184,6 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
         # Check if file is already open
         if uri in ls.files.openFiles:
           debug "didOpenFile: URI already tracked, skipping", uri = uri
-          # TODO/NOTE: Do I have to complete the future here?
-          # q.responseFuture.complete(@[])
 
         else:
           # Check if file is known to any nimsuggest instance

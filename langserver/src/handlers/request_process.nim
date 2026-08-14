@@ -1,10 +1,11 @@
 import std/[options, json, os]
 import chronos
+import chronos/asyncproc
 import chronicles
 import ../protocol/[types, enums]
 import ../utils/asyncprocmonitor
 import ../nimsuggest/nimsuggest
-import ../langserver/[langserver_types]
+import ../langserver/[langserver_types, query_types]
 
 proc getNphPath*(): Option[string] =
   let path = findExe "nph"
@@ -128,7 +129,13 @@ proc initialize*(
 # === shutdown ===
 proc shutdown*(ls: LanguageServer, input: JsonNode): Future[JsonNode] {.async.} =
   debug "Shutting down"
-  await ls.pool.stopNimsuggestProcesses()
+  let shutdownQuery = LangserverQuery(
+    kind: LangserverQueryKind.SHUTDOWN,
+    shutdown: newFuture[bool]("shutdown")
+  )
+  ls.langserverQueue.addLastNoWait(shutdownQuery)
+  discard await shutdownQuery.shutdown
+  # await ls.pool.stopNimsuggestProcesses()
   ls.isShutdown = true
   # let id = input{"id"}.extractId
   result = newJNull()
@@ -140,7 +147,8 @@ proc exit*(
 ): Future[JsonNode] {.async.} =
   if not p.ls.isShutdown:
     debug "Received an exit request without prior shutdown request"
-    await p.ls.pool.stopNimsuggestProcesses()
+    discard await p.ls.shutdown(newJNull())
+    # await p.ls.pool.stopNimsuggestProcesses()
   debug "Quitting process"
   result = newJNull()
   await p.onExit()

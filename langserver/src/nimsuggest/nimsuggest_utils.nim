@@ -130,9 +130,11 @@ proc toNimsuggestQuery*(
   of NimsuggestQueryKind.CHANGED:
     return some(NimsuggestQuery[NimsuggestFilePosition](
       id: q.id, uri: q.uri, dirtyFile: q.dirtyFile,
-      responseFuture: q.responseFuture, 
+      responseFuture: q.responseFuture,
       cancelled: q.cancelled,
       kind: NimsuggestQueryKind.CHANGED,
-      saved: q.saved      
+      saved: q.saved
     ))
+  of NimsuggestQueryKind.CLOSE_MAILBOX:
+    return none(NimsuggestQuery[NimsuggestFilePosition])
 

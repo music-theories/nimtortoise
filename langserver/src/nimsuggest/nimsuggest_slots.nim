@@ -151,11 +151,19 @@ proc execStop*(slot: NimsuggestSlot, pool: NimsuggestPool): Future[bool] {.async
         if not nsOpt.get.project.process.isNil:
           await shutdownChildProcess(nsOpt.get.project.process)
         slot.state = SlotState.STOPPED
+        slot.queryMailbox.addLastNoWait(NimsuggestQuery[LspFilePosition](
+          kind: NimsuggestQueryKind.CLOSE_MAILBOX,
+          responseFuture: newFuture[seq[Suggest]]("close_mailbox"),
+        ))
         return true
       except CatchableError as ex:
         debug "execStop: stop raised (process may already be dead)",
           projectFile = slot.projectFile, msg = ex.msg
     slot.state = SlotState.STOPPED
+    slot.queryMailbox.addLastNoWait(NimsuggestQuery[LspFilePosition](
+      kind: NimsuggestQueryKind.CLOSE_MAILBOX,
+      responseFuture: newFuture[seq[Suggest]]("close_mailbox"),
+    ))
     return false
 
 proc attemptCrashRespawn*(

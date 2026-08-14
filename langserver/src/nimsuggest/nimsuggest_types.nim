@@ -39,6 +39,7 @@ type
     CHECK_PROJECT      ## chk     — full project diagnostics
     RECOMPILE          ## recompile — force full in-process recompile
     KNOWN              ## known     — is this file in the module graph?
+    CLOSE_MAILBOX      ## sentinel  — causes processNimsuggestQueries to exit cleanly
 
   NimsuggestQuery*[P] = ref object
     id*: uint
@@ -70,7 +71,8 @@ type
       NimsuggestQueryKind.CHECK_FILE,
       NimsuggestQueryKind.CHECK_PROJECT,
       NimsuggestQueryKind.RECOMPILE,
-      NimsuggestQueryKind.KNOWN:
+      NimsuggestQueryKind.KNOWN,
+      NimsuggestQueryKind.CLOSE_MAILBOX:
       discard
     of NimsuggestQueryKind.CHANGED:
       saved*: bool

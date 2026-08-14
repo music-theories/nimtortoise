@@ -226,6 +226,8 @@ proc getNimsuggestCapabilities*(
 
 proc logNsError(project: Project) {.async.} =
   let err = string.fromBytes(project.process.stderrStream.read().await)
+  if err.len == 0:
+    return
   error "NimSuggest Error (stderr)", err = err
   project.markFailed(err)
 
@@ -352,42 +354,48 @@ proc processQueue(self: Nimsuggest): Future[void] {.async.} =
             if not f.failed and not f.read():
               debug "Calling restart"
               self.timeoutCallback(self)
-        let ta = initTAddress(&"127.0.0.1:{self.port}")
-        let transport = await ta.connect()
-        discard await transport.write(req.commandString & "\c\L")
+        try:
+          let ta = initTAddress(&"127.0.0.1:{self.port}")
+          let transport = await ta.connect()
+          discard await transport.write(req.commandString & "\c\L")
 
-        const bufferSize = 1024 * 1024 * 4
-        var buffer: seq[byte] = newSeq[byte](bufferSize)
+          const bufferSize = 1024 * 1024 * 4
+          var buffer: seq[byte] = newSeq[byte](bufferSize)
 
-        var data = await transport.read()
-        let content = data.toString()
+          var data = await transport.read()
+          let content = data.toString()
 
-        for lineStr in content.splitLines:
-          if lineStr != "":
-            case req.command
-            of "known":
-              let sug = Suggest()
-              sug.section = ideKnown
-              sug.forth = lineStr
-              res.add sug
-            of "inlayHints":
-              res.add Suggest(inlayHintInfo: parseSuggestInlayHint(lineStr))
-            else:
-              let sug = parseSuggestDef(lineStr)
-              if sug.isSome:
-                res.add sug.get
+          for lineStr in content.splitLines:
+            if lineStr != "":
+              case req.command
+              of "known":
+                let sug = Suggest()
+                sug.section = ideKnown
+                sug.forth = lineStr
+                res.add sug
+              of "inlayHints":
+                res.add Suggest(inlayHintInfo: parseSuggestInlayHint(lineStr))
+              else:
+                let sug = parseSuggestDef(lineStr)
+                if sug.isSome:
+                  res.add sug.get
 
-        if (content == ""):
-          self.project.markFailed "Server crashed/socket closed."
-          debug "Server socket closed"
-        if not req.future.finished:
-          debug "Sending result(s)", length = res.len
-          req.future.complete res
-          self.successfullCall = true
-          transport.close()
-        else:
-          debug "Call was cancelled before sending the result", command = req.command
-          transport.close()
+          if (content == ""):
+            self.project.markFailed "Server crashed/socket closed."
+            debug "Server socket closed"
+          if not req.future.finished:
+            debug "Sending result(s)", length = res.len
+            req.future.complete res
+            self.successfullCall = true
+            transport.close()
+          else:
+            debug "Call was cancelled before sending the result", command = req.command
+            transport.close()
+        except CatchableError as ex:
+          debug "processQueue: TCP error", msg = ex.msg
+          self.project.markFailed ex.msg
+          if not req.future.finished:
+            req.future.complete @[]
   self.processing = false
   self.project.lastCmdDate = some(now())
 
