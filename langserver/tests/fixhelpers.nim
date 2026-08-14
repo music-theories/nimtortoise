@@ -48,6 +48,16 @@ proc generateMonorepoNimblePaths*() =
     "--noNimblePath\n--path:\"" & pkgbSrc & "\"\n"
   )
 
+proc stopServer*(client: LspSocketClient) =
+  ## Cleanly shut down the language server via the LSP wire protocol.
+  ## `shutdown` stops all nimsuggest processes; `exit` closes the transport.
+  ## The sleepAsync gives Chronos one scheduler pass to flush the exit handler and
+  ## close all sockets + pipe FDs, preventing both FD accumulation and port reuse
+  ## across successive test suites.
+  discard waitFor client.call("shutdown", newJNull())
+  client.notify("exit", newJNull())
+  waitFor sleepAsync(200)
+
 proc startServer*(rootRelPath: string): (CommandLineParams, LanguageServer, LspSocketClient) =
   let cmdParams = CommandLineParams(
     mode: some lsp,

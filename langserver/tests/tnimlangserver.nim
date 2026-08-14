@@ -13,6 +13,7 @@ import ../src/utils/utils
 import ../src/utils/process_utils
 import ../src/nimtortoise
 
+from fixhelpers import stopServer
 
 ## tnimlangserver.nim — rewrite-compatible port of tests/tnimlangserver.nim
 ##
@@ -48,6 +49,8 @@ suite "Nimlangserver":
     }
     let initializeResult = waitFor client.initialize(initParams)
     check initializeResult.capabilities.textDocumentSync.isSome
+
+  stopServer(client)
 
 
 let helloWorldUri = fixtureUri("projects/hw/hw.nim")
@@ -96,6 +99,7 @@ suite "Suggest API selection":
       hover = client.call("textDocument/hover", %hoverParams).waitFor
     check hover.kind == JNull
 
+  stopServer(client)
 
 suite "LSP features":
   let cmdParams = CommandLineParams(mode: some lsp, transport: some socket, port: getNextFreePort())
@@ -343,6 +347,7 @@ suite "LSP features":
     doAssert nullResponse == nullValue
     doAssert ls.isShutdown
 
+  stopServer(client)
 
 suite "Null configuration:":
   let cmdParams = CommandLineParams(mode: some lsp, transport: some socket, port: getNextFreePort())
@@ -380,3 +385,5 @@ suite "Null configuration:":
     let hoverParams = positionParams("projects/hw/hw.nim".fixtureUri, 2, 0)
     let hover = client.call("textDocument/hover", %hoverParams).waitFor
     doAssert hover.kind == JNull
+
+  stopServer(client)

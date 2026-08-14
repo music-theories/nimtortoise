@@ -68,6 +68,8 @@ suite "Fix — checkFile sends changed() before chkFile":
       0
     )
 
+  stopServer(client)
+
 # ---------------------------------------------------------------------------
 # Suite 2: Fix #8 — config-first init
 # ---------------------------------------------------------------------------
@@ -104,6 +106,8 @@ suite "Fix #8 — config-first init: projectMapping applied on first open":
         "Nimsuggest initialized for" in msg and "widget.nim" in msg,
       1000
     )
+
+  stopServer(client)
 
 # ---------------------------------------------------------------------------
 # Suite 3: concurrent spawn limit
@@ -143,3 +147,5 @@ suite "Fix — concurrent didOpen respects maxNimsuggestProcesses=1":
 
     waitFor sleepAsync(1000)
     check waitForInstanceCount(client, 1, 5000)
+
+  stopServer(client)

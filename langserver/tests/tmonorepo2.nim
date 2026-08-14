@@ -41,6 +41,8 @@ suite "Fix #7 and #11 — workspace/didRenameFiles":
     )
     echo "    >> DONE: publishDiagnostics clears errors for old URI after rename"
 
+  stopServer(client)
+
 suite "Fix #12A — openFiles sync on didClose":
   generateSimpleNimblePaths()
   let (cmdParams, ls, client) = startServer("tests/projects/simple")
@@ -62,3 +64,5 @@ suite "Fix #12A — openFiles sync on didClose":
     discard sendHover(client, "tests/projects/simple/src/simple.nim", 4, 5)
     check true
     echo "    >> DONE: closing one file does not break hover on another file"
+
+  stopServer(client)

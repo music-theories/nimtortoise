@@ -13,6 +13,8 @@ import ../src/utils/utils
 import ../src/utils/process_utils
 import ../src/nimtortoise
 
+from fixhelpers import stopServer
+
 suite "LSP features (failing)":
   let helloWorldUri = fixtureUri("projects/hw/hw.nim")
   let cmdParams = CommandLineParams(mode: some lsp, transport: some socket, port: getNextFreePort())
@@ -63,3 +65,5 @@ suite "LSP features (failing)":
     let hoverParams = positionParams(fixtureUri("projects/hw/hw.nim"), 2, 0)
     let hoverResponse = client.call("textDocument/hover", %hoverParams).waitFor
     check contains($hoverResponse, "hw.a: proc ()")
+
+  stopServer(client)

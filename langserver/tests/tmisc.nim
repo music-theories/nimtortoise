@@ -13,6 +13,7 @@ import ../src/utils/utils
 import ../src/utils/process_utils
 import ../src/nimtortoise
 
+from fixhelpers import stopServer
 
 ## tmisc.nim — rewrite-compatible port of tests/tmisc.nim
 ##
@@ -79,6 +80,8 @@ suite "Nimlangserver misc":
       fmt"Nimsuggest for {hwAbsFile} was stopped because it was idle for too long",
     )
 
+  stopServer(client)
+
 suite "Nimlangserver idle nimsuggest cleanup":
   let cmdParams = CommandLineParams(mode: some lsp, transport: some socket, port: getNextFreePort())
   let ls = main(cmdParams)
@@ -124,6 +127,8 @@ suite "Nimlangserver idle nimsuggest cleanup":
         break
     check removed
 
+  stopServer(client)
+
 suite "Nimlangserver fail count":
   test "fail count is reset when a nimsuggest starts successfully":
     echo "    >> fail count is reset when a nimsuggest starts successfully"
@@ -155,3 +160,4 @@ suite "Nimlangserver fail count":
     # Verify crashCount is 0 after a clean spawn
     if hwAbsFile2 in ls2.pool.slots:
       check ls2.pool.slots[hwAbsFile2].crashCount == 0
+    stopServer(client2)

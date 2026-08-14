@@ -32,6 +32,8 @@ suite "Fix #10 — nimble.paths forwarded to nimsuggest":
     check hover.kind != JNull
     echo "    >> DONE: nimsuggest receives --noNimblePath from nimble.paths"
 
+  stopServer(client)
+
 suite "Fix #16 — listTests with no entryPoint":
   generateSimpleNimblePaths()
   let (cmdParams, ls, client) = startServer("tests/projects/simple")
@@ -52,6 +54,8 @@ suite "Fix #16 — listTests with no entryPoint":
       500
     )
     echo "    >> DONE: listTests returns success with empty result when entryPoint is not set"
+
+  stopServer(client)
 
 suite "Fix #17 — in-flight commands complete with [] not error":
   generateSimpleNimblePaths()
@@ -84,6 +88,8 @@ suite "Fix #17 — in-flight commands complete with [] not error":
     )
     echo "    >> DONE: documentSymbol returns [] not an error when nimsuggest is killed mid-flight"
 
+  stopServer(client)
+
 suite "Fix #19 — LRU eviction at process limit":
   generateMonorepoNimblePaths()
   let (cmdParams, ls, client) = startServer("tests/projects/monorepo")
@@ -112,6 +118,8 @@ suite "Fix #19 — LRU eviction at process limit":
     )
     check hover.kind != JNull
     echo "    >> DONE: when limit is 1, opening pkga evicts pkgb"
+
+  stopServer(client)
 
 suite "Fix #13 — opening pkgb while pkga nimsuggest runs":
   generateMonorepoNimblePaths()
@@ -143,3 +151,5 @@ suite "Fix #13 — opening pkgb while pkga nimsuggest runs":
     )
     check hover.kind != JNull
     echo "    >> DONE: opening pkgb while pkga nimsuggest runs gives hover for pkgb"
+
+  stopServer(client)
