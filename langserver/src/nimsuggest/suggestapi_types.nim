@@ -1,4 +1,4 @@
-import std/[options, sets, times, deques]
+import std/[options, times, deques]
 
 import chronos
 import chronos/asyncproc
@@ -77,7 +77,6 @@ type
     tooltip*: string
 
   NimsuggestImpl* = object
-    openFiles*: OrderedSet[FileUri]
     successfullCall*: bool
     port*: int
     root*: FilePath

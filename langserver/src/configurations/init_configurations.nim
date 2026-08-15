@@ -122,9 +122,17 @@ proc parseWorkspaceConfigurationResponse*(conf: JsonNode): Option[NlsConfig] =
     let items = if conf.kind == JArray: conf else: newJArray()
     if items.len == 0:
       return none(NlsConfig)
-    if items[0].kind == JObject:
-      return some(nlsConfigFromJson(items[0]))
-    return none(NlsConfig)
+    if items[0].kind != JObject:
+      return none(NlsConfig)
+    var cfg = nlsConfigFromJson(items[0])
+    # Fall back to the nim section for fields not set in nimTortoise.
+    # projectMapping is the key field: the nimTortoise section typically has an
+    # empty array (no override) while the nim section carries the real mappings.
+    if cfg.projectMapping.len == 0 and items.len > 1 and items[1].kind == JObject:
+      let nimJson = items[1]
+      if nimJson.hasKey("projectMapping"):
+        cfg.projectMapping = nimJson["projectMapping"].to(seq[NlsNimsuggestConfig])
+    return some(cfg)
   except CatchableError:
     debug "Failed to parse workspace/configuration response.", error = getCurrentExceptionMsg()
     return none(NlsConfig)

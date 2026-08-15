@@ -68,7 +68,9 @@ proc parseTestResults*(xmlContent: string): RunTestProjectResult =
       result.suites.add(suite)
 
 proc listTests*(
-  entryPoint: string, nimPath: string, workspaceRoot: string
+  entryPoint: FilePath, 
+  nimPath: FilePath, 
+  workspaceRoot: FilePath
 ): Future[TestProjectInfo] {.async.} =
   debug "TODO: Implement tests."
   return TestProjectInfo()
@@ -111,12 +113,12 @@ proc listTests*(
 #     await shutdownChildProcess(process)
 
 proc runTests*(
-    entryPoint: string,
-    nimPath: string,
-    suiteName: string,
-    testNames: seq[string],
-    workspaceRoot: string,
-    ls: LanguageServer,
+  ls: LanguageServer,
+  entryPoint: string,
+  nimPath: string,
+  suiteName: string,
+  testNames: seq[string],
+  workspaceRoot: string,
 ): Future[RunTestProjectResult] {.async.} =
   var entryPoint = getFullPath(entryPoint, workspaceRoot)
   if not fileExists(entryPoint):

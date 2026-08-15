@@ -10,9 +10,6 @@ proc initialized*(ls: LanguageServer, _: JsonNode): Future[void] {.async.} =
   debug "Client initialized."
   ls.maybeRegisterCapabilityDidChangeConfiguration()
 
-  # ls.maybeRequestConfigurationFromClient()
-  # proc maybeRequestConfigurationFromClient*(ls: LanguageServer) =
-
   if ls.supportsConfigurationRequest:
     debug "Requesting configuration from the client"
     
@@ -35,21 +32,11 @@ proc initialized*(ls: LanguageServer, _: JsonNode): Future[void] {.async.} =
     except CatchableError as ex:
       debug "Failed to receive workspace configuration", error = ex.msg
 
-    # asyncSpawn ls.receiveConfiguration(configFuture)
   else:
     debug "Client does not support workspace/configuration"
     ls.configurations.configReady.fire()
-  
-  # debug "Waiting for workspace configuration from client"
-  # let completed = await withTimeout(ls.configurations.configReady.wait(), milliseconds(CONFIG_WAIT_TIMEOUT_MS))
 
-  # if not completed:
-  #   warn "Workspace configuration not received within timeout; proceeding with defaults"
-
-  # await ls.waitForWorkspaceConfiguration()
-  await ls.initNimsuggestInstances(
-    ls.capabilities.lspInitializeParams.getRootPath
-  )
+  await ls.initNimsuggestInstances()
 
   if not ls.lsInitialized.finished:
     ls.lsInitialized.complete()

@@ -25,7 +25,7 @@ proc extractMacroExpansion*(output: string, targetLine: int): string =
       result = result.replace("[ExpandMacro]", "")
 
 proc nimExpandMacro*(
-    nimPath: string, suggest: Suggest, filePath: string
+  nimPath: string, suggest: Suggest, filePath: string
 ): Future[string] {.async.} =
   let
     macroName = suggest.qualifiedPath[suggest.qualifiedPath.len - 1]
@@ -61,7 +61,7 @@ proc extractArcExpansion*(output: string, procName: string): string =
     result = result.replace(cond, "").strip()
 
 proc nimExpandArc*(
-    nimPath: string, suggest: Suggest, filePath: string
+  nimPath: string, suggest: Suggest, filePath: string
 ): Future[string] {.async.} =
   let procName = suggest.qualifiedPath[suggest.qualifiedPath.len - 1]
   debug "nimExpandArc", procName = procName, filePath = filePath

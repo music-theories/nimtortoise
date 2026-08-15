@@ -55,10 +55,9 @@ proc toPendingRequestStatus(pr: PendingRequest): PendingRequestStatus =
 
 
 proc progressSupported*(ls: LanguageServer): bool =
-  result = ls.capabilities.serverMode == lsp and
-    ls.capabilities.lspInitializeParams.capabilities.window
-      .get(ClientCapabilities_window()).workDoneProgress
-      .get(false)
+  return ls.capabilities.lspInitializeParams.capabilities.window
+    .get(ClientCapabilities_window()).workDoneProgress
+    .get(false)
 
 proc progress*(ls: LanguageServer, token, kind: string, title = "") =
   if ls.progressSupported:
@@ -104,8 +103,8 @@ proc getLspStatus*(ls: LanguageServer): NimLangServerStatus {.raises: [].} =
             path: ns.nimSuggestPath,
             port: ns.port,
           )
-          for open in ns.openFiles.toSeq():
-            nsStatus.openFiles.add string(open)
+          for open in slot.ownedUris.toSeq():
+            nsStatus.openFiles.add(string(open))
           result.nimsuggestInstances.add nsStatus
       except CatchableError:
         discard

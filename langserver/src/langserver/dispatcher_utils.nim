@@ -102,7 +102,6 @@ proc addFileToOpenFiles*(
   # Register in the file table (sync, atomic)
   let fileInfo = NlsFileInfo(
     slot: nimsuggestSlot,
-    # changed: true,
     fingerTable: fingerTable,
     textDocument: params,
     lastChanged: times.now(),
@@ -110,16 +109,11 @@ proc addFileToOpenFiles*(
   )
   ls.files.openFiles[params.uri] = fileInfo
 
-  if params.uri in ls.files.idleOpenFiles:
-    ls.files.idleOpenFiles.del(params.uri)
+  # if params.uri in ls.files.idleOpenFiles:
+  #   ls.files.idleOpenFiles.del(params.uri)
 
   # Register ownership in the slot (sync, atomic with above)
   nimsuggestSlot.assignUri(params.uri)
-  # Also sync the live NimSuggest's openFiles set so getLspStatus displays correctly.
-  # execSpawn copies ownedUris → ns.openFiles at spawn time, but files opened on an
-  # already-READY slot are not reached by that path.
-  if nimsuggestSlot.state == SlotState.READY:
-    nimsuggestSlot.ns.read.openFiles.incl(params.uri)
 
 proc sortNimsuggestByDate(a, b: NimsuggestSlot): int = 
   if a.lastCmdTime == b.lastCmdTime:
@@ -177,45 +171,46 @@ proc queryFile*(ls: LanguageServer, uri: FileUri, kind: NimsuggestQueryKind): Fu
     result.complete(@[])
     return
   let dirtyFile = ls.uriToStash(uri)
-
-  fileInfo.slot.queryMailbox.addLastNoWait(NimsuggestQuery[LspFilePosition](
+  let query = NimsuggestQuery[LspFilePosition](
     kind: kind,
     uri: uri,
     dirtyFile: dirtyFile,
     responseFuture: result,
-  ))
+  )
 
-var compiledRegexCache {.threadvar.}: Table[string, Regex2]
+  fileInfo.slot.queryMailbox.addLastNoWait(query)
 
-proc getCompiledRegex(pattern: string): Regex2 =
-  ## Returns a cached compiled Regex2 for pattern, compiling it on first use.
-  ## Chronos is single-threaded cooperative, so no locking is needed.
-  if pattern notin compiledRegexCache:
-    compiledRegexCache[pattern] = re2(pattern)
-  compiledRegexCache[pattern]
+# var compiledRegexCache {.threadvar.}: Table[string, Regex2]
 
-proc clearCompiledRegexCache*() =
-  ## Invalidate the regex cache. Call after workspace configuration changes so
-  ## that stale projectMapping patterns are not reused across config updates.
-  compiledRegexCache.clear()
+# proc getCompiledRegex(pattern: string): Regex2 =
+#   ## Returns a cached compiled Regex2 for pattern, compiling it on first use.
+#   ## Chronos is single-threaded cooperative, so no locking is needed.
+#   if pattern notin compiledRegexCache:
+#     compiledRegexCache[pattern] = re2(pattern)
+#   compiledRegexCache[pattern]
 
-proc getIntendedProject*(ls: LanguageServer, uri: FileUri): FilePath =
-  ## ProjectMapping regex lookup only. No slot creation, no LRU fallback.
-  ## Returns FilePath("") if no mapping matches.
-  let path = uri.uriToPath
-  let rootPath =
-    case ls.capabilities.serverMode
-    of lsp: ls.capabilities.lspInitializeParams.getRootPath
-    of mcp: ls.capabilities.mcpInitializeParams.getRootPath
-  let pathRelativeToRoot = string(path).tryRelativeTo(rootPath)
-  let config = ls.configurations.currentConfig
-  for mapping in config.projectMapping:
-    var m: RegexMatch2
-    if find(string(path), getCompiledRegex(mapping.fileRegex), m):
-      if mapping.projectFile == "":
-        return path  # regex matched but no projectFile — file is its own project
-      return FilePath(
-        if isAbsolute(mapping.projectFile): mapping.projectFile
-        else: rootPath / mapping.projectFile
-      )
-  return FilePath("")
+# proc clearCompiledRegexCache*() =
+#   ## Invalidate the regex cache. Call after workspace configuration changes so
+#   ## that stale projectMapping patterns are not reused across config updates.
+#   compiledRegexCache.clear()
+
+# proc getIntendedProject*(ls: LanguageServer, uri: FileUri): FilePath =
+#   ## ProjectMapping regex lookup only. No slot creation, no LRU fallback.
+#   ## Returns FilePath("") if no mapping matches.
+#   let path = uri.uriToPath
+#   let rootPath =
+#     case ls.capabilities.serverMode
+#     of lsp: ls.capabilities.lspInitializeParams.getRootPath
+#     of mcp: ls.capabilities.mcpInitializeParams.getRootPath
+#   let pathRelativeToRoot = string(path).tryRelativeTo(rootPath)
+#   let config = ls.configurations.currentConfig
+#   for mapping in config.projectMapping:
+#     var m: RegexMatch2
+#     if find(string(path), getCompiledRegex(mapping.fileRegex), m):
+#       if mapping.projectFile == "":
+#         return path  # regex matched but no projectFile — file is its own project
+#       return FilePath(
+#         if isAbsolute(mapping.projectFile): mapping.projectFile
+#         else: rootPath / mapping.projectFile
+#       )
+#   return FilePath("")

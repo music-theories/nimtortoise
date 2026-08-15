@@ -1,4 +1,5 @@
 import std/[os, sha1, tables, options]
+import chronicles
 import ./langserver_types
 import ../utils/utils
 import ../protocol/types
@@ -7,7 +8,7 @@ proc uriStorageLocation*(ls: LanguageServer, uri: FileUri): FilePath =
   # Use SHA-1 for a collision-resistant stash filename (40 hex chars).
   # std/hash is a 64-bit integer hash; two URIs could share it and silently
   # overwrite each other's edit buffer. SHA-1 collision probability is ~2^-80.
-  return FilePath(ls.files.storageDir / ($secureHash(string(uri)) & ".nim"))
+  return FilePath(string(ls.files.storageDir) / ($secureHash(string(uri)) & ".nim"))
 
 proc uriToStash*(ls: LanguageServer, uri: FileUri): FilePath =
   if ls.files.openFiles.hasKey(uri):
@@ -32,13 +33,28 @@ proc getCharacter*(
   else:
     return none(int)
 
-proc getRootPath*(ip: LspInitializeParams): string =
-  if ip.rootUri.isNone or ip.rootUri.get == FileUri(""):
-    if ip.rootPath.isSome and ip.rootPath.get != "":
-      return ip.rootPath.get
+proc getRootPath*(params: LspInitializeParams): Option[FilePath] = 
+  if params.rootUri.isSome():
+    let rootUri: FileUri = params.rootUri.get()
+    if string(rootUri).len > 0:
+      let path = uriToPath(rootUri)
+      debug "getRootPath: rootUri on LSPInitializeParams found ", path = path
+      return some(path)
     else:
-      return string(FilePath(getCurrentDir()).pathToUri.uriToPath)
-  string(ip.rootUri.get.uriToPath)
+      debug "getRootPath: rootUri on LSPInitializeParams is none()."
+      return none(FilePath)
+  else:
+    let rootPathParam = params.rootPath
+    if rootPathParam.isSome():
+      let rootPath = rootPathParam.get()
+      if string(rootPath).len > 0:
+        let path = toFilePath(normalizedPath(rootPath))
+        debug "getRootPath: rootUri on LSPInitializeParams found ", path = path
+        return some(path)
+      else:
+        debug "getRootPath: rootPath on LSPInitializeParams has length 0."
+      return none(FilePath)
 
-proc getRootPath*(ip: McpInitializeParams): string =
-  string(FilePath(getCurrentDir()).pathToUri.uriToPath)
+    else:
+      debug "getRootPath: rootPath on LSPInitializeParams is none."
+      return none(FilePath)

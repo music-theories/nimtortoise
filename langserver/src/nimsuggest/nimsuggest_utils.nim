@@ -1,9 +1,15 @@
-import std/[options, tables]
+import std/[os, sequtils, strutils, tables, options]
 import chronos
 import chronicles
+
+import ../utils/process_utils
 import ../utils/utils
-import ./[suggestapi_types, nimsuggest_types]
 import ../protocol/types
+import ../nim_compiler/nim_compiler
+import ../nimble/[nimble_types, nimble]
+import ../configurations/configurations
+
+import ./[suggestapi_types, nimsuggest_types]
 
 proc mailboxHasQueryOfKind*(
   slot: NimsuggestSlot, 
@@ -135,6 +141,49 @@ proc toNimsuggestQuery*(
       kind: NimsuggestQueryKind.CHANGED,
       saved: q.saved
     ))
-  of NimsuggestQueryKind.CLOSE_MAILBOX:
+  of NimsuggestQueryKind.SHUTDOWN:
     return none(NimsuggestQuery[NimsuggestFilePosition])
 
+proc getNimSuggestPathAndVersion*(
+  nimbleDumpInfo: NimbleDumpInfo, conf: NlsConfig # , workingDir: string
+): Future[tuple[path: string, version: string]] {.async.} =
+  # let nimDir = nimbleDumpInfo.nimDir.get("")
+  if nimbleDumpInfo.nimDir.isSome():
+    let nimDir = nimbleDumpInfo.nimDir.get()
+    var nimsuggestPath = expandTilde(conf.nimsuggestPath)
+    if nimsuggestPath.len > 0:
+      let nimVersion = getNimVersion(nimsuggestPath.parentDir)
+      debug "findNimsuggestPathAndVersion: Using nimsuggest", 
+        path = nimsuggestPath, version = nimVersion
+      return (path: nimsuggestPath, version: nimVersion)
+    else:
+      if nimDir != "" and dirExists(nimDir):
+        let nimVersion = getNimVersion(nimDir) & " from " & nimDir
+        debug "findNimsuggestPathAndVersion: Found nimsuggest.", 
+          path = nimsuggestPath, version = nimVersion
+        return (
+          path: nimDir / "nimsuggest".addFileExt(ExeExt),
+          version: nimVersion
+        )
+      else:
+        debug "findNimsuggestPathAndVersion: nim directory from nimble dump doesn't exist. ", nimDir = nimDir
+        let nimsuggestPath = findExe("nimsuggest")
+        if nimsuggestPath.len > 0:
+          let nimVersion = getNimVersion(nimsuggestPath.parentDir)
+          debug "findNimsuggestPathAndVersion: found nimsuggest using findExe(). ", 
+            path = nimsuggestPath, version = nimVersion
+          return (path: nimsuggestPath, version: nimVersion)
+        else:
+          let nimbleBinPath = getHomeDir() / ".nimble" / "bin" / "nimsuggest".addFileExt(ExeExt)
+          debug "findNimsuggestPathAndVersion: used findExe() to look for nimsuggest but couldn't find it. Looking in homeDir ", location = nimbleBinPath
+          # Fallback for restricted PATH environments (e.g. Dock launch on macOS where
+          # PATH is /usr/bin:/bin:/usr/sbin:/sbin and ~/.nimble/bin is not included,
+          # or Linux desktop launches that only source ~/.profile). Uses ExeExt so
+          # the check works on Windows ("nimsuggest.exe") too.
+          if fileExists(nimbleBinPath):
+            let nimVersion = getNimVersion(nimbleBinPath.parentDir)
+            debug "findNimsuggestPathAndVersion: found nimsuggest in homeDir ", version = nimVersion
+            return (path: nimbleBinPath, version: nimVersion)
+          else:
+            debug "findNimsuggestPathAndVersion: Could not locate nimsuggest "
+            return (path: "", version: getNimVersion(""))

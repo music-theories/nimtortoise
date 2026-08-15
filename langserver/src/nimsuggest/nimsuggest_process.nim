@@ -1,8 +1,9 @@
-import std/[options, strutils, sets, tables, times, json]
+import std/[options, strutils, sets, tables, times, json, sequtils]
 import chronos
 import chronicles
 
 import ../utils/utils
+import ../utils/process_utils
 import ../configurations/configurations
 import ../protocol/types
 
@@ -57,8 +58,8 @@ proc runNimsuggestQuery*(
     return await ns.recompile()
   of NimsuggestQueryKind.KNOWN:
     return await ns.known(path)
-  of NimsuggestQueryKind.CLOSE_MAILBOX:
-    doAssert false, "CLOSE_MAILBOX must not reach runNimsuggestQuery"
+  of NimsuggestQueryKind.SHUTDOWN:
+    doAssert false, "SHUTDOWN must not reach runNimsuggestQuery"
 
 proc processNimsuggestQueries*(
   slot: NimsuggestSlot, 
@@ -68,13 +69,15 @@ proc processNimsuggestQueries*(
   notifyProc: proc(name: string, params: JsonNode) {.gcsafe, raises: [].} #Send a notification to the client
 ) {.async.} =
   debug "processNimsuggestQueries: starting", projectFile = slot.projectFile
+  var shutdownFut: Future[void] = nil
   while true:
     debug "processNimsuggestQueries: waiting for query", projectFile = slot.projectFile, mailboxLen = slot.queryMailbox.len
 
     let originalQuery = await slot.queryMailbox.popFirst()
 
-    if originalQuery.kind == NimsuggestQueryKind.CLOSE_MAILBOX:
-      debug "processNimsuggestQueries: received CLOSE_MAILBOX, exiting loop", projectFile = slot.projectFile
+    if originalQuery.kind == NimsuggestQueryKind.SHUTDOWN:
+      debug "processNimsuggestQueries: received SHUTDOWN, exiting loop", projectFile = slot.projectFile
+      shutdownFut = originalQuery.shutdownFuture
       break
 
     debug "processNimsuggestQueries: running query", kind = $originalQuery.kind, projectFile = slot.projectFile, uri = originalQuery.uri
@@ -160,7 +163,7 @@ proc processNimsuggestQueries*(
       NimsuggestQueryKind.WORKSPACE_SYMBOLS,
       NimsuggestQueryKind.EXPAND,
       NimsuggestQueryKind.KNOWN,
-      NimsuggestQueryKind.CLOSE_MAILBOX:
+      NimsuggestQueryKind.SHUTDOWN:
       discard
 
     # Wait for spawning slot
@@ -261,3 +264,31 @@ proc processNimsuggestQueries*(
           
           if not q.responseFuture.finished:
             q.responseFuture.complete(@[]) # empty, not fail — see fix #17
+
+  # --- Shutdown: kill the OS process now that the queue is drained ---
+  try:
+    if slot.ns.finished and not slot.ns.failed:
+      let ns = slot.ns.read()
+      if not ns.project.process.isNil:
+        await shutdownChildProcess(ns.project.process)
+  except CatchableError:
+    discard  # process may already be dead; that is fine
+  if shutdownFut != nil:
+    shutdownFut.complete()
+
+proc restartSlot*(
+  slot: NimsuggestSlot, pool: NimsuggestPool, config: NlsConfig,
+  openFiles: TableRef[FileUri, NlsFileInfo]
+): Future[void] {.async.} =
+  discard await execStop(slot, pool)
+  if await execSpawn(slot, pool, slot.projectFile, config):
+    asyncSpawn processNimsuggestQueries(slot, pool, openFiles, config, pool.notifyProc)
+
+proc restartAllNimsuggestInstances*(
+  pool: NimsuggestPool, config: NlsConfig,
+  openFiles: TableRef[FileUri, NlsFileInfo]
+) =
+  for projectFile in pool.slots.keys.toSeq():
+    if pool.slots.hasKey(projectFile):
+      asyncSpawn restartSlot(pool.slots[projectFile], pool, config, openFiles)
+

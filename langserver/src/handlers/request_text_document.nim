@@ -335,13 +335,6 @@ proc processDocumentSymbolResponses*(
     }
     result.add(symbolInformationJson)  
 
-
-# proc processDocumentSymbolQuery(
-#   ls: LanguageServer,
-#   nimsuggestResponse: seq[Suggest]
-# ): seq[SymbolInformation] =
-#   return nimsuggestResponse.map(x => x.toUtf16Pos(ls).toSymbolInformation)
-
 proc documentSymbols*(
     ls: LanguageServer, params: DocumentSymbolParams, id: int
 ): Future[seq[SymbolInformation]] {.async.} =
@@ -358,8 +351,8 @@ proc processPrepareRenameQuery(
   ls: LanguageServer,
   nimsuggestResponse: seq[Suggest]
 ): JsonNode =
-  let projectDir = ls.capabilities.lspInitializeParams.getRootPath
-  if nimsuggestResponse.len > 0 and string(nimsuggestResponse[0].filePath).isRelTo(projectDir):
+  # let projectDir = ls.capabilities.lspInitializeParams.getRootPath
+  if nimsuggestResponse.len > 0 and string(nimsuggestResponse[0].filePath).isRelTo(string(ls.files.rootPath)):
     let locationJson = toLocationJsonForAnyFile(
       nimsuggestResponse[0], ls
     )
@@ -386,13 +379,13 @@ proc processRenameQuery(
   nimsuggestResponse: seq[Suggest]
 ): WorkspaceEdit =
   # Build up list of edits that the client needs to perform for each file
-  let projectDir = ls.capabilities.lspInitializeParams.getRootPath
+  # let projectDir = ls.capabilities.lspInitializeParams.getRootPath
   var edits = newJObject()
   for reference in nimsuggestResponse:
     # Only rename symbols in the project.
     # If client supports prepareRename then an error will already have been thrown
     let uri = pathToUri(reference.filePath)
-    if string(reference.filePath).isRelTo(projectDir):
+    if string(reference.filePath).isRelTo(string(ls.files.rootPath)):
       if string(uri) notin edits:
         edits[string(uri)] = newJArray()
 

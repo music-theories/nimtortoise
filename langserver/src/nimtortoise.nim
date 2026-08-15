@@ -158,10 +158,10 @@ proc handleParams(): CommandLineParams =
       except ValueError:
         stderr.writeLine("Invalid client process ID: ", pidStr)
         quit 1
-    if param == "--lsp":
-      result.mode = some ServerMode.lsp
-    if param == "--mcp":
-      result.mode = some ServerMode.mcp
+    # if param == "--lsp":
+    #   result.mode = some ServerMode.lsp
+    # if param == "--mcp":
+    #   result.mode = some ServerMode.mcp
     if param == "--stdio":
       result.transport = some TransportMode.stdio
     if param == "--socket":
@@ -180,8 +180,8 @@ proc handleParams(): CommandLineParams =
     if result.port == default(Port):
       result.port = getNextFreePort()
     echo &"port={result.port}"
-  if result.mode.isNone:
-    result.mode = some ServerMode.lsp
+  # if result.mode.isNone:
+  #   result.mode = some ServerMode.lsp
   if result.transport.isNone:
     result.transport = some TransportMode.stdio
 
@@ -222,18 +222,20 @@ proc main*(cmdLineParams: CommandLineParams): LanguageServer =
   ]#
 
   let startupProgressToken = "startupMessage"
-  result = initLanguageServer(cmdLineParams, ensureStorageDir())
+  result = initLanguageServer(
+    cmdLineParams, toFilePath(ensureStorageDir())
+  )
   case result.transport.transportMode
   of stdio:
     result.startStdioServer()
   of socket:
     result.startSocketServer(cmdLineParams.port)
 
-  case result.capabilities.serverMode
-  of lsp:
-    result.transport.srv.registerLspRoutes(result)
-  of mcp:
-    result.transport.srv.registerMcpRoutes(result)
+  # case result.capabilities.serverMode
+  # of lsp:
+  result.transport.srv.registerLspRoutes(result)
+  # of mcp:
+  #   result.transport.srv.registerMcpRoutes(result)
 
   result.registerProcMonitor()
 

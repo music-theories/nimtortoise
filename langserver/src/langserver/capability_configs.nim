@@ -8,13 +8,11 @@ import ./[langserver_types]
 #   ls.configurations.currentConfig.get(NlsConfig())
 
 proc supportsConfigurationRequest*(ls: LanguageServer): bool =
-  ls.capabilities.serverMode == lsp and
-    ls.capabilities.lspClientCapabilities.workspace.isSome and
+  return ls.capabilities.lspClientCapabilities.workspace.isSome and
     ls.capabilities.lspClientCapabilities.workspace.get.configuration.get(false)
 
 proc requiresDynamicRegistrationForDidChangeConfiguration*(ls: LanguageServer): bool =
-  ls.capabilities.serverMode == lsp and
-    ls.capabilities.lspClientCapabilities.workspace.isSome and
+  return ls.capabilities.lspClientCapabilities.workspace.isSome and
     ls.capabilities.lspClientCapabilities.workspace.get.didChangeConfiguration.isSome and
     ls.capabilities.lspClientCapabilities.workspace.get.didChangeConfiguration.get.dynamicRegistration.get(
       false

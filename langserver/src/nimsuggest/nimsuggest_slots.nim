@@ -1,7 +1,6 @@
 import std/[options, tables, os, sets, strformat, times, json, sequtils]
 import chronos
 import chronicles
-import ../utils/process_utils
 import ./[suggestapi, suggestapi_types, nimsuggest_types]
 import ../configurations/configurations
 import ../protocol/types
@@ -33,14 +32,13 @@ proc slotForUri*(pool: NimsuggestPool, uri: FileUri): Option[NimsuggestSlot] =
   for slot in pool.slots.values:
     if uri in slot.ownedUris:
       return some(slot)
-  none(NimsuggestSlot)
+  return none(NimsuggestSlot)
 
 proc assignUri*(slot: NimsuggestSlot, uri: FileUri) =
   slot.ownedUris.incl(uri)
 
 proc unassignUri*(slot: NimsuggestSlot, uri: FileUri) =
   slot.ownedUris.excl(uri)
-
 
 # === UTILS ===
 proc isLive*(slot: NimsuggestSlot): bool =
@@ -111,10 +109,6 @@ proc execSpawn*(
       if pool.notifyProc != nil:
         pool.notifyProc("window/showMessage",
           %*{"type": 3, "message": fmt"Nimsuggest initialized for {projectFile}"})
-      for uri in slot.ownedUris:
-        if uri notin slot.crashedUris:
-          ns.openFiles.incl(uri)
-          debug "execSpawn: re-registered uri", uri = uri
       return true
 
     except CatchableError as ex:
@@ -142,29 +136,21 @@ proc execStop*(slot: NimsuggestSlot, pool: NimsuggestPool): Future[bool] {.async
       await sleepAsync(10)
     return true
 
-  of SlotState.READY, SlotState.SPAWNING, SlotState.CRASHED, SlotState.STOPPED:
-    let nsOpt = slot.resolvedNs  # capture before state change; resolvedNs checks state == READY
+  of SlotState.READY, SlotState.SPAWNING, SlotState.CRASHED:
+    debug "execStop: stopping nimsuggest", projectFile = slot.projectFile
     slot.state = SlotState.STOPPING
-    if nsOpt.isSome:
-      debug "execStop: stopping nimsuggest", projectFile = slot.projectFile
-      try:
-        if not nsOpt.get.project.process.isNil:
-          await shutdownChildProcess(nsOpt.get.project.process)
-        slot.state = SlotState.STOPPED
-        slot.queryMailbox.addLastNoWait(NimsuggestQuery[LspFilePosition](
-          kind: NimsuggestQueryKind.CLOSE_MAILBOX,
-          responseFuture: newFuture[seq[Suggest]]("close_mailbox"),
-        ))
-        return true
-      except CatchableError as ex:
-        debug "execStop: stop raised (process may already be dead)",
-          projectFile = slot.projectFile, msg = ex.msg
-    slot.state = SlotState.STOPPED
+    let shutdownFut = newFuture[void]("shutdown")
     slot.queryMailbox.addLastNoWait(NimsuggestQuery[LspFilePosition](
-      kind: NimsuggestQueryKind.CLOSE_MAILBOX,
-      responseFuture: newFuture[seq[Suggest]]("close_mailbox"),
+      kind: NimsuggestQueryKind.SHUTDOWN,
+      responseFuture: newFuture[seq[Suggest]]("shutdown"),
+      shutdownFuture: shutdownFut,
     ))
-    return false
+    slot.state = SlotState.STOPPED
+    await shutdownFut
+    return true
+
+  of SlotState.STOPPED:
+    return true  # already dead; drain loop already exited
 
 proc attemptCrashRespawn*(
   slot: NimsuggestSlot,
@@ -202,14 +188,6 @@ proc attemptCrashRespawn*(
     pool.removeSlot(slot.projectFile)
     return false
 
-proc restartSlot*(
-  slot: NimsuggestSlot, pool: NimsuggestPool, config: NlsConfig
-): Future[void] {.async.} =
-  ## Stop and re-spawn a single slot without removing it from the pool.
-  discard await execStop(slot, pool)
-  discard await execSpawn(slot, pool, slot.projectFile, config)
-
-
 proc stopNimsuggestProcesses*(pool: NimsuggestPool) {.async.} =
   debug "stopping child nimsuggest processes"
   for slot in pool.slots.values.toSeq:
@@ -217,16 +195,6 @@ proc stopNimsuggestProcesses*(pool: NimsuggestPool) {.async.} =
 
 proc stopNimsuggestProcessesP*(pool: NimsuggestPool) =
   waitFor pool.stopNimsuggestProcesses()
-
-proc restartAllNimsuggestInstances*(
-  pool: NimsuggestPool, config: NlsConfig
-) =
-  ## Fire-and-forget restart of every slot in the pool.
-  ## Snapshots keys first to avoid mutating the table during async iteration.
-  debug "Restarting all nimsuggest instances"
-  for projectFile in pool.slots.keys.toSeq():
-    if pool.slots.hasKey(projectFile):
-      asyncSpawn restartSlot(pool.slots[projectFile], pool, config)
 
 proc idleSlots*(
   pool: NimsuggestPool,
@@ -237,7 +205,7 @@ proc idleSlots*(
   ## notification, since it has access to files.nim procs.
   let cutoff = times.now() - config.nimsuggestIdleTimeout
   for slot in pool.slots.values.toSeq:
-    if slot.isLive == false:
+    if slot.isLive() == false:
       continue
     if slot.lastCmdTime > cutoff:
       continue
