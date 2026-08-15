@@ -1,12 +1,19 @@
 import std/[options, tables, os, sets, strformat, times, json, sequtils]
 import chronos
 import chronicles
-import ./[suggestapi, suggestapi_types, nimsuggest_types]
+import ./[suggestapi, suggestapi_types, suggestapi_queries, nimsuggest_types]
 import ../configurations/configurations
+import ../nimble/nimble_utils
 import ../protocol/types
 
-proc newSlot*(projectFile: FilePath, isEntryPoint = false, workingDir = getCurrentDir()): NimsuggestSlot =
-  NimsuggestSlot(
+proc newSlot*(
+  projectFile: FilePath, 
+  isEntryPoint: bool,# = false, 
+  workingDir: FilePath # = getCurrentDir()
+): NimsuggestSlot =
+  
+
+  return NimsuggestSlot(
     state: SlotState.SPAWNING,
     projectFile: projectFile,
     workingDir: workingDir,
@@ -16,7 +23,6 @@ proc newSlot*(projectFile: FilePath, isEntryPoint = false, workingDir = getCurre
     lastCmdTime: now(),
     isEntryPoint: isEntryPoint,
     crashedUris: initHashSet[FileUri](),
-    # pendingChangedUris: initHashSet[FileUri](),
   )
 
 proc addSlot*(pool: NimsuggestPool, slot: NimsuggestSlot) =
@@ -89,16 +95,23 @@ proc execSpawn*(
     debug "execSpawn: calling createNimsuggest",
       projectFile = projectFile, attempt = slot.crashCount + 1
     try:
-      let project = await createNimsuggest(
+      let protocolVersion = detectNimsuggestVersion(
         projectFile,
-        pool.nimsuggestPath,
-        pool.nimVersion,
-        int(inMilliseconds(config.nimsuggestRequestTimeout)),
-        proc(self: Nimsuggest) {.gcsafe, raises: [].} = discard,
-        proc(self: Project) {.gcsafe, raises: [].} = discard,
-        workingDir = slot.workingDir,
+        FilePath(pool.nimsuggestPath),
+        FilePath(slot.workingDir),
       )
-      let ns = await project.ns
+      let capabilities = getNimsuggestCapabilities(pool.nimsuggestPath)
+      let ns = await createNimsuggest(
+        projectFile,
+        FilePath(pool.nimsuggestPath),
+        FilePath(slot.workingDir),
+        timeout                   = int(inMilliseconds(config.nimsuggestRequestTimeout)),
+        enableLog                 = config.logNimsuggest,
+        enableExceptionInlayHints = config.inlayHints.exceptionHints.enable,
+        nimPaths                  = findNimblePaths(string(slot.projectFile)),
+        protocolVersion           = protocolVersion,
+        capabilities              = capabilities,
+      )
       debug "execSpawn: createNimsuggest succeeded", projectFile = projectFile, port = ns.port
       nsFut.complete(ns)
       slot.state = SlotState.READY
@@ -107,7 +120,7 @@ proc execSpawn*(
       if pool.statusChangedProc != nil:
         pool.statusChangedProc()
       if pool.notifyProc != nil:
-        pool.notifyProc("window/showMessage",
+        pool.notifyProc("window/logMessage",
           %*{"type": 3, "message": fmt"Nimsuggest initialized for {projectFile}"})
       return true
 
@@ -179,7 +192,7 @@ proc attemptCrashRespawn*(
       projectFile = slot.projectFile, crashCount = slot.crashCount
     if pool.notifyProc != nil:
       pool.notifyProc(
-        "window/showMessage",
+        "window/logMessage",
         %*{
           "type": 1,
           "message": fmt"Nimsuggest for {slot.projectFile} failed after {config.maxNimsuggestCrashRetries} attempts.",

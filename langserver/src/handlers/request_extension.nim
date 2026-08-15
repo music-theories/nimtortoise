@@ -50,12 +50,14 @@ proc extensionSuggest*(ls: LanguageServer, params: SuggestParams): Future[Sugges
 
 # === extension/tasks ===
 proc tasks*(ls: LanguageServer, conf: JsonNode): Future[seq[NimbleTask]] {.async.} =  
+  await ls.lsInitialized
   return await getNimbleTasks(ls.nimbleDumpCache)
 
 # === extension/runTask ===
 proc runTask*(
-    ls: LanguageServer, params: RunTaskParams
+  ls: LanguageServer, params: RunTaskParams
 ): Future[RunTaskResult] {.async.} =
+  await ls.lsInitialized
   return await runNimbleTask(params)
   
 # === extension/listTests === 

@@ -33,8 +33,8 @@ type
     ideType
     ideExpand
 
-  NimsuggestCallback* = proc(self: Nimsuggest): void {.gcsafe, raises: [].}
-  ProjectCallback* = proc(self: Project): void {.gcsafe, raises: [].}
+  # NimsuggestCallback* = proc(self: Nimsuggest): void {.gcsafe, raises: [].}
+  # ProjectCallback* = proc(self: Project): void {.gcsafe, raises: [].}
 
   Suggest* = ref object
     section*: IdeCmd
@@ -77,28 +77,14 @@ type
     tooltip*: string
 
   NimsuggestImpl* = object
-    successfullCall*: bool
     port*: int
-    root*: FilePath
+    process*: AsyncProcessRef
+    failed*: bool
+    errorMessage*: string
     requestQueue*: Deque[SuggestCall]
     processing*: bool
     timeout*: int
-    timeoutCallback*: NimsuggestCallback
-    protocolVersion*: int
     capabilities*: set[NimSuggestCapability]
-    nimSuggestPath*: string
-    version*: string
-    project*: Project
+    protocolVersion*: int
 
   NimSuggest* = ref NimsuggestImpl
-
-  Project* = ref object
-    ns*: Future[NimSuggest]
-    file*: FilePath
-    process*: AsyncProcessRef
-    errorCallback*: Option[ProjectCallback]
-    errorMessage*: string
-    failed*: bool
-    lastCmd*: string
-    lastCmdDate*: Option[DateTime]
-  

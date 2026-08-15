@@ -91,7 +91,8 @@ suite "Nimsuggest error handling":
     # paths run deterministically.
     let helloWorldFile = FilePath(getCurrentDir() / "tests/projects/hw/hw.nim")
     let project = createNimsuggest(
-      helloWorldFile, "nimsuggest", "", 120_000,
+      helloWorldFile, "nimsuggest", "", 
+      120_000,
       proc(self: Nimsuggest) {.gcsafe, raises: [].} = discard,
       proc(self: Project) {.gcsafe, raises: [].} = discard,
     ).waitFor

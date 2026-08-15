@@ -317,8 +317,8 @@ proc signatureHelp*(
 
 # === textDocument/documentSymbol ===
 proc processDocumentSymbolResponses*(
-  nimsuggestResponses: seq[Suggest],
   ls: LanguageServer,
+  nimsuggestResponses: seq[Suggest],
 ): seq[SymbolInformation] =
   result = @[]
   for response in nimsuggestResponses:
@@ -344,7 +344,7 @@ proc documentSymbols*(
     NimsuggestQueryKind.DOCUMENT_SYMBOLS
   )
   let response = await ls.addQueryToQueue(query)
-  return processDocumentSymbolResponses(response, ls)
+  return processDocumentSymbolResponses(ls, response)
 
 # === textDocument/prepareRename ===
 proc processPrepareRenameQuery(

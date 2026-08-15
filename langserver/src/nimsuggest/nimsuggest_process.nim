@@ -1,4 +1,4 @@
-import std/[options, strutils, sets, tables, times, json, sequtils]
+import std/[options, strformat, strutils, sets, tables, times, json, sequtils]
 import chronos
 import chronicles
 
@@ -187,7 +187,11 @@ proc processNimsuggestQueries*(
         originalQuery.responseFuture.complete(@[])
 
     of SlotState.READY:
-      if slot.ns.read().project.failed:
+      if slot.ns.read().failed:
+        let errMsg = slot.ns.read().errorMessage
+        if pool.notifyProc != nil and errMsg.len > 0:
+          pool.notifyProc("window/logMessage",
+            %*{"type": 1, "message": fmt"Nimsuggest ({slot.projectFile}): {errMsg}"})
         let respawnWasSuccessful = await attemptCrashRespawn(slot, pool, config)
         if not respawnWasSuccessful:
           slot.crashedUris.incl(originalQuery.uri)
@@ -221,7 +225,7 @@ proc processNimsuggestQueries*(
               id: 0,
               kind: NimsuggestQueryKind.CHECK_FILE,
               uri: q.uri,
-              dirtyFile: q.dirtyFile,
+              dirtyFile: FilePath(""),
               responseFuture: newFuture[seq[Suggest]]("checkFile"),
             )
             
@@ -269,8 +273,8 @@ proc processNimsuggestQueries*(
   try:
     if slot.ns.finished and not slot.ns.failed:
       let ns = slot.ns.read()
-      if not ns.project.process.isNil:
-        await shutdownChildProcess(ns.project.process)
+      if not ns.process.isNil:
+        await shutdownChildProcess(ns.process)
   except CatchableError:
     discard  # process may already be dead; that is fine
   if shutdownFut != nil:

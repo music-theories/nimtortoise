@@ -63,15 +63,13 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
         q.dirtyFile = FilePath("")
       else:
         q.dirtyFile = ls.uriToStash(q.uri)
+      
       # First, check if the current file is owned by a nimsuggest instance
-      if not(q.uri in ls.files.openFiles):
-        debug "processLangserverQueue: Could not add message to mailbox, file is no longer open. ", uri = q.uri, kind = $q.kind
-        q.responseFuture.complete(@[])
-
-      else:
+      let path = uriToPath(q.uri)
+      if q.uri in ls.files.openFiles:
         let fileInfo = ls.files.openFiles[q.uri]
-
         # If a slot is stopped, crashed or stopping, do not attempt to restart - this should happen when a user saves, open changes a file - otherwise any random dragging a mouse across a file would cause a restart. 
+        # TODO/NOTE: Is KNOWN treated correctly?
         case fileInfo.slot.state
         of SlotState.READY, SlotState.SPAWNING:
           debug "processLangserverQueue: dispatcher adding message to slot mailbox", uri = q.uri, kind = $q.kind, fileInfoIsNil = (fileInfo == nil), projectFile = fileInfo.slot.projectFile
@@ -83,6 +81,20 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
           if not q.responseFuture.finished:
             q.responseFuture.complete(@[])
           continue
+
+      elif path in ls.pool.slots:
+        let slot = ls.pool.slots[path]
+        case slot.state
+        of SlotState.READY, SlotState.SPAWNING:
+          debug "processLangserverQueue: Add path-level query to mailbox. ", uri = q.uri, kind = $q.kind
+          ls.pool.slots[path].queryMailbox.addLastNoWait(q)
+        else:
+          debug "processLangserverQueue: Could not add path-level message to mailbox. Slot is not live.", uri = q.uri, kind = $q.kind
+          q.responseFuture.complete(@[])
+
+      else:
+        debug "processLangserverQueue: Could not add message to mailbox", uri = q.uri, kind = $q.kind
+        q.responseFuture.complete(@[])
 
     of LangserverQueryKind.FILE_ACCESS:
       let q = query.fileAccess

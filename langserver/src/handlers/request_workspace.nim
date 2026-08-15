@@ -1,4 +1,4 @@
-import std/[json, sequtils, strformat, sets, options]
+import std/[json, sequtils, strformat, sets, options, strutils]
 import chronos
 import chronicles
 import ../protocol/types
@@ -19,6 +19,32 @@ proc resolveSlot(ls: LanguageServer, projectFile: FilePath): Option[NimsuggestSl
   if uri in ls.files.openFiles:
     return some(ls.files.openFiles[uri].slot)
   return none(NimsuggestSlot)
+
+
+##[
+TODO: Execute command is going to be the main mechanism through which any extension code is run, and the `extensions/listTasks` type requests will just be wrappers around this.  `executeCommand` is the standard LSP way to expose the different functionalities.
+
+These need to be added to the LspExtensionCapability object
+  LspExtensionCapability* = enum
+    #List of extensions this server support. Useful for clients
+    excRestartSuggest = "RestartSuggest"
+    excNimbleTask = "NimbleTask"
+    excRunTests = "RunTests"
+
+WORKING
+- status
+- capabilities
+- suggest/restart
+- listTasks
+- runTask
+TODO
+- 
+
+STUBBED
+- macroExpand
+- runTests
+- cancelTest
+]##
 
 proc executeCommand*(
   ls: LanguageServer, params: ExecuteCommandParams
@@ -85,23 +111,42 @@ proc executeCommand*(
   result = newJNull()
 
 # === workspace/symbol ===
+proc processWorkspaceSymbolResponses*(
+  ls: LanguageServer,
+  nimsuggestResponses: seq[Suggest],
+  params: WorkspaceSymbolParams, 
+): seq[SymbolInformation] =
+  let responses = processDocumentSymbolResponses(ls, nimsuggestResponses)
+  let query = params.query.toLowerAscii()
+  if query.len > 0:
+    return responses.filterIt(query in it.name.toLowerAscii())
+  else:
+    return @[]
+  
 proc workspaceSymbol*(
-  ls: LanguageServer, params: WorkspaceSymbolParams, id: int
+  ls: LanguageServer, 
+  params: WorkspaceSymbolParams, 
+  id: int
 ): Future[seq[SymbolInformation]] {.async.} =
   # Route through any live slot's queryMailbox.
-  if ls.pool == nil:
-    return @[]
-  var liveUri = FileUri("")
+  var futures: seq[Future[seq[Suggest]]]
   for slot in ls.pool.slots.values:
-    if slot.isLive and slot.ownedUris.len > 0:
-      liveUri = slot.ownedUris.toSeq[0]
-      break
-  if string(liveUri) == "":
+    if slot.isLive():
+      let q = ls.initNimsuggestFileQuery(
+        id, pathToUri(slot.projectFile), 
+        NimsuggestQueryKind.WORKSPACE_SYMBOLS
+      )
+      futures.add(ls.addQueryToQueue(q))
+
+  if futures.len == 0:
     return @[]
-  let q = ls.initNimsuggestFileQuery(id, liveUri, NimsuggestQueryKind.WORKSPACE_SYMBOLS)
-  let symbols = await ls.addQueryToQueue(q)
-  result = processDocumentSymbolResponses(
-    symbols, ls
+  await allFutures(futures)
+  var merged: seq[Suggest]
+  for f in futures:
+    merged.add(f.read())
+
+  return processWorkspaceSymbolResponses(
+    ls, merged, params
   )
   
 proc applyEdit*(

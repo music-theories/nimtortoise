@@ -13,7 +13,8 @@ import ./[nimble_types]
 
 
 ## BIG NOTE: You need to ensure that, on consolidation, you take into account the parameter mapping.
-
+## You also need to work out exactly what this workingDir thing is and where it is called.
+## This probably needs to work PER SLOT - as each slot as a workingDir on `NimsuggestSlot`.
 proc getWorkingDir*(rootPath: FilePath, path: FilePath, config: NlsConfig): string =
   ## Gets working directory.
   # let rootPath = uriToPath(rootUri)
@@ -22,11 +23,19 @@ proc getWorkingDir*(rootPath: FilePath, path: FilePath, config: NlsConfig): stri
   let pathRelativeToRoot = string(path).tryRelativeTo(rootPathAsString)
   let mapping = config.workingDirectoryMapping
   result = parentDir(string(path)) # This won't work - will only give back the directory the binary is running in.
-  # 
+  
   for m in mapping:
     if pathRelativeToRoot.isSome() and m.projectFile == pathRelativeToRoot.get():
       result = rootPathAsString / m.directory
       break
+
+
+##[
+- GET ENTRY POINT
+- First check project mapping
+  - If there is a relevant project mapping, use that.  
+- If not, check nimble entry points by walking the directory structure from the seletced file up to the rootPath, looking for a suitable nimble file - or do we need to iterate over the nimble dump cache?
+]##
 
 
 # === FIND NIMBLE FILES ===
@@ -147,32 +156,31 @@ proc getNimbleEntryPoints*(
 #     rootPath = rootPath
 #   return @[]
 
-# NOTE - THIS IS ONLY USED IN TESTS - SO NO LONGER NECESSARY
-# proc findNimblePaths*(fromFile: string): seq[string] =
-#   ## Walk up from fromFile's directory looking for nimble.paths.
-#   ## Returns the flags it contains (--noNimblePath and --path:... entries)
-#   ## with any surrounding quotes stripped, ready to pass directly to nimsuggest.
-#   var dir = fromFile.parentDir
-#   while dir.len > 0:
-#     let pathsFile = dir / "nimble.paths"
-#     if pathsFile.fileExists:
-#       debug "Found nimble.paths for nimsuggest", path = pathsFile
-#       for line in pathsFile.lines:
-#         let trimmed = line.strip()
-#         if trimmed.len == 0:
-#           continue
-#         if trimmed.startsWith("--path:"):
-#           # nimble.paths wraps paths in quotes: --path:"/foo/bar"
-#           # Strip them so the arg is passed cleanly to nimsuggest.
-#           let val = trimmed[7 .. ^1]
-#           if val.len >= 2 and val[0] == '"' and val[^1] == '"':
-#             result.add("--path:" & val[1 .. ^2])
-#           else:
-#             result.add(trimmed)
-#         else:
-#           result.add(trimmed)
-#       return
-#     let parent = dir.parentDir
-#     if parent == dir:
-#       break
-#     dir = parent
+proc findNimblePaths*(fromFile: string): seq[string] =
+  ## Walk up from fromFile's directory looking for nimble.paths.
+  ## Returns the flags it contains (--noNimblePath and --path:... entries)
+  ## with any surrounding quotes stripped, ready to pass directly to nimsuggest.
+  var dir = fromFile.parentDir
+  while dir.len > 0:
+    let pathsFile = dir / "nimble.paths"
+    if pathsFile.fileExists:
+      debug "Found nimble.paths for nimsuggest", path = pathsFile
+      for line in pathsFile.lines:
+        let trimmed = line.strip()
+        if trimmed.len == 0:
+          continue
+        if trimmed.startsWith("--path:"):
+          # nimble.paths wraps paths in quotes: --path:"/foo/bar"
+          # Strip them so the arg is passed cleanly to nimsuggest.
+          let val = trimmed[7 .. ^1]
+          if val.len >= 2 and val[0] == '"' and val[^1] == '"':
+            result.add("--path:" & val[1 .. ^2])
+          else:
+            result.add(trimmed)
+        else:
+          result.add(trimmed)
+      return
+    let parent = dir.parentDir
+    if parent == dir:
+      break
+    dir = parent
