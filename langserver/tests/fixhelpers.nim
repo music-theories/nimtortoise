@@ -60,7 +60,7 @@ proc stopServer*(client: LspSocketClient) =
 
 proc startServer*(rootRelPath: string): (CommandLineParams, LanguageServer, LspSocketClient) =
   let cmdParams = CommandLineParams(
-    mode: some lsp,
+    # mode: some lsp,
     transport: some socket,
     port: getNextFreePort()
   )

@@ -28,7 +28,7 @@ from fixhelpers import stopServer
 ##       ls.configurations.configReady.fire()
 
 suite "Nimlangserver extensions":
-  let cmdParams = CommandLineParams(mode: some lsp, transport: some socket, port: getNextFreePort())
+  let cmdParams = CommandLineParams(transport: some socket, port: getNextFreePort())
   let ls = main(cmdParams)
   let client = newLspSocketClient()
   waitFor client.connect("localhost", cmdParams.port)

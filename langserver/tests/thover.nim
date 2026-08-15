@@ -17,7 +17,7 @@ from fixhelpers import stopServer
 
 suite "LSP features (failing)":
   let helloWorldUri = fixtureUri("projects/hw/hw.nim")
-  let cmdParams = CommandLineParams(mode: some lsp, transport: some socket, port: getNextFreePort())
+  let cmdParams = CommandLineParams(transport: some socket, port: getNextFreePort())
   let ls = main(cmdParams)
   let client = newLspSocketClient()
   client.registerNotification(

@@ -22,7 +22,7 @@ from fixhelpers import stopServer
 ##   main(cmdParams)       — unchanged (from src/nimtortoise)
 
 suite "Nimlangserver":
-  let cmdParams = CommandLineParams(mode: some lsp, transport: some socket, port: getNextFreePort())
+  let cmdParams = CommandLineParams(transport: some socket, port: getNextFreePort())
   let ls = main(cmdParams)
   let client = newLspSocketClient()
   client.registerNotification(
@@ -57,7 +57,7 @@ let helloWorldUri = fixtureUri("projects/hw/hw.nim")
 
 
 suite "Suggest API selection":
-  let cmdParams = CommandLineParams(mode: some lsp, transport: some socket, port: getNextFreePort())
+  let cmdParams = CommandLineParams(transport: some socket, port: getNextFreePort())
   let ls = main(cmdParams)
   let client = newLspSocketClient()
   client.registerNotification(
@@ -102,7 +102,7 @@ suite "Suggest API selection":
   stopServer(client)
 
 suite "LSP features":
-  let cmdParams = CommandLineParams(mode: some lsp, transport: some socket, port: getNextFreePort())
+  let cmdParams = CommandLineParams(transport: some socket, port: getNextFreePort())
   let ls = main(cmdParams)
   let client = newLspSocketClient()
   client.registerNotification(
@@ -350,7 +350,7 @@ suite "LSP features":
   stopServer(client)
 
 suite "Null configuration:":
-  let cmdParams = CommandLineParams(mode: some lsp, transport: some socket, port: getNextFreePort())
+  let cmdParams = CommandLineParams(transport: some socket, port: getNextFreePort())
   let ls = main(cmdParams)
   let client = newLspSocketClient()
   client.registerNotification(

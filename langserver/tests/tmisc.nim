@@ -44,7 +44,7 @@ from fixhelpers import stopServer
 ##   ls.pendingRequests         → ls.messaging.pendingRequests
 
 suite "Nimlangserver misc":
-  let cmdParams = CommandLineParams(mode: some lsp, transport: some socket, port: getNextFreePort())
+  let cmdParams = CommandLineParams(transport: some socket, port: getNextFreePort())
   let ls = main(cmdParams)
   let client = newLspSocketClient()
   waitFor client.connect("localhost", cmdParams.port)
@@ -83,7 +83,7 @@ suite "Nimlangserver misc":
   stopServer(client)
 
 suite "Nimlangserver idle nimsuggest cleanup":
-  let cmdParams = CommandLineParams(mode: some lsp, transport: some socket, port: getNextFreePort())
+  let cmdParams = CommandLineParams(transport: some socket, port: getNextFreePort())
   let ls = main(cmdParams)
   let client = newLspSocketClient()
   waitFor client.connect("localhost", cmdParams.port)
@@ -136,7 +136,7 @@ suite "Nimlangserver fail count":
     # After a slot spawns successfully, crashCount must be 0 so it is not
     # permanently blocked after MAX_CRASH_RETRIES.
     # Verified: processCommands resets slot.crashCount = 0 at queues.nim:249.
-    let cmdParams2 = CommandLineParams(mode: some lsp, transport: some socket, port: getNextFreePort())
+    let cmdParams2 = CommandLineParams(transport: some socket, port: getNextFreePort())
     let ls2 = main(cmdParams2)
     let client2 = newLspSocketClient()
     waitFor client2.connect("localhost", cmdParams2.port)
