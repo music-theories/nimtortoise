@@ -2,11 +2,24 @@
 # BSD License. Look at license.txt for more info.
 
 ## This module is implicitly imported in NimScript .nimble files.
+##
+## Vendored from nim-lang/nimble, src/nimblepkg/nimscriptapi.nim
+## Nimble version: 0.24.0 (commit 33a3f6d)
+## Source: https://github.com/nim-lang/nimble
+##
+## When updating, copy the upstream file verbatim and re-apply the single
+## intentional local change: the `const` destructuring of `getParams()` must be
+## changed to `let` (see comment inline) to prevent a nimsuggest crash.
 
 import system except getCommand, setCommand, switch, `--`
 import strformat, strutils, tables, sequtils
 export tables
 
+when (NimMajor, NimMinor) < (1, 3):
+  when not defined(nimscript):
+    import os
+else:
+  import os
 
 var
   packageName* = ""    ## Set this to the package name. It
@@ -19,6 +32,7 @@ var
   srcDir*: string      ## The package's source directory.
   binDir*: string      ## The package's binary directory.
   backend*: string     ## The package's backend.
+  testEntryPoint*: string ## The package's test entry point.
 
   skipDirs*, skipFiles*, skipExt*, installDirs*, installFiles*,
     installExt*, bin*, paths*, entryPoints*: seq[string] = @[] ## Nimble metadata.
@@ -27,17 +41,17 @@ var
   foreignDeps*: seq[string] = @[] ## The foreign dependencies. Only
                                   ## exported for 'distros.nim'.
 
-  nimbleTasks*: seq[tuple[name, description: string]] = @[]
-  beforeHooks*: seq[string] = @[]
-  afterHooks*: seq[string] = @[]
-  flags*: Table[string, seq[string]]
+  nimbleTasks: seq[tuple[name, description: string]] = @[]
+  beforeHooks: seq[string] = @[]
+  afterHooks: seq[string] = @[]
+  flags: Table[string, seq[string]]
   namedBin*: Table[string, string]
 
-  command* = "e"
-  project* = ""
-  success* = false
-  retVal* = true
-  nimblePathsEnv* = "__NIMBLE_PATHS"
+  command = "e"
+  project = ""
+  success = false
+  retVal = true
+  nimblePathsEnv = "__NIMBLE_PATHS"
 
 proc requires*(deps: varargs[string]) =
   ## Call this to set the list of requirements of your Nimble
@@ -53,12 +67,11 @@ proc taskRequires*(task: string, deps: varargs[string]) =
 
 proc getParams(): tuple[scriptFile, projectFile, outFile, actionName: string,
                         commandLineParams: seq[string]] =
-  result = (scriptFile: "", projectFile: "", outFile: "", actionName: "", commandLineParams: @[])
   # Called by nimscriptwrapper.nim:execNimscript()
   #   nim e --flags /full/path/to/file.nims /full/path/to/file.nimble /full/path/to/file.out action
-  for i in 2 .. nimscript.paramCount():
+  for i in 2 .. paramCount():
     let
-      param = nimscript.paramStr(i)
+      param = paramStr(i)
     if param[0] != '-':
       if result.scriptFile.len == 0:
         result.scriptFile = param
@@ -73,9 +86,10 @@ proc getParams(): tuple[scriptFile, projectFile, outFile, actionName: string,
     else:
       result.commandLineParams.add param
 
-let #if we make this const nimsuggest would crash 
+let #if we make this const nimsuggest would crash
   # Command line values are const so that thisDir() works at compile time
   (scriptFile, projectFile, outFile, actionName, commandLineParams*) = getParams()
+const
   NimbleVersion* {.strdefine.} = ""
   NimbleMajor* {.intdefine.} = 0
   NimbleMinor* {.intdefine.} = 0
@@ -113,6 +127,8 @@ template printSeqIfLen(varName) =
   printSeqIfLen(astToStr(varName), varName)
 
 proc printPkgInfo(): string =
+  #Notice this functions is called by the wrapper to store the package info as a ini file.
+  #We should instead just use the declarative parser to parse the variables of the nimble file.
   if backend.len == 0:
     backend = "c"
 
@@ -134,7 +150,7 @@ proc printPkgInfo(): string =
   printIfLen srcDir
   printIfLen binDir
   printIfLen backend
-
+  printIfLen testEntryPoint
   printSeqIfLen skipDirs
   printSeqIfLen skipFiles
   printSeqIfLen skipExt

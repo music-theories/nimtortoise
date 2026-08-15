@@ -8,7 +8,7 @@ srcDir        = "src"
 installExt    = @["nim"]
 bin           = @["nimforest"]
 entryPoints   = @["src/nimforest.nim", "tests/tdependency_tree.nim"]
-# testEntryPoint = "tests/tdependency_tree.nim"
+testEntryPoint = "tests/tdependency_tree.nim"
 
 # Dependencies
 
