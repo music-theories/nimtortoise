@@ -1,6 +1,8 @@
 import std/[os, strformat, options, tables, strutils]
 import chronos
+
 import ../resources/resources
+
 import ./[
   dependency_tree,
   nimble_dump, nim_dump,
@@ -9,8 +11,15 @@ import ./[
 
 proc initForest*(
   rootPathString: string
-): Future[Option[Forest]] {.async.} = 
+): Future[Forest] {.async.} = 
   let rootPath = DirPathAbs(rootPathString.absolutePath().normalizedPath())
+
+  result = Forest(
+    root: rootPath,
+    nimble: initTable[FilePathAbs, NimbleDumpInfo](),
+    paths: initTable[FilePathAbs, seq[DirPathAbs]](),
+    trees: initTable[FilePathAbs, seq[FilePathAbs]]()
+  )
 
   if dirExists(rootPathString):
     let nimbleInfo = initNimbleInfo(rootPath)
@@ -20,12 +29,20 @@ proc initForest*(
     var dependencyGraph = initDependencyGraph(
       nimbleInfo.entryPoints, rootPath
     )
+    result.nimble = nimbleInfo.dump
+    result.trees = dependencyGraph.graph
+
     for entryPoint, nimDump in nimDumpInfo:
       let source = readFile(string(entryPoint))
       for importName in extractImports(source):
         let modulePath = importName.replace('.', DirSep)
         for path in nimDump.libPaths:
           if path.isInside(rootPath):
+            if entryPoint in result.paths:
+              result.paths[entryPoint].add(path)
+            else: 
+              result.paths[entryPoint] = @[path]
+
             let candidate = FilePathAbs(
               (string(path) / modulePath & ".nim").normalizedPath
             )
@@ -34,15 +51,3 @@ proc initForest*(
                 dependencyGraph.graph[entryPoint] = @[]
               if candidate notin dependencyGraph.graph[entryPoint]:
                 dependencyGraph.graph[entryPoint].add(candidate)
-
-
-    return some(Forest(
-      nimble: nimbleInfo,
-      nim: nimDumpInfo,
-      dependencies: dependencyGraph
-    ))
-
-  else:
-    quit(fmt"Could not generate dependency graph, this folder does not exist: {rootPathString}")
-    return none(Forest)
-

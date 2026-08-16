@@ -32,6 +32,13 @@ proc fromJsonHook*(a: var FilePathRel; b: JsonNode) = a = FilePathRel(b.getStr()
 proc fromJsonHook*(a: var DirPathAbs;  b: JsonNode) = a = DirPathAbs(b.getStr())
 proc fromJsonHook*(a: var DirPathRel;  b: JsonNode) = a = DirPathRel(b.getStr())
 
+proc toJsonHook*(x: FileUri):     JsonNode = newJString(string(x))
+proc toJsonHook*(x: FilePathAbs): JsonNode = newJString(string(x))
+proc toJsonHook*(x: FilePathRel): JsonNode = newJString(string(x))
+proc toJsonHook*(x: DirPathAbs):  JsonNode = newJString(string(x))
+proc toJsonHook*(x: DirPathRel):  JsonNode = newJString(string(x))
+
+
 # ── path joining (/  operator) ─────────────────────────────────────────────────
 ## Joining an absolute dir with a relative child yields an absolute result.
 ## The file/dir distinction of the right-hand side is preserved.
@@ -148,6 +155,13 @@ func withExt*(p: FilePathRel; newExt: string): FilePathRel =
   let (dir, name, _) = splitFile(string(p))
   FilePathRel(dir / (name & newExt))
 
+# ── reinterpretation casts (use when the FS has told you what a path is) ───────
+## These are intentional escape hatches — you are asserting the file/dir nature.
+func asFilePathAbs*(p: DirPathAbs):  FilePathAbs = FilePathAbs(string(p))
+func asDirPathAbs*(p: FilePathAbs):  DirPathAbs  = DirPathAbs(string(p))
+func asFilePathRel*(p: DirPathRel):  FilePathRel = FilePathRel(string(p))
+func asDirPathRel*(p: FilePathRel):  DirPathRel  = DirPathRel(string(p))
+
 # ── containment checks ────────────────────────────────────────────────────────
 func isInside*(file: FilePathAbs; dir: DirPathAbs): bool =
   ## Returns true if file is inside dir (at any depth).
@@ -161,9 +175,3 @@ func isInside*(sub: DirPathAbs; dir: DirPathAbs): bool =
   let d = string(dir).normalizedPath & DirSep
   string(sub).normalizedPath.startsWith(d)
 
-# ── reinterpretation casts (use when the FS has told you what a path is) ───────
-## These are intentional escape hatches — you are asserting the file/dir nature.
-func asFilePathAbs*(p: DirPathAbs):  FilePathAbs = FilePathAbs(string(p))
-func asDirPathAbs*(p: FilePathAbs):  DirPathAbs  = DirPathAbs(string(p))
-func asFilePathRel*(p: DirPathRel):  FilePathRel = FilePathRel(string(p))
-func asDirPathRel*(p: FilePathRel):  DirPathRel  = DirPathRel(string(p))

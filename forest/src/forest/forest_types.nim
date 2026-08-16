@@ -16,22 +16,6 @@ type
     dependentFile*: FilePathAbs
 
 type
-  NimbleFile* = object
-    entryPoints*: string
-
-  NimRelatedFileKind* {.pure.} = enum
-    NIMBLE, NIMBLE_PATHS, NIMBLE_LOCK,
-    NIM_CFG, NIMS
-
-  NimRelatedFile* = object
-    case kind*: NimRelatedFileKind
-    of NIMBLE: discard
-    of NIMBLE_PATHS: discard
-    of NIMBLE_LOCK: discard
-    of NIM_CFG: discard
-    of NIMS: discard
-
-type
   NimbleDumpInfo* = object
     name*:           string
     entryPoints*:    seq[FilePathRel]  ## relative to nimble file dir
@@ -59,8 +43,10 @@ type
     dump*: Table[FilePathAbs, NimbleDumpInfo]
     entryPoints*: seq[FilePathAbs]
 
-  Forest* = object
-    nimble*: NimbleInfo
-    nim*: Table[FilePathAbs, NimDumpInfo]
-    dependencies*: DependencyGraph
-    
+type 
+ Forest* = object
+    root*:   DirPathAbs
+    nimble*: Table[FilePathAbs, NimbleDumpInfo]
+    paths*:  Table[FilePathAbs, seq[DirPathAbs]]
+    trees*:  Table[FilePathAbs, seq[FilePathAbs]]
+  

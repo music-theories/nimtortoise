@@ -1,4 +1,4 @@
-import std/[os, sequtils, strutils, tables]
+import std/[os, strutils, tables, json, jsonutils]
 import chronos
 import ./[forest_types]
 import ../resources/resources
@@ -14,52 +14,75 @@ proc getAllNimsFiles*(rootPath: DirPathAbs): seq[FilePathAbs] =
   getAllFiles(rootPath, "*.nims")
 
 
+proc toJsonHook*(f: Forest): JsonNode =
+  result = newJObject()
+  result["root"] = newJString(string(f.root))
+
+  let nimble = newJObject()
+  for k, d in f.nimble.pairs:
+    let entry = newJObject()
+    entry["name"] = newJString(d.name)
+    let eps = newJArray()
+    for p in d.entryPoints: eps.add newJString(string(p))
+    entry["entryPoints"] = eps
+    entry["testEntryPoint"] = newJString(string(d.testEntryPoint))
+    nimble[string(k)] = entry
+  result["nimble"] = nimble
+
+  let paths = newJObject()
+  for k, ps in f.paths.pairs:
+    let arr = newJArray()
+    for p in ps: arr.add newJString(string(p))
+    paths[string(k)] = arr
+  result["paths"] = paths
+
+  let trees = newJObject()
+  for k, deps in f.trees.pairs:
+    let arr = newJArray()
+    for d in deps: arr.add newJString(string(d))
+    trees[string(k)] = arr
+  result["trees"] = trees
+
 proc debugStr*(f: Forest): string =
   var lines: seq[string]
-  let root = string(f.dependencies.root)
+  let root = string(f.root)
 
   proc rel(p: string): string =
     relativePath(p, root)
 
-  # --- NimbleInfo ---
-  lines.add "=== NimbleInfo ==="
-  lines.add "  dump:"
-  if f.nimble.dump.len == 0:
-    lines.add "    (none)"
-  else:
-    for (k, d) in f.nimble.dump.pairs:
-      lines.add "    [" & rel(string(k)) & "]"
-      lines.add "      name: " & d.name
-      if d.entryPoints.len > 0:
-        lines.add "      entryPoints:"
-        for p in d.entryPoints:
-          lines.add "        " & string(p)
-      if d.testEntryPoint != FilePathRel(""):
-        lines.add "      testEntryPoint: " & string(d.testEntryPoint)
-
-  # --- NimDumpInfo per file (libPaths inside root only) ---
-  lines.add ""
-  lines.add "=== Nim dump (per file) ==="
-  if f.nim.len == 0:
+  # --- Nimble dump ---
+  lines.add "=== Nimble ==="
+  if f.nimble.len == 0:
     lines.add "  (none)"
   else:
-    for (k, d) in f.nim.pairs:
-      let localLibPaths = d.libPaths.filterIt(string(it).startsWith(root))
+    for (k, d) in f.nimble.pairs:
       lines.add "  [" & rel(string(k)) & "]"
-      if localLibPaths.len > 0:
-        lines.add "    libPaths:"
-        for p in localLibPaths:
-          lines.add "      " & rel(string(p))
-      else:
-        lines.add "    libPaths: (none inside root)"
+      lines.add "    name: " & d.name
+      if d.entryPoints.len > 0:
+        lines.add "    entryPoints:"
+        for p in d.entryPoints:
+          lines.add "      " & string(p)
+      if d.testEntryPoint != FilePathRel(""):
+        lines.add "    testEntryPoint: " & string(d.testEntryPoint)
 
-  # --- DependencyGraph (graph only, relative paths) ---
+  # --- Paths (lib/search paths per entry point) ---
   lines.add ""
-  lines.add "=== DependencyGraph ==="
-  if f.dependencies.graph.len == 0:
+  lines.add "=== Paths ==="
+  if f.paths.len == 0:
+    lines.add "  (none)"
+  else:
+    for (k, ps) in f.paths.pairs:
+      lines.add "  [" & rel(string(k)) & "]"
+      for p in ps:
+        lines.add "    " & rel(string(p))
+
+  # --- Trees (dependency graph per entry point) ---
+  lines.add ""
+  lines.add "=== Trees ==="
+  if f.trees.len == 0:
     lines.add "  (empty)"
   else:
-    for (k, deps) in f.dependencies.graph.pairs:
+    for (k, deps) in f.trees.pairs:
       if deps.len == 0:
         lines.add "  " & rel(string(k)) & " -> (no deps)"
       else:

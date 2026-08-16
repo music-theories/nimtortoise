@@ -1,4 +1,4 @@
-import std/[os, strformat, options, monotimes]
+import std/[os, strformat, monotimes, json, jsonutils]
 import chronos
 import ./forest/[
   init_forest,
@@ -13,21 +13,28 @@ export
 import ./resources/resources
 export resources
 
-
 when isMainModule:
-  if paramCount() != 1:
-    quit("Usage: forest <path/to/file.nim>", 1)
-    
-  let rootPath = paramStr(1)
+  var outputJson = false
+  var rootPath = ""
+
+  for i in 1..paramCount():
+    case paramStr(i)
+    of "--json": 
+      outputJson = true
+    else:        
+      rootPath = paramStr(i)
+
+  if rootPath == "":
+    quit("Usage: forest [--json] <path/to/dir>", 1)
+
   if dirExists(rootPath):
     let t0 = getMonoTime()
-    let output = waitFor initForest(rootPath)
+    let outputForest = waitFor initForest(rootPath)
     let totalTime = fmt"initForest took {getMonoTime() - t0}"
-    if output.isSome():
-      let success = output.get()
-      echo debugStr(success)
-      echo totalTime
+    if outputJson:  
+      echo outputForest.toJson().pretty()
     else:
-      echo "FOREST FAILURE"
+      echo debugStr(outputForest)
+      echo totalTime
   else:
     quit(fmt"Could not generate dependency graph, this folder does not exist: {rootPath}")
