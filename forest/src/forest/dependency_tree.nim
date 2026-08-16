@@ -1,4 +1,5 @@
-import std/[os, strutils, tables, sets, json, sequtils, options]
+import std/[os, strutils, tables, json, sequtils, options]
+import chronicles
 import ../resources/resources
 import ./[forest_types]
 
@@ -190,15 +191,9 @@ proc visit(
     return
 
   of VISITING:
-    let cycleStart = dependencyGraph.stack.find(file)
-    var cycle = dependencyGraph.stack[cycleStart .. ^1]
-    cycle.add(file)
-
-    raise newException(
-      ValueError,
-      "Circular dependency detected:\n  " &
-      cycle.mapIt(displayPath(it, root)).join(" -> ")
-    )
+    # Safety net — should not be reached because cycle checks happen before
+    # edges are added. If we get here, just return without crashing.
+    return
 
   of UNVISITED:
     dependencyGraph.states[file] = VISITING
@@ -218,6 +213,19 @@ proc visit(
         continue
 
       let dep = dependency.get
+
+      # Pre-check: if dep is currently being visited, adding this edge
+      # would create a cycle. Skip the edge and warn instead.
+      let depState = if dep in dependencyGraph.states: dependencyGraph.states[dep]
+                     else: VisitState.UNVISITED
+      if depState == VisitState.VISITING:
+        let cycleStart = dependencyGraph.stack.find(dep)
+        var cycle = dependencyGraph.stack[cycleStart .. ^1]
+        cycle.add(dep)
+        warn "Circular dependency detected, skipping edge",
+          cycle = cycle.mapIt(displayPath(it, root)).join(" -> ")
+        continue
+
       if dep notin dependencyGraph.graph[file]:
         dependencyGraph.graph[file].add(dep)
 
@@ -276,8 +284,5 @@ proc initDependencyGraph*(
     if string(root).len > 0: root
     else: commonParentDir(entries.mapIt(parentDir(it)))
 
-  try:
-    for entry in entries:
-      result.visit(entry, result.root)
-  except CatchableError as e:
-    quit(e.msg, 1)
+  for entry in entries:
+    result.visit(entry, result.root)

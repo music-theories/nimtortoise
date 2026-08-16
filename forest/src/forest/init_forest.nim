@@ -1,9 +1,8 @@
-import std/[os, strformat, options, tables, sequtils, strutils]
+import std/[os, strformat, options, tables, strutils]
 import chronos
-import chronicles
 import ../resources/resources
 import ./[
-  dependency_tree, repo_analysis, 
+  dependency_tree,
   nimble_dump, nim_dump,
   forest_utils, forest_types,
 ]
@@ -14,7 +13,7 @@ proc initForest*(
   let rootPath = DirPathAbs(rootPathString.absolutePath().normalizedPath())
 
   if dirExists(rootPathString):
-    let nimbleInfo = await initNimbleInfo(rootPath)
+    let nimbleInfo = initNimbleInfo(rootPath)
     let nimDumpInfo = getNimDumpInfoForEntryPoints(
       nimbleInfo.entryPoints, rootPath
     )
@@ -46,7 +45,4 @@ proc initForest*(
   else:
     quit(fmt"Could not generate dependency graph, this folder does not exist: {rootPathString}")
     return none(Forest)
-  
-  
-let rootPath = DirPathAbs("/Users/dp/Desktop/software_libraries/nim_tortoise")
 

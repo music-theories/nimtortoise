@@ -32,37 +32,10 @@ type
     of NIMS: discard
 
 type
-  NimbleVer* = object
-    kind*: string   ## e.g. "verAny", "verEqLater", "verEq", etc.
-    ver*:  string   ## empty when kind is "verAny"
-
-  NimbleRequire* = object
-    name*: string
-    str*:  string   ## human-readable version string e.g. ">= 2.0.8"
-    ver*:  NimbleVer
-
   NimbleDumpInfo* = object
-    name*:         string
-    version*:      string
-    nimblePath*:   FilePathAbs
-    author*:       string
-    desc*:         string
-    license*:      string
-    skipDirs*:     seq[string]       ## glob patterns/names, not FS paths
-    skipFiles*:    seq[string]       ## glob patterns/names
-    skipExt*:      seq[string]       ## file extensions
-    installDirs*:  seq[DirPathRel]
-    installFiles*: seq[FilePathRel]
-    installExt*:   seq[string]       ## file extensions
-    requires*:     seq[NimbleRequire]
-    bin*:          seq[string]       ## binary names, not paths
-    binDir*:       DirPathRel        ## relative to nimble file dir
-    srcDir*:       DirPathRel        ## relative to nimble file dir
-    backend*:      string
-    paths*:        seq[DirPathAbs]   ## absolute search paths from nimble
-    nimDir*:       DirPathAbs
-    entryPoints*:  seq[FilePathRel]  ## relative to nimble file dir
-    testEntryPoint*: FilePathRel     ## relative to nimble file dir
+    name*:           string
+    entryPoints*:    seq[FilePathRel]  ## relative to nimble file dir
+    testEntryPoint*: FilePathRel       ## relative to nimble file dir
 
 type
   NimDumpInfo* = object

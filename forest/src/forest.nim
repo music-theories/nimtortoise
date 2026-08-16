@@ -4,13 +4,21 @@ import ./forest/[
   init_forest,
   forest_utils, forest_types, 
   dependency_tree, dependency_tree_utils, 
-  repo_analysis
 ]
+export 
+  init_forest,
+  forest_utils, forest_types,
+  dependency_tree, dependency_tree_utils
+
 import ./resources/resources
+export resources
+
 
 when isMainModule:
-  # let rootPath = "/Users/dp/Desktop/software_libraries/nim_tortoise"
-  let rootPath = "/Users/dp/Desktop/funis/funis"
+  if paramCount() != 1:
+    quit("Usage: forest <path/to/file.nim>", 1)
+    
+  let rootPath = paramStr(1)
   if dirExists(rootPath):
     let t0 = getMonoTime()
     let output = waitFor initForest(rootPath)
@@ -18,22 +26,8 @@ when isMainModule:
     if output.isSome():
       let success = output.get()
       echo debugStr(success)
-      # let check = success.dependencies.graph.checkDependency(
-      #   FilePathAbs(rootPath / "langserver/src/nimsuggest/nimsuggest.nim")
-      #     .isADependencyOf(FilePathAbs(rootPath / "langserver/src/nimtortoise.nim"))
-      # )
-      # echo check
       echo totalTime
-      
     else:
-      echo "FAILURE"
-    # let repoGraph: DependencyGraph = buildRepoDependencyGraph(root)
-
-
-    # let check2 = repoGraph.graph.checkDependency(
-    #   FilePathAbs(rootPath / "langserver/src/nimtortoise.nim")
-    #     .isADependencyOf(FilePathAbs(rootPath / "langserver/src/nimsuggest/nimsuggest.nim"))
-    # )
-    # echo check2
+      echo "FOREST FAILURE"
   else:
     quit(fmt"Could not generate dependency graph, this folder does not exist: {rootPath}")

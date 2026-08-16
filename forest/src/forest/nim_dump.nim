@@ -20,30 +20,33 @@ proc fromNimDumpJson*(j: JsonNode): NimDumpInfo =
   for k, v in j{"warnings"}.pairs():
     result.warnings[k] = v.getBool()
 
-proc getNimDumpInfo*(nimFile: FilePathAbs): Option[NimDumpInfo] =
-  ## Runs `nim dump --dump.format:json` on nimFile and parses the result.
+proc startNimDump(nimFile: FilePathAbs): Option[Process] =
   if not fileExists(string(nimFile)):
     debug "nim file does not exist", nimFile = $nimFile
-    return none(NimDumpInfo)
+    return none(Process)
   let workingDir = parentDir(nimFile)
   debug "running nim dump", nimFile = $nimFile
-  let p = startProcess(
+  return some(startProcess(
     "nim", workingDir = string(workingDir),
     args = @[
-      "dump", 
-      "--dump.format:json", 
-      "--noNimblePath", 
+      "dump",
+      "--dump.format:json",
+      "--noNimblePath",
+      "--hints:off",
+      "--warnings:off",
       string(nimFile)
     ],
     options = {poUsePath}
-  )
+  ))
+
+proc collectNimDump(p: Process, nimFile: FilePathAbs): Option[NimDumpInfo] =
   let output = p.outputStream.readAll()
   let exitCode = p.waitForExit()
   p.close()
   if exitCode != 0:
     warn "nim dump failed", nimFile = $nimFile, exitCode = exitCode
     return none(NimDumpInfo)
-  # nim dump --dump.format:json writes JSON to stderr and hints to stdout;
+  # nim dump --dump.format:json writes JSON to stdout; hints/warnings go to stderr (not captured);
   # find the JSON object in the output
   let jsonStart = output.find('{')
   if jsonStart < 0:
@@ -55,24 +58,31 @@ proc getNimDumpInfo*(nimFile: FilePathAbs): Option[NimDumpInfo] =
     warn "failed to parse nim dump JSON", err = e.msg
     return none(NimDumpInfo)
 
-# proc filterToRepoRoot(paths: seq[DirPathAbs], repoRoot: DirPathAbs): seq[DirPathAbs] =
-#   ## Returns only paths that are inside repoRoot.
-#   let root = string(repoRoot).normalizedPath
-#   for p in paths:
-#     if string(p).normalizedPath.startsWith(root):
-#       result.add(p)
-
+proc getNimDumpInfo*(nimFile: FilePathAbs): Option[NimDumpInfo] =
+  ## Runs `nim dump --dump.format:json` on nimFile and parses the result.
+  let maybeProcess = startNimDump(nimFile)
+  if maybeProcess.isNone:
+    return none(NimDumpInfo)
+  collectNimDump(maybeProcess.get(), nimFile)
 
 proc getNimDumpInfoForEntryPoints*(
   entryPoints: seq[FilePathAbs], rootPath: DirPathAbs
-): Table[FilePathAbs, NimDumpInfo] = 
+): Table[FilePathAbs, NimDumpInfo] =
   result = initTable[FilePathAbs, NimDumpInfo]()
+
+  # Phase 1: launch all subprocesses (non-blocking)
+  var running: seq[(FilePathAbs, Process)]
   for entryPoint in entryPoints:
-    let info = getNimDumpInfo(entryPoint)
+    let maybeProcess = startNimDump(entryPoint)
+    if maybeProcess.isSome:
+      running.add((entryPoint, maybeProcess.get()))
+    else:
+      warn "nim dump failed, skipping search paths", entryPoint = $entryPoint
+
+  # Phase 2: collect results — all processes already running in parallel
+  for (entryPoint, p) in running:
+    let info = collectNimDump(p, entryPoint)
     if info.isNone:
       warn "nim dump failed, skipping search paths", entryPoint = $entryPoint
     else:
       result[entryPoint] = info.get()
-
-    # filterToRepoRoot(info.get.libPaths, repoRoot)
-

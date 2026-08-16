@@ -1,4 +1,4 @@
-import std/[os, sequtils, strutils, sugar, tables]
+import std/[os, sequtils, strutils, tables]
 import chronos
 import ./[forest_types]
 import ../resources/resources
@@ -9,12 +9,6 @@ proc getAllFiles*(rootPath: DirPathAbs, suffix: string): seq[FilePathAbs] =
   for p in walkDirRec(string(rootPath), yieldFilter = {pcFile}):
     if p.endsWith(ext):
       result.add(FilePathAbs(p))
-  # Original: searched root only, then one level deep (single-project workspaces).
-  # let root = string(rootPath)
-  # result = walkFiles(root / suffix).toSeq().map(x => FilePathAbs(x))
-  # if result.len == 0:
-  #   for subdir in walkDirs(root / "*"):
-  #     result.add(walkFiles(subdir / suffix).toSeq().map(x => FilePathAbs(x)))
 
 proc getAllNimsFiles*(rootPath: DirPathAbs): seq[FilePathAbs] =
   getAllFiles(rootPath, "*.nims")
