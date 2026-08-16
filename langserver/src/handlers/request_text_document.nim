@@ -28,20 +28,20 @@ proc supportSignatureHelp*(cc: LspClientCapabilities): bool =
   if cc.isNil:
     return false
   let caps = cc.textDocument
-  caps.isSome and caps.get.signatureHelp.isSome
+  return caps.isSome() and caps.get.signatureHelp.isSome()
 
 
-proc nsCapabilities*(ls: LanguageServer, uri: FileUri): set[NimSuggestCapability] =
-  ## Returns the live nimsuggest capabilities for the slot serving `uri`.
-  ## Safe to call synchronously after queryAt/queryFile returns — by that point
-  ## processQueries has already awaited slot.ns.get so the slot is READY.
-  let slotOpt = resolvedSlot(ls.pool, ls.files.openFiles, uri)
-  if slotOpt.isNone:
-    return {}
-  let nsOpt = slotOpt.get.resolvedNs
-  if nsOpt.isNone:
-    return {}
-  nsOpt.get.capabilities
+# proc nsCapabilities*(ls: LanguageServer, uri: FileUri): set[NimSuggestCapability] =
+#   ## Returns the live nimsuggest capabilities for the slot serving `uri`.
+#   ## Safe to call synchronously after queryAt/queryFile returns — by that point
+#   ## processQueries has already awaited slot.ns.get so the slot is READY.
+#   let slotOpt = resolvedSlot(ls.pool, ls.files.openFiles, uri)
+#   if slotOpt.isNone:
+#     return {}
+#   let nsOpt = slotOpt.get.resolvedNs
+#   if nsOpt.isNone:
+#     return {}
+#   nsOpt.get.capabilities
 
 proc processCompletionQuery(
   ls: LanguageServer, 
@@ -49,7 +49,7 @@ proc processCompletionQuery(
   nimsuggestResponse: seq[Suggest]
 ): seq[CompletionItem] = 
   result = nimsuggestResponse.map(toCompletionItem)
-  if ls.capabilities.lspClientCapabilities.supportSignatureHelp() and nsCon in ls.nsCapabilities(q.uri):
+  if ls.capabilities.lspClientCapabilities.supportSignatureHelp() and nsCon in ls.pool.nimsuggestCapabilities:
     #show only unique overloads if we support signatureHelp
     var unique = initTable[string, CompletionItem]()
     for completion in result:
@@ -288,7 +288,7 @@ proc processSignatureHelpQuery(
   nimsuggestResponse: seq[Suggest]
 ): Option[SignatureHelp] = 
   # nsCapabilities is valid now — slot is READY after addQueryToQueue returns
-  if nsCon notin ls.nsCapabilities(query.uri):
+  if nsCon notin ls.pool.nimsuggestCapabilities:
     return none[SignatureHelp]()
   let signatures = nimsuggestResponse.map(toSignatureInformation)
   if signatures.len() > 0:
@@ -508,11 +508,11 @@ proc inlayHint*(
   )
   let responses = await ls.addQueryToQueue(query)
   # nsProtocolVersion is valid now — slot is READY after queryInlayHints returns
-  let protocolVersion = nsProtocolVersion(
-    ls.pool, ls.files.openFiles, params.textDocument.uri
-  )
-  if protocolVersion < 4:
-    return @[]
+  # let protocolVersion = nsProtocolVersion(
+  #   ls.pool, ls.files.openFiles, params.textDocument.uri
+  # )
+  # if protocolVersion < 4:
+  #   return @[]
 
   return processInlayHintResponses(
     responses, params.textDocument.uri,

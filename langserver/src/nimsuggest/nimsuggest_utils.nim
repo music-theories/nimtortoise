@@ -145,7 +145,7 @@ proc toNimsuggestQuery*(
     return none(NimsuggestQuery[NimsuggestFilePosition])
 
 proc getNimSuggestPathAndVersion*(
-  nimbleDumpInfo: NimbleDumpInfo, conf: NlsConfig # , workingDir: string
+  nimbleDumpInfo: NimbleDumpInfo, conf: NlsConfig 
 ): Future[tuple[path: string, version: string]] {.async.} =
   # let nimDir = nimbleDumpInfo.nimDir.get("")
   if nimbleDumpInfo.nimDir.isSome():

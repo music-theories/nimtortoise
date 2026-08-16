@@ -12,15 +12,12 @@ import ../utils/process_utils
 import ../nimble/nimscript_utils
 import ./[suggestapi_utils, suggestapi_types]
 
-proc detectNimsuggestVersion(
-  root: FilePath, 
+proc detectNimsuggestProtocolVersion*(
   nimsuggestPath: FilePath, 
-  workingDir: FilePath
 ): int {.gcsafe.} =
   var process = startProcess(
     command = string(nimsuggestPath),
-    workingDir = string(workingDir),
-    args = @[string(root), "--info:protocolVer"],
+    args = @["--info:protocolVer"],
     options = {poUsePath},
   )
   var l: string
@@ -35,7 +32,7 @@ proc detectNimsuggestVersion(
     return parseInt(l)
 
 proc getNimsuggestCapabilities*(
-  nimsuggestPath: string
+  nimsuggestPath: FilePath
 ): set[NimSuggestCapability] {.gcsafe.} =
   proc parseCapability(c: string): Option[NimSuggestCapability] =
     debug "Parsing nimsuggest capability", capability = c
@@ -46,7 +43,7 @@ proc getNimsuggestCapabilities*(
       result = none(NimSuggestCapability)
 
   var process = startProcess(
-    command = nimsuggestPath, args = @["--info:capabilities"], options = {poUsePath}
+    command = string(nimsuggestPath), args = @["--info:capabilities"], options = {poUsePath}
   )
   var l: string
   if not process.outputStream.readLine(l):
@@ -64,6 +61,7 @@ proc buildNimsuggestArguments*(
   capabilities: set[NimSuggestCapability],
   enableExceptionInlayHints: bool,
   enableLog: bool,
+  nimPaths: seq[string],
 ): seq[string] =
   let isNimble = string(fileToRun).endsWith(".nimble")
   let isNimScript = string(fileToRun).endsWith(".nims") or isNimble
@@ -92,3 +90,8 @@ proc buildNimsuggestArguments*(
       result.add("--exceptionInlayHints:on")
     else:
       result.add("--exceptionInlayHints:off")
+
+  debug "Nim Paths ", paths = nimPaths
+
+  for p in nimPaths:
+    result.add(p)

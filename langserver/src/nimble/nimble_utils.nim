@@ -6,7 +6,7 @@ import regex
 import stew/byteutils
 
 import ../protocol/types
-import ../utils/process_utils
+# import ../utils/process_utils
 import ../utils/utils
 import ../configurations/configurations
 import ./[nimble_types]
@@ -50,6 +50,43 @@ proc searchForNimbleFiles*(rootPath: FilePath): seq[FilePath] =
       output.add(walkFiles(subdir / "*.nimble").toSeq())
   return map(output, x => toFilePath(x))
 
+
+proc findNimblePaths*(
+  fromFile: string, rootFolder: string
+): seq[string] =
+  ## Walk up from fromFile's directory looking for nimble.paths.
+  ## Returns the flags it contains (--noNimblePath and --path:... entries)
+  ## with any surrounding quotes stripped, ready to pass directly to nimsuggest.
+  var dir = fromFile.parentDir
+  while dir.len > 0:
+    let pathsFile = dir / "nimble.paths"
+    if pathsFile.fileExists:
+      debug "Found nimble.paths for nimsuggest", path = pathsFile
+      for line in pathsFile.lines:
+        let trimmed = line.strip()
+        if trimmed.len == 0:
+          continue
+        if trimmed.startsWith("--path:"):
+          # nimble.paths wraps paths in quotes: --path:"/foo/bar"
+          # Strip them so the arg is passed cleanly to nimsuggest.
+          let val = trimmed[7 .. ^1]
+          if val.len >= 2 and val[0] == '"' and val[^1] == '"':
+            result.add("--path:" & val[1 .. ^2])
+          else:
+            result.add(trimmed)
+        else:
+          result.add(trimmed)
+      return
+    if dir == rootFolder:
+      break
+    let parent = dir.parentDir
+    if parent == dir:
+      break
+    dir = parent
+  warn "No nimble.paths file found.  This may cause problems.  Consider running `nimble setup` before continuing."
+
+echo findNimblePaths("langserver/src/nimble_nimble_utils.nim", "langserver")
+
 # === PROJECT MAPPING ===
 var compiledRegexCache {.threadvar.}: Table[string, Regex2]
 
@@ -65,25 +102,76 @@ proc clearCompiledRegexCache*() =
   ## that stale projectMapping patterns are not reused across config updates.
   compiledRegexCache.clear()
 
+##[
+Path: a filesystem path string, e.g.
+/Users/dp/projects/monorepo/pkga/src/pkga.nim
+URI: an LSP file URI, e.g.
+file:///Users/dp/projects/monorepo/pkga/src/pkga.nim
+The URI has the file:// scheme prefix. uriToPath strips it; pathToUri adds it.
+]##
+
 proc getEntryPointFromProjectMapping*(
-  rootPath: FilePath, uri: FileUri, config: NlsConfig
+  filePath: FilePath, 
+  rootPath: FilePath, 
+  projectMapping:seq[NlsNimsuggestConfig]
 ): FilePath =
   ## ProjectMapping regex lookup only. No slot creation, no LRU fallback.
   ## Returns FilePath("") if no mapping matches.
-  let path = uriToPath(uri)
-  let pathAsString = string(path)
+  # let path = uriToPath(uri)
+  let pathAsString = string(filePath)
   let rootPathAsString = string(rootPath)
   let pathRelativeToRoot = tryRelativeTo(pathAsString, rootPathAsString)
-  for mapping in config.projectMapping:
+  echo "pathRelativeToRoot ", pathRelativeToRoot
+  for mapping in projectMapping:
     var m: RegexMatch2
-    if find(pathAsString, getCompiledRegex(mapping.fileRegex), m):
+    let compiledRegex = re2(mapping.fileRegex)  
+    echo "pathAsString ", pathAsString
+    if find(pathAsString, compiledRegex, m):
+      echo "m: ", $m
+      echo "mapping: ", $mapping.projectFile
       if mapping.projectFile == "":
-        return path  # regex matched but no projectFile — file is its own project
+        echo "empty projectFile"
+        return filePath  # regex matched but no projectFile — file is its own project
       elif isAbsolute(mapping.projectFile):
+        echo "isAbsolute: ", isAbsolute(mapping.projectFile)
         return FilePath(mapping.projectFile)
       else: 
+        echo "other: "
         return FilePath(rootPathAsString / mapping.projectFile)
+  echo "OH NO! "
   return FilePath("")
+
+let testProjectMapping: seq[NlsNimsuggestConfig] = @[
+  NlsNimsuggestConfig(
+    projectFile: "langserver/src/nimtortoise.nim",
+    fileRegex: "langserver/src/.*\\.nim"
+  ),
+  NlsNimsuggestConfig(
+    projectFile: "langserver/tests/all.nim",
+    fileRegex: "langserver/tests/.*\\.nim"
+  )
+]
+
+echo "ENTRY POINT ", getEntryPointFromProjectMapping(
+  FilePath("langserver/"),
+  FilePath(""),
+  testProjectMapping
+)
+let compiledRegex = re2("langserver/src/.*\\.nim")  
+# echo "pathAsString ", pathAsString
+echo regex.match("langserver/src/nimble/nimble_utils.nim", compiledRegex)
+
+echo regex.match("langserver/tests/textensions.nim", compiledRegex)
+
+echo regex.match("langserver/src/nimble_tortoise.nim", compiledRegex)
+
+echo regex.match("vscode_extension/src/nimble/nimble_utils.nim", compiledRegex)
+
+# {
+#   "projectFile": "vscode_extension/src/vscode_nim_tortoise.nim",
+#   "fileRegex": "vscode_extension/src/.*\\.nim"
+# },
+
 
 
 
@@ -155,32 +243,3 @@ proc getNimbleEntryPoints*(
 #   warn "No .nimble files found in workspace root or immediate subdirectories",
 #     rootPath = rootPath
 #   return @[]
-
-proc findNimblePaths*(fromFile: string): seq[string] =
-  ## Walk up from fromFile's directory looking for nimble.paths.
-  ## Returns the flags it contains (--noNimblePath and --path:... entries)
-  ## with any surrounding quotes stripped, ready to pass directly to nimsuggest.
-  var dir = fromFile.parentDir
-  while dir.len > 0:
-    let pathsFile = dir / "nimble.paths"
-    if pathsFile.fileExists:
-      debug "Found nimble.paths for nimsuggest", path = pathsFile
-      for line in pathsFile.lines:
-        let trimmed = line.strip()
-        if trimmed.len == 0:
-          continue
-        if trimmed.startsWith("--path:"):
-          # nimble.paths wraps paths in quotes: --path:"/foo/bar"
-          # Strip them so the arg is passed cleanly to nimsuggest.
-          let val = trimmed[7 .. ^1]
-          if val.len >= 2 and val[0] == '"' and val[^1] == '"':
-            result.add("--path:" & val[1 .. ^2])
-          else:
-            result.add(trimmed)
-        else:
-          result.add(trimmed)
-      return
-    let parent = dir.parentDir
-    if parent == dir:
-      break
-    dir = parent

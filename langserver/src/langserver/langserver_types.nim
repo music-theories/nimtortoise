@@ -107,6 +107,7 @@ type
     isShutdown*: bool
     nimbleDumpCache*: Table[FilePath, NimbleDumpInfo]
     lsInitialized*: Future[void]
+    
     ## Completed after initNimsuggestInstances finishes (config + nimble dump + entry-point spawns).
     ## DID_OPEN polls this before the spawn path so files are routed to the correct
     ## pre-spawned entry-point slot rather than spawning nimsuggest using themselves.

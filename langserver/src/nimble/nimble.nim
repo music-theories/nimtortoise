@@ -4,9 +4,12 @@ import chronos/asyncproc
 import chronicles
 import stew/byteutils
 
+import nimforest/nimforest
+
 import ../protocol/types
 import ../utils/process_utils
 import ../utils/utils
+
 
 import ./[nimble_types, nimble_utils]
 

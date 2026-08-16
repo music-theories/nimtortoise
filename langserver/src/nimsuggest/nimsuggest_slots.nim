@@ -1,18 +1,16 @@
 import std/[options, tables, os, sets, strformat, times, json, sequtils]
 import chronos
 import chronicles
-import ./[suggestapi, suggestapi_types, suggestapi_queries, nimsuggest_types]
+import ./[suggestapi, suggestapi_types, suggestapi_utils, suggestapi_queries, nimsuggest_types]
 import ../configurations/configurations
 import ../nimble/nimble_utils
 import ../protocol/types
 
 proc newSlot*(
   projectFile: FilePath, 
+  workingDir: FilePath, # = getCurrentDir()
   isEntryPoint: bool,# = false, 
-  workingDir: FilePath # = getCurrentDir()
 ): NimsuggestSlot =
-  
-
   return NimsuggestSlot(
     state: SlotState.SPAWNING,
     projectFile: projectFile,
@@ -68,7 +66,10 @@ proc execSpawn*(
   slot: NimsuggestSlot, 
   pool: NimsuggestPool, 
   projectFile: FilePath,
-  config: NlsConfig
+  rootFolder: FilePath,
+  config: NlsConfig,
+  # nimsuggestVersion: int,
+  # nims
 ): Future[bool] {.async.} =
   ## Start a nimsuggest process for `projectFile`, retrying up to MAX_CRASH_RETRIES times.
   ## Returns true if the spawn succeeded, false if all attempts failed.
@@ -84,6 +85,9 @@ proc execSpawn*(
   slot.state = SlotState.SPAWNING
   let nsFut = newFuture[NimSuggest]("execSpawn")
   slot.ns = nsFut
+  slot.nimblePaths = findNimblePaths(
+    string(projectFile), string(rootFolder)
+  )
 
   while slot.crashCount <= config.maxNimsuggestCrashRetries:
     if slot.crashCount > 0:
@@ -95,22 +99,16 @@ proc execSpawn*(
     debug "execSpawn: calling createNimsuggest",
       projectFile = projectFile, attempt = slot.crashCount + 1
     try:
-      let protocolVersion = detectNimsuggestVersion(
-        projectFile,
-        FilePath(pool.nimsuggestPath),
-        FilePath(slot.workingDir),
-      )
-      let capabilities = getNimsuggestCapabilities(pool.nimsuggestPath)
       let ns = await createNimsuggest(
         projectFile,
         FilePath(pool.nimsuggestPath),
         FilePath(slot.workingDir),
-        timeout                   = int(inMilliseconds(config.nimsuggestRequestTimeout)),
-        enableLog                 = config.logNimsuggest,
-        enableExceptionInlayHints = config.inlayHints.exceptionHints.enable,
-        nimPaths                  = findNimblePaths(string(slot.projectFile)),
-        protocolVersion           = protocolVersion,
-        capabilities              = capabilities,
+        int(inMilliseconds(config.nimsuggestRequestTimeout)),
+        config.logNimsuggest,
+        config.inlayHints.exceptionHints.enable,
+        slot.nimblePaths,
+        pool.nimsuggestProtocol,
+        pool.nimsuggestCapabilities,
       )
       debug "execSpawn: createNimsuggest succeeded", projectFile = projectFile, port = ns.port
       nsFut.complete(ns)
@@ -168,6 +166,7 @@ proc execStop*(slot: NimsuggestSlot, pool: NimsuggestPool): Future[bool] {.async
 proc attemptCrashRespawn*(
   slot: NimsuggestSlot,
   pool: NimsuggestPool,
+  rootFolder: FilePath,
   config: NlsConfig
 ): Future[bool] {.async.} =
   slot.state = SlotState.CRASHED
@@ -185,7 +184,10 @@ proc attemptCrashRespawn*(
     # so we just reset state directly — no sentinel needed.
     slot.state = SlotState.STOPPED
     slot.crashedUris.clear() # explicit restart = clean slate
-    return await execSpawn(slot, pool, slot.projectFile, config)
+    return await execSpawn(
+      slot, pool, slot.projectFile, 
+      rootFolder, config
+    )
     
   else:
     error "processQueries: crash limit reached, slot permanently failed",
@@ -209,52 +211,52 @@ proc stopNimsuggestProcesses*(pool: NimsuggestPool) {.async.} =
 proc stopNimsuggestProcessesP*(pool: NimsuggestPool) =
   waitFor pool.stopNimsuggestProcesses()
 
-proc idleSlots*(
-  pool: NimsuggestPool,
-  config: NlsConfig
-): seq[NimsuggestSlot] =
-  ## Return slots that have exceeded the idle timeout and have no recently-active
-  ## open files. The caller (langserver.nim tick) handles file eviction and
-  ## notification, since it has access to files.nim procs.
-  let cutoff = times.now() - config.nimsuggestIdleTimeout
-  for slot in pool.slots.values.toSeq:
-    if slot.isLive() == false:
-      continue
-    if slot.lastCmdTime > cutoff:
-      continue
-    result.add(slot)
+# proc idleSlots*(
+#   pool: NimsuggestPool,
+#   config: NlsConfig
+# ): seq[NimsuggestSlot] =
+#   ## Return slots that have exceeded the idle timeout and have no recently-active
+#   ## open files. The caller (langserver.nim tick) handles file eviction and
+#   ## notification, since it has access to files.nim procs.
+#   let cutoff = times.now() - config.nimsuggestIdleTimeout
+#   for slot in pool.slots.values.toSeq:
+#     if slot.isLive() == false:
+#       continue
+#     if slot.lastCmdTime > cutoff:
+#       continue
+#     result.add(slot)
 
-proc resolvedSlot*(
-  pool: NimsuggestPool,
-  openFiles: TableRef[FileUri, NlsFileInfo],
-  uri: FileUri
-): Option[NimsuggestSlot] =
-  ## Return the current owning slot for uri, healing a stale fileInfo.slot
-  ## pointer if execCheckKnown moved the URI to a different slot since open.
-  let fileInfo = openFiles.getOrDefault(uri)
-  if fileInfo == nil:
-    return none(NimsuggestSlot)
-  if not fileInfo.slot.ownsUri(uri):
-    let current = pool.slotForUri(uri)
-    if current.isNone:
-      return none(NimsuggestSlot)
-    else:
-      fileInfo.slot = current.get()
-      return some(fileInfo.slot)
+# proc resolvedSlot*(
+#   pool: NimsuggestPool,
+#   openFiles: TableRef[FileUri, NlsFileInfo],
+#   uri: FileUri
+# ): Option[NimsuggestSlot] =
+#   ## Return the current owning slot for uri, healing a stale fileInfo.slot
+#   ## pointer if execCheckKnown moved the URI to a different slot since open.
+#   let fileInfo = openFiles.getOrDefault(uri)
+#   if fileInfo == nil:
+#     return none(NimsuggestSlot)
+#   if not fileInfo.slot.ownsUri(uri):
+#     let current = pool.slotForUri(uri)
+#     if current.isNone:
+#       return none(NimsuggestSlot)
+#     else:
+#       fileInfo.slot = current.get()
+#       return some(fileInfo.slot)
 
-proc nsProtocolVersion*(
-  pool: NimsuggestPool,
-  openFiles: TableRef[FileUri, NlsFileInfo],
-  uri: FileUri
-): int =
-  ## Returns the nimsuggest protocol version for the slot serving `uri`.
-  ## Safe to call synchronously after queryAt/queryFile returns.
-  let slotOpt = pool.resolvedSlot(openFiles, uri)
-  if slotOpt.isNone:
-    return 0
-  let nsOpt = slotOpt.get.resolvedNs
-  if nsOpt.isNone:
-    return 0
-  nsOpt.get.protocolVersion
+# proc nsProtocolVersion*(
+#   pool: NimsuggestPool,
+#   openFiles: TableRef[FileUri, NlsFileInfo],
+#   uri: FileUri
+# ): int =
+#   ## Returns the nimsuggest protocol version for the slot serving `uri`.
+#   ## Safe to call synchronously after queryAt/queryFile returns.
+#   let slotOpt = pool.resolvedSlot(openFiles, uri)
+#   if slotOpt.isNone:
+#     return 0
+#   let nsOpt = slotOpt.get.resolvedNs
+#   if nsOpt.isNone:
+#     return 0
+#   nsOpt.get.protocolVersion
 
 

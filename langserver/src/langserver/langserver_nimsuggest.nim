@@ -12,43 +12,48 @@ import ../utils/utils
 import ./[langserver_types, langserver_utils]
 import ../protocol/types
 
-proc initNimsuggestInstances*(ls: LanguageServer) {.async.} =
-  ## Starts nimsuggest instances.
-  # let rootPath = getRootPath(ls.capabilities.lspInitializeParams)
-  let rootPath = getRootPath(ls.capabilities.lspInitializeParams)
+# proc initNimsuggestInstances*(ls: LanguageServer) {.async.} =
+#   ## Starts nimsuggest instances.
+#   # let rootPath = getRootPath(ls.capabilities.lspInitializeParams)
+#   # let rootPath = getRootPath(ls.capabilities.lspInitializeParams)
 
-  if rootPath.isSome():
-    let foundRootPath = rootPath.get()
-    debug "initNimsuggestInstances: rootPath found.", found = foundRootPath
-    ls.files.rootPath = foundRootPath
+#   if rootPath.isSome():
+#     let foundRootPath = rootPath.get()
+#     debug "initNimsuggestInstances: rootPath found.", found = foundRootPath
+#     ls.files.rootPath = foundRootPath
 
-  else:
-    debug "initNimsuggestInstances: no rootPath found.  Quitting."
-    return 
+#   else:
+#     debug "initNimsuggestInstances: no rootPath found.  Quitting."
+#     return 
 
-  let config = ls.configurations.currentConfig
+#   let config = ls.configurations.currentConfig
 
-  # Update pool settings from config (pool was created with defaults in initLanguageServer)
-  ls.pool.maxSlots = config.maxNimsuggestProcesses
-  ls.pool.fileCheckDelay = initDuration(milliseconds = config.fileCheckDelay)
+#   # Update pool settings from config (pool was created with defaults in initLanguageServer)
+#   ls.pool.maxSlots = config.maxNimsuggestProcesses
+#   ls.pool.fileCheckDelay = initDuration(milliseconds = config.fileCheckDelay)
 
-  # Get all nimble information
-  let foundNimbleFiles: seq[FilePath] = searchForNimbleFiles(ls.files.rootPath)
-  var nimsuggestSet = false
 
-  for i, nimbleFile in foundNimbleFiles:
-    let nimbleDumpInfo: NimbleDumpInfo = await getNimbleDumpInfo(ls.nimbleDumpCache, nimbleFile)
+#   # Get all nimble information
+#   let foundNimbleFiles: seq[FilePath] = searchForNimbleFiles(ls.files.rootPath)
+#   var nimsuggestSet = false
 
-    if not(nimbleFile in ls.nimbleDumpCache):
-      ls.nimbleDumpCache[nimbleFile] = nimbleDumpInfo
+#   for i, nimbleFile in foundNimbleFiles:
+#     let nimbleDumpInfo: NimbleDumpInfo = await getNimbleDumpInfo(ls.nimbleDumpCache, nimbleFile)
 
-    if nimsuggestSet == false:
-      # Resolve the nimsuggest binary path and Nim version now that config is available.
-      let (nimsuggestPath, nimVersion) = await getNimSuggestPathAndVersion(nimbleDumpInfo, config)
-      ls.pool.nimsuggestPath = nimsuggestPath
-      ls.pool.nimVersion = nimVersion
+#     if not(nimbleFile in ls.nimbleDumpCache):
+#       ls.nimbleDumpCache[nimbleFile] = nimbleDumpInfo
 
-      nimsuggestSet = true
+#     if nimsuggestSet == false:
+#       # Resolve the nimsuggest binary path and Nim version now that config is available.
+#       let (nimsuggestPath, nimVersion) = await getNimSuggestPathAndVersion(nimbleDumpInfo, config)
+#       ls.pool.nimVersion = nimVersion
+#       let nsPath = toFilePath(nimsuggestPath)
+
+#       ls.pool.nimsuggestPath = nsPath
+#       ls.pool.nimsuggestProtocol = detectNimsuggestProtocolVersion(nsPath)
+#       ls.pool.nimsuggestCapabilities = getNimsuggestCapabilities(nsPath)
+
+#       nimsuggestSet = true
 
 # proc getEntryPoints(
 #   ls: LanguageServer, rootPath: string

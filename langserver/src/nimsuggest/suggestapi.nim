@@ -18,7 +18,7 @@ proc createNimsuggest*(
   timeout: int,
   enableLog: bool,
   enableExceptionInlayHints: bool,
-  nimPaths: seq[string],
+  nimblePaths: seq[string],
   protocolVersion: int,
   capabilities: set[NimSuggestCapability],
 ): Future[NimSuggest] {.async.} =
@@ -30,15 +30,16 @@ proc createNimsuggest*(
   )
 
   let args = buildNimsuggestArguments(
-    fileToRun, protocolVersion, capabilities, enableExceptionInlayHints, enableLog
-  ) & nimPaths
+    fileToRun, protocolVersion, capabilities, enableExceptionInlayHints, enableLog,
+    nimblePaths
+  )
 
   info "Starting nimsuggest",
     root = fileToRun, timeout = timeout, path = nimsuggestPath, workingDir = workingDir
 
   result.process = await startProcess(
-    nimsuggestPath,
-    workingDir = workingDir,
+    string(nimsuggestPath),
+    string(workingDir),
     arguments = args,
     options = {UsePath},
     stdoutHandle = AsyncProcess.Pipe,
@@ -82,7 +83,7 @@ proc processQueue(self: Nimsuggest): Future[void] {.async.} =
         # abandoned readFut fails at the OS level (freeing the socket), and mark
         # the slot failed so processNimsuggestQueries triggers crash-respawn.
         let readFut = transport.read()
-        let dataOpt = await withTimeout(readFut, self.timeout)
+        let dataOpt = await process_utils.withTimeout(readFut, self.timeout)
         if dataOpt.isNone:
           transport.close()
           self.markFailed(fmt"timeout ({self.timeout}ms): {req.commandString}")
@@ -102,9 +103,10 @@ proc processQueue(self: Nimsuggest): Future[void] {.async.} =
               let sug = Suggest()
               sug.section = ideKnown
               sug.forth = lineStr
-              res.add sug
+              res.add(sug)
             of "inlayHints":
-              res.add Suggest(inlayHintInfo: parseSuggestInlayHint(lineStr))
+              let val = parseSuggestInlayHint(lineStr)
+              res.add(Suggest(inlayHintInfo: val))
             else:
               let sug = parseSuggestDef(lineStr)
               if sug.isSome:
@@ -131,13 +133,13 @@ proc processQueue(self: Nimsuggest): Future[void] {.async.} =
   self.processing = false
 
 proc call*(
-    self: Nimsuggest,
-    command: string,
-    file: FilePath,
-    dirtyFile: FilePath,
-    line: int,
-    column: int,
-    tag = "",
+  self: Nimsuggest,
+  command: string,
+  file: FilePath,
+  dirtyFile: FilePath,
+  line: int,
+  column: int,
+  tag = "",
 ): Future[seq[Suggest]] =
   result = Future[seq[Suggest]]()
   let commandString =
@@ -209,7 +211,7 @@ createRangeCommand(inlayHints)
 
 proc isKnown*(nimsuggest: Nimsuggest, filePath: FilePath): Future[bool] {.async.} =
   let fut = nimsuggest.known(filePath)
-  let res = await withTimeout(fut, REQUEST_TIMEOUT)
+  let res = await process_utils.withTimeout(fut, REQUEST_TIMEOUT)
   if res.isNone:
     debug "Timeout reached running [isKnown], assuming the file is known (nimsuggest busy)",
       file = $filePath

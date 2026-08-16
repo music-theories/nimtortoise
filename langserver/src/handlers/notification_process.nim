@@ -3,43 +3,9 @@ import chronos
 import chronicles
 import ../protocol/types
 import ../langserver/langserver
-import ../configurations/configurations
 
 # === initialized ===
-proc initialized*(ls: LanguageServer, _: JsonNode): Future[void] {.async.} =
-  debug "Client initialized."
-  ls.maybeRegisterCapabilityDidChangeConfiguration()
-
-  if ls.supportsConfigurationRequest:
-    debug "Requesting configuration from the client"
-    
-    let configurationParams = %*{"items": [{"section": "nimTortoise"}, {"section": "nim"}]}
-    
-    let configFuture = ls.call("workspace/configuration", configurationParams)
-
-    try:
-      let conf = await configFuture
-      debug "Received the following configuration", configuration = conf
-      let newConfiguration: Option[NlsConfig] = parseWorkspaceConfigurationResponse(conf)
-      if newConfiguration.isSome: 
-        let newConfigValue = newConfiguration.get()
-        let newConfigurationIsDifferent = isDifferentFrom(newConfigValue, ls.configurations.currentConfig)
-
-        if newConfigurationIsDifferent:
-          ls.configurations.currentConfig = newConfigValue
-
-      ls.configurations.configReady.fire()
-    except CatchableError as ex:
-      debug "Failed to receive workspace configuration", error = ex.msg
-
-  else:
-    debug "Client does not support workspace/configuration"
-    ls.configurations.configReady.fire()
-
-  await ls.initNimsuggestInstances()
-
-  if not ls.lsInitialized.finished:
-    ls.lsInitialized.complete()
+# See init_langserver.nim
   
 # === $/cancelRequest ===
 proc cancelRequest*(ls: LanguageServer, params: CancelParams): Future[void] {.async.} =
