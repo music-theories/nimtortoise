@@ -83,6 +83,7 @@ proc registerLspRoutes(srv: RpcSocketServer, ls: LanguageServer) =
     "extension/capabilities", wrapRpc(partial(lsp.extensionCapabilities, ls))
   )
   srv.register("extension/suggest", wrapRpc(partial(lsp.extensionSuggest, ls)))
+  srv.register("extension/listTasks", wrapRpc(partial(lsp.listTasks, ls)))
   srv.register("extension/tasks", wrapRpc(partial(lsp.tasks, ls)))
   srv.register("extension/runTask", wrapRpc(partial(lsp.runTask, ls)))
   # TESTS REMOVED

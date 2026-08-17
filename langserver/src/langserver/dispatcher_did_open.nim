@@ -1,4 +1,4 @@
-import std/[options, sets, tables, sequtils]
+import std/[options, sets, tables, sequtils, strutils]
 import chronos
 import chronicles
 import ../nimsuggest/nimsuggest
@@ -153,6 +153,13 @@ proc processDidOpenQuery*(
     # Check there is a free nimsuggest slot
     let filePath = toFilePathAbs(uri)
 
+    # Nimsuggest only accepts .nim files as entry points. Skip spawn for
+    # .nimble, .nims, and any other non-.nim files — they are not compilable
+    # by nimsuggest and will crash it with "command expects a filename".
+    if not string(filePath).endsWith(".nim"):
+      debug "didOpen: Non-.nim file, skipping nimsuggest spawn", uri = uri
+      return
+
     debug "didOpen: Check if it has a projectFile/entryPoint.  i.e. Is a true orphan?", uri = uri, filePath = filePath
     let spawnInfo: NimsuggestSpawnInfo = getNimsuggestSpawnInfo(
       filePath, ls.files.rootPath, ls.dependencies
@@ -194,35 +201,43 @@ proc processDidOpenQuery*(
               ls.configurations.currentConfig,
               ls.notify,
             )
-            debug "didOpen: Ensure the projectFile/entryPoint ACTUALLY knows the uri ", entryPoint = spawnInfo.entryPoint
+            debug "didOpen: Successfully spawned a new nimsuggest slot ", entryPoint = spawnInfo.entryPoint, uri = uri
 
-            let projectKnownQuery = NimsuggestQuery[LspFilePosition](
-              id: 0.uint,
-              kind: NimsuggestQueryKind.KNOWN,
-              uri: uri,
-              dirtyFile: FilePathAbs(""),
-              responseFuture: newFuture[seq[Suggest]]("known"),
-            )
-            newSlot.queryMailbox.addLastNoWait(projectKnownQuery)
+            ls.addFileToOpenFiles(newSlot, q.didOpen.textDocument)
+            discard await ls.consolidateNimsuggestInstances(newSlot)
+            discard ls.queryFile(uri, NimsuggestQueryKind.CHECK_FILE)
 
-            let projectResponse = await projectKnownQuery.responseFuture
+            # debug "didOpen: Ensure the projectFile/entryPoint ACTUALLY knows the uri ", entryPoint = spawnInfo.entryPoint
 
-            let thisProjectKnowsTheFile = checkNimsuggestKnownResponse(projectResponse)
+            # let projectKnownQuery = NimsuggestQuery[LspFilePosition](
+            #   id: 0.uint,
+            #   kind: NimsuggestQueryKind.KNOWN,
+            #   uri: uri,
+            #   dirtyFile: FilePathAbs(""),
+            #   responseFuture: newFuture[seq[Suggest]]("known"),
+            # )
+            # newSlot.queryMailbox.addLastNoWait(projectKnownQuery)
 
-            if thisProjectKnowsTheFile:
-              debug "didOpen: The project DOES know the uri.", fileThatKnows = newSlot.spawnInfo.entryPoint,  fileThatIsKnown = uri
-              ls.addFileToOpenFiles(newSlot, q.didOpen.textDocument)
-              discard await ls.consolidateNimsuggestInstances(newSlot)
-              discard ls.queryFile(uri, NimsuggestQueryKind.CHECK_FILE)
+            # let projectResponse = await projectKnownQuery.responseFuture
 
-            else:
-              debug "didOpen: The project does NOT know the current file.  This means it is within the module's folders but not connected to it. It is an orphan.  Spin up a new standalone nimsuggest for it."
-              # TODO: I don't think this branch will be reached. but just in case ...
+            # let thisProjectKnowsTheFile = checkNimsuggestKnownResponse(projectResponse)
 
-              discard await stopNimsuggestSlotAndRemoveFromPool(ls.pool, newSlot)
-              discard await createNewSuggestSlotAndConsolidate(
-                ls, newSlot.spawnInfo.entryPoint, q.didOpen.textDocument
-              )
+            # if thisProjectKnowsTheFile:
+            #   debug "didOpen: The project DOES know the uri.", fileThatKnows = newSlot.spawnInfo.entryPoint,  fileThatIsKnown = uri
+            #   ls.addFileToOpenFiles(newSlot, q.didOpen.textDocument)
+            #   discard await ls.consolidateNimsuggestInstances(newSlot)
+            #   discard ls.queryFile(uri, NimsuggestQueryKind.CHECK_FILE)
+
+            # else:
+            #   debug "didOpen: The project does NOT know the current file.  This means it is within the module's folders but not connected to it. It is an orphan.  Spin up a new standalone nimsuggest for it."
+            #   # v4 unknown-file workaround: nimsuggest compiled the project entry point
+            #   # but won't index files it hasn't served yet — queries return length=0.
+            #   # Use filePath (the opened file) as the standalone entry point, not the
+            #   # project entry point, so nimsuggest compiles it directly.
+            #   discard await stopNimsuggestSlotAndRemoveFromPool(ls.pool, newSlot)
+            #   discard await createNewSuggestSlotAndConsolidate(
+            #     ls, filePath, q.didOpen.textDocument
+            #   )
           else:
             debug "didOpen: Spawning projectFile/entryPoint was NOT successful.", entryPoint = spawnInfo.entryPoint
             ls.pool.removeSlot(spawnInfo.entryPoint)

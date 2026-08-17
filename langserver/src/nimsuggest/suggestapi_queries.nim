@@ -138,4 +138,4 @@ proc buildNimsuggestArguments*(
   debug "Nim Paths ", paths = spawningInfo.paths
 
   for p in spawningInfo.paths:
-    result.add($(p))
+    result.add("--path:" & $(p))

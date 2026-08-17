@@ -27,7 +27,7 @@ proc initDefaultNlsConfig*(): NlsConfig =
     logNimsuggest: true, 
     inlayHints: NlsInlayHintsConfig(
       typeHints: NlsInlayTypeHintsConfig(
-        enable: true
+        enable: false
       ),
       exceptionHints: NlsInlayExceptionHintsConfig(
         enable: true,
@@ -35,7 +35,7 @@ proc initDefaultNlsConfig*(): NlsConfig =
         hintStringRight: ""
       ),
       parameterHints: NlsInlayParameterHintsConfig(
-        enable: true
+        enable: false
       ),
     ),
     notificationVerbosity: NlsNotificationVerbosity.nvInfo,
@@ -117,8 +117,7 @@ proc parseDidChangeConfiguration*(conf: JsonNode): NlsConfig =
 
 proc parseWorkspaceConfigurationResponse*(conf: JsonNode): Option[NlsConfig] =
   ## Parses the response to a workspace/configuration request (pull model).
-  ## Expected format: [<nimTortoise section>, <nim section>] — 1 or 2 elements.
-  ## The nimTortoise section takes priority; the nim section fills in missing values.
+  ## Expected format: [<nimTortoise section>] — single element array.
   try:
     let items = if conf.kind == JArray: conf else: newJArray()
     if items.len == 0:

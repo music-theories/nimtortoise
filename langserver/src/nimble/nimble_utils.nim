@@ -93,15 +93,15 @@ proc getNimsuggestSpawnInfo*(
         bestScore = score
         bestEntryPoint = ep
 
-  # Step 4: No entry point can reach fileOpened (orphan) - it becomes its own entry point.  No paths found in this case.  TODO - maybe do a nim dump to get paths?
+  # Step 4: A reachable entry point was found — use the best (closest) one.
   if anyReachable:
-    result.entryPoint = fileOpened
-    result.paths = @[]
-
-  else:
-    # Step 5: Get lib search paths for this entry point from dependencies.paths.
     result.entryPoint = bestEntryPoint
     result.paths = dependencies.paths.getOrDefault(bestEntryPoint, @[])
+
+  else:
+    # Step 5: No entry point can reach fileOpened (orphan) — it becomes its own entry point.
+    result.entryPoint = fileOpened
+    result.paths = @[]
 
 # proc findNimblePaths*(
 #   fromFile: string, rootFolder: string

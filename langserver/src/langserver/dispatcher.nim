@@ -267,7 +267,7 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
         if ls.usePullConfigurationModel():
           if ls.supportsConfigurationRequest():
             debug "Requesting configuration from the client"
-            let configurationParams = %*{"items": [{"section": "nimTortoise"}, {"section": "nim"}]}
+            let configurationParams = %*{"items": [{"section": "nimTortoise"}]}
             let configFuture = ls.call("workspace/configuration", configurationParams)
             receivedConfigJson = await configFuture 
           else:

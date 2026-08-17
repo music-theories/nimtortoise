@@ -203,6 +203,8 @@ proc processNimsuggestQueries*(
           continue
       
     if slot.state == SlotState.READY:
+
+      debug "processNimsuggestQueries: original Query ", entryPoint = slot.spawnInfo.entryPoint, kind = $originalQuery.kind, uri = $originalQuery.uri
       let convertedQuery = toNimsuggestQuery(originalQuery, openFiles)
       if convertedQuery.isNone:
         debug "processNimsuggestQueries: query conversion failed, skipping"
@@ -242,23 +244,23 @@ proc processNimsuggestQueries*(
             # reliably. Suppress misleading diagnostics and trigger RECOMPILE instead.
             # Loose module-qualifier matches (foo.Bar vs Bar) are NOT handled here —
             # they appear as an advisory note in the diagnostic message only.
-            if queryResponse.anyIt(it.forth == "Error" and isExactSplitIdentityTypeMismatch(it.doc)):
-              debug "processNimsuggestQueries: exact split-identity detected, triggering RECOMPILE",
-                uri = $q.uri
-              let recompileQuery = NimsuggestQuery[LspFilePosition](
-                id: 0,
-                kind: NimsuggestQueryKind.RECOMPILE,
-                uri: q.uri,
-                dirtyFile: FilePathAbs(""),
-                responseFuture: newFuture[seq[Suggest]]("splitIdentityRecompile"),
-              )
-              slot.queryMailbox.addFirstNoWait(recompileQuery)
-            else:
-              let diagnosticsJson = convertNimSuggestResponseToDiagnostics(
-                queryResponse, q.uri, openFiles
-              )
-              notifyProc("textDocument/publishDiagnostics", diagnosticsJson)
-              debug "processNimsuggestQueries: CHECK_FILE run, sending diagnostics ", uri = $q.uri, json = diagnosticsJson
+            # if queryResponse.anyIt(it.forth == "Error" and isExactSplitIdentityTypeMismatch(it.doc)):
+            #   debug "processNimsuggestQueries: exact split-identity detected, triggering RECOMPILE",
+            #     uri = $q.uri
+            #   let recompileQuery = NimsuggestQuery[LspFilePosition](
+            #     id: 0,
+            #     kind: NimsuggestQueryKind.RECOMPILE,
+            #     uri: q.uri,
+            #     dirtyFile: FilePathAbs(""),
+            #     responseFuture: newFuture[seq[Suggest]]("splitIdentityRecompile"),
+            #   )
+            #   slot.queryMailbox.addFirstNoWait(recompileQuery)
+            # else:
+            let diagnosticsJson = convertNimSuggestResponseToDiagnostics(
+              queryResponse, q.uri, openFiles
+            )
+            notifyProc("textDocument/publishDiagnostics", diagnosticsJson)
+            debug "processNimsuggestQueries: CHECK_FILE run, sending diagnostics ", uri = $q.uri, json = diagnosticsJson
             
           of NimsuggestQueryKind.CHECK_PROJECT, NimsuggestQueryKind.RECOMPILE:
             let timeNow = now()
@@ -292,6 +294,7 @@ proc processNimsuggestQueries*(
       let ns = slot.ns.read()
       if not ns.process.isNil:
         await shutdownChildProcess(ns.process)
+
   except CatchableError:
     discard  # process may already be dead; that is fine
   if shutdownFut != nil:

@@ -100,10 +100,17 @@ proc processQueue(self: Nimsuggest): Future[void] {.async.} =
           if lineStr != "":
             case req.command
             of "known":
+              # "." is the nimsuggest protocol end-marker, not a result row.
+              # Filter it here so callers see length=0 (unknown) not length=1, forth=".".
+              # if lineStr != ".":
               let sug = Suggest()
               sug.section = ideKnown
               sug.forth = lineStr
+              
+              debug "KNOWN RESPONSE ", section = ideKnown, forth = lineStr 
+              
               res.add(sug)
+              
             of "inlayHints":
               let val = parseSuggestInlayHint(lineStr)
               res.add(Suggest(inlayHintInfo: val))

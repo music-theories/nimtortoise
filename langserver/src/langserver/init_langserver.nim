@@ -202,7 +202,7 @@ proc initialized*(ls: LanguageServer, _: JsonNode): Future[void] {.async.} =
   if ls.supportsConfigurationRequest:
     debug "Requesting configuration from the client"
     
-    let configurationParams = %*{"items": [{"section": "nimTortoise"}, {"section": "nim"}]}
+    let configurationParams = %*{"items": [{"section": "nimTortoise"}]}
     
     let configFuture = ls.call("workspace/configuration", configurationParams)
 
