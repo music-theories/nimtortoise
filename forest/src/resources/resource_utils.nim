@@ -13,6 +13,12 @@ func `==`*(a, b: FilePathRel): bool = string(a) == string(b)
 func `==`*(a, b: DirPathAbs):  bool = string(a) == string(b)
 func `==`*(a, b: DirPathRel):  bool = string(a) == string(b)
 
+func `!=`*(a, b: FileUri):     bool = string(a) != string(b)
+func `!=`*(a, b: FilePathAbs): bool = string(a) != string(b)
+func `!=`*(a, b: FilePathRel): bool = string(a) != string(b)
+func `!=`*(a, b: DirPathAbs):  bool = string(a) != string(b)
+func `!=`*(a, b: DirPathRel):  bool = string(a) != string(b)
+
 
 proc hash*(x: FileUri):     Hash = result = string(x).hash; result = !$result
 proc hash*(x: FilePathAbs): Hash = result = string(x).hash; result = !$result

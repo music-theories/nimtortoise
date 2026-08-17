@@ -3,13 +3,14 @@ import chronicles
 import ../resources/resources
 import ./[forest_types]
 
-proc normalizePath(path: string): FilePathAbs =
+proc normalizePath(path: string): FilePathAbs {.raises: [OSError, ValueError].} =
   FilePathAbs(absolutePath(path).normalizedPath)
 
-proc displayPath(path: FilePathAbs, root: DirPathAbs): string =
-  relativePath(string(path), string(root)).replace('\\', '/')
+proc displayPath(path: FilePathAbs, root: DirPathAbs): string {.raises: [].} =
+  try: relativePath(string(path), string(root)).replace('\\', '/')
+  except: string(path)
 
-proc cleanName(raw: string): string =
+proc cleanName(raw: string): string {.raises: [].} =
   ## Strip "as alias", "except ...", and trailing ";..." suffixes from a module
   ## name token.  Semicolons begin a new statement (e.g. "import foo; export foo").
   var name = raw.strip()
@@ -24,7 +25,7 @@ proc cleanName(raw: string): string =
     name = name[0 ..< exceptPos].strip()
   result = name
 
-proc expandGroup(group: string, output: var seq[string]) =
+proc expandGroup(group: string, output: var seq[string]) {.raises: [].} =
   ## Expand one import group, which is either:
   ##   foo                   -- simple name
   ##   foo as bar            -- aliased name
@@ -45,7 +46,7 @@ proc expandGroup(group: string, output: var seq[string]) =
       if name.len > 0:
         output.add(prefix & name)
 
-proc extractImports*(source: string): seq[string] =
+proc extractImports*(source: string): seq[string] {.raises: [].} =
   ## Extract module names from common Nim import syntax:
   ##
   ##   import foo, bar/baz
@@ -148,7 +149,7 @@ proc resolveImport(
   importName:    string,
   importingFile: FilePathAbs,
   root:          DirPathAbs,
-): Option[FilePathAbs] =
+): Option[FilePathAbs] {.raises: [OSError, ValueError].} =
   ## Nim modules normally correspond to:
   ##
   ##   foo        -> foo.nim
@@ -179,7 +180,7 @@ proc visit(
   dependencyGraph: var DependencyGraph,
   file: FilePathAbs,
   root: DirPathAbs,
-) =
+) {.raises: [IOError, OSError, ValueError].} =
   let file = normalizePath(string(file))
 
   var currentState = VisitState.UNVISITED
@@ -234,7 +235,7 @@ proc visit(
     discard dependencyGraph.stack.pop()
     dependencyGraph.states[file] = VISITED
 
-proc formatInJson*(dependencyGraph: DependencyGraph): string =
+proc formatInJson*(dependencyGraph: DependencyGraph): string {.raises: [].} =
   var output = newJObject()
   for file, dependencies in dependencyGraph.graph.pairs:
     let key = displayPath(file, dependencyGraph.root)
@@ -246,7 +247,7 @@ proc formatInJson*(dependencyGraph: DependencyGraph): string =
     output[key] = deps
   return pretty(output)
 
-proc commonParentDir(paths: seq[DirPathAbs]): DirPathAbs =
+proc commonParentDir(paths: seq[DirPathAbs]): DirPathAbs {.raises: [].} =
   ## Returns the longest common directory prefix of all paths.
   if paths.len == 0: return DirPathAbs("")
   var parts = string(paths[0]).split(DirSep)
@@ -261,7 +262,7 @@ proc commonParentDir(paths: seq[DirPathAbs]): DirPathAbs =
 proc initDependencyGraph*(
   entryFiles: seq[FilePathAbs],
   root:       DirPathAbs
-): DependencyGraph =
+): DependencyGraph {.raises: [IOError, OSError, ValueError].} =
   ## Build a dependency graph from one or more entry .nim files.
   ## If root is empty it is inferred as the common parent directory of all
   ## entry files (suitable for a multi-package repo).

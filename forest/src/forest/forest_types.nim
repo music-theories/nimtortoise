@@ -39,6 +39,10 @@ type
     hints*:          Table[string, bool]
     warnings*:       Table[string, bool]
 
+  NimInfo* = object
+    version*:        string
+    nimExe*:         FilePathAbs
+
 type
   NimbleInfo* = object
     files*: seq[FilePathAbs]
@@ -48,6 +52,7 @@ type
 type 
   Forest* = object
     root*:   DirPathAbs
+    nim*:    NimInfo
     nimble*: Table[FilePathAbs, NimbleDumpInfo]
     paths*:  Table[FilePathAbs, seq[DirPathAbs]]
     trees*:  Table[FilePathAbs, seq[FilePathAbs]]

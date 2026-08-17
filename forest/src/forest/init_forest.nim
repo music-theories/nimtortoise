@@ -1,4 +1,4 @@
-import std/[os, strformat, options, tables, strutils]
+import std/[os, tables, strutils]
 import chronos
 
 import ../resources/resources
@@ -10,18 +10,18 @@ import ./[
 ]
 
 proc initForest*(
-  rootPathString: string
+  rootPath: DirPathAbs
 ): Future[Forest] {.async.} = 
-  let rootPath = DirPathAbs(rootPathString.absolutePath().normalizedPath())
 
   result = Forest(
     root: rootPath,
+    nim:    NimInfo(version: "", nimExe: FilePathAbs("")),
     nimble: initTable[FilePathAbs, NimbleDumpInfo](),
     paths: initTable[FilePathAbs, seq[DirPathAbs]](),
     trees: initTable[FilePathAbs, seq[FilePathAbs]]()
   )
 
-  if dirExists(rootPathString):
+  if dirExists(string(rootPath)):
     let nimbleInfo = initNimbleInfo(rootPath)
     let nimDumpInfo = getNimDumpInfoForEntryPoints(
       nimbleInfo.entryPoints, rootPath
@@ -31,7 +31,15 @@ proc initForest*(
     )
     result.nimble = nimbleInfo.dump
 
+    var nimInfoSet = false
     for entryPoint, nimDump in nimDumpInfo:
+      if nimInfoSet == false:
+        result.nim = NimInfo(
+          version: nimDump.version,
+          nimExe:  nimDump.nimExe
+        )
+        nimInfoSet = true
+      
       let source = readFile(string(entryPoint))
       for importName in extractImports(source):
         let modulePath = importName.replace('.', DirSep)
@@ -52,3 +60,9 @@ proc initForest*(
                 dependencyGraph.graph[entryPoint].add(candidate)
 
     result.trees = dependencyGraph.graph
+
+proc initForest*(
+  rootPathString: string
+): Future[Forest] {.async.} = 
+  let rootPath = DirPathAbs(rootPathString.absolutePath().normalizedPath())
+  return await initForest(rootPath)
