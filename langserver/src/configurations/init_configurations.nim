@@ -1,6 +1,7 @@
 import std/[json, options, times]
 import chronos
 import chronicles
+import forest
 import ./[configuration_types]
 
 func inlayHintsEnabled*(cnf: NlsConfig): bool =
@@ -9,21 +10,21 @@ func inlayHintsEnabled*(cnf: NlsConfig): bool =
 proc initDefaultNlsConfig*(): NlsConfig = 
   return NlsConfig(
     # --- Files/Folders ---
-    projectMapping: @[],
-    workingDirectoryMapping: @[],
+    # projectMapping: @[],
+    # workingDirectoryMapping: @[],
     # --- Save Settings ---
     checkOnSave: false,
     formatOnSave: false,
     # --- Langserver settings --- 
     # langserverTimeout: 1_800_000, # in MS - This is 30 mins
-    fileCheckDelay: 1000, # in MS
+    fileCheckDelay: initDuration(milliseconds = 1000), # in MS
     # -- Nimsuggest Settings ---
     maxNimsuggestProcesses: 2, # max number of nimsuggest processes to keep alive. 0 means unlimited.
     maxNimsuggestCrashRetries: 3, # auto-restart attempts before giving up on a crashed slot
-    nimsuggestPath: "nimsuggest",
+    nimsuggestPath: FilePathAbs(""), # OR should it be "nimsuggest"?
     nimsuggestIdleTimeout: initDuration(seconds = 1800), 
     nimsuggestRequestTimeout: initDuration(seconds = 30), 
-    logNimsuggest: true, # TODO - check createNimuggest function
+    logNimsuggest: true, 
     inlayHints: NlsInlayHintsConfig(
       typeHints: NlsInlayTypeHintsConfig(
         enable: true
@@ -51,10 +52,10 @@ proc nlsConfigFromJson*(json: JsonNode): NlsConfig =
   if json.kind != JObject:
     return
 
-  if json.hasKey("projectMapping"):
-    result.projectMapping = json["projectMapping"].to(seq[NlsNimsuggestConfig])
-  if json.hasKey("workingDirectoryMapping"):
-    result.workingDirectoryMapping = json["workingDirectoryMapping"].to(seq[NlsWorkingDirectoryMaping])
+  # if json.hasKey("projectMapping"):
+  #   result.projectMapping = json["projectMapping"].to(seq[NlsNimsuggestConfig])
+  # if json.hasKey("workingDirectoryMapping"):
+  #   result.workingDirectoryMapping = json["workingDirectoryMapping"].to(seq[NlsWorkingDirectoryMaping])
   if json.hasKey("checkOnSave"):
     result.checkOnSave = json["checkOnSave"].getBool()
   if json.hasKey("formatOnSave"):
@@ -62,13 +63,13 @@ proc nlsConfigFromJson*(json: JsonNode): NlsConfig =
   # if json.hasKey("langserverTimeout"):
   #   result.langserverTimeout = json["langserverTimeout"].getInt()
   if json.hasKey("fileCheckDelay"):
-    result.fileCheckDelay = json["fileCheckDelay"].getInt()
+    result.fileCheckDelay = initDuration(milliseconds = json["fileCheckDelay"].getInt())
   if json.hasKey("maxNimsuggestProcesses"):
     result.maxNimsuggestProcesses = json["maxNimsuggestProcesses"].getInt()
   if json.hasKey("maxNimsuggestCrashRetries"):
     result.maxNimsuggestCrashRetries = json["maxNimsuggestCrashRetries"].getInt()
   if json.hasKey("nimsuggestPath"):
-    result.nimsuggestPath = json["nimsuggestPath"].getStr()
+    result.nimsuggestPath = FilePathAbs(json["nimsuggestPath"].getStr())
   if json.hasKey("nimsuggestIdleTimeout"):
     result.nimsuggestIdleTimeout = initDuration(seconds = json["nimsuggestIdleTimeout"].getInt())
   if json.hasKey("nimsuggestRequestTimeout"):
@@ -125,14 +126,8 @@ proc parseWorkspaceConfigurationResponse*(conf: JsonNode): Option[NlsConfig] =
     if items[0].kind != JObject:
       return none(NlsConfig)
     var cfg = nlsConfigFromJson(items[0])
-    # Fall back to the nim section for fields not set in nimTortoise.
-    # projectMapping is the key field: the nimTortoise section typically has an
-    # empty array (no override) while the nim section carries the real mappings.
-    if cfg.projectMapping.len == 0 and items.len > 1 and items[1].kind == JObject:
-      let nimJson = items[1]
-      if nimJson.hasKey("projectMapping"):
-        cfg.projectMapping = nimJson["projectMapping"].to(seq[NlsNimsuggestConfig])
     return some(cfg)
+    
   except CatchableError:
     debug "Failed to parse workspace/configuration response.", error = getCurrentExceptionMsg()
     return none(NlsConfig)

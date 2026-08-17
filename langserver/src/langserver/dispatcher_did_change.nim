@@ -5,7 +5,7 @@ import ../nimsuggest/nimsuggest
 import ../protocol/types
 import ../utils/utils
 import ./[langserver_types, query_types]
-import ./[dispatcher_utils, langserver_utils, langserver_nimsuggest]
+import ./[dispatcher_utils, langserver_utils]
 
 proc saveFileChangesToStash(
   ls: LanguageServer,
@@ -98,7 +98,7 @@ proc processDidChangeQuery*(
       ))
 
     of SlotState.CRASHED, SlotState.STOPPING:
-      debug "processDidChangeQuery: DID_CHANGE dispatcher cannot add message to slot in CRASHED or STOPPING mailbox", uri = uri, state = slot.state, projectFile = slot.projectFile
+      debug "processDidChangeQuery: DID_CHANGE dispatcher cannot add message to slot in CRASHED or STOPPING mailbox", uri = uri, state = slot.state, entryPoint = slot.spawnInfo.entryPoint
       
 
   else:

@@ -232,6 +232,90 @@ proc tryParseMismatch(msg: string): Option[ParsedMismatch] =
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
+proc isExactSplitIdentityTypeMismatch*(doc: string): bool =
+  ## Returns true only when the split-identity match is definitive — no module-qualifier
+  ## stripping is applied. Safe to use as a trigger for automatic recovery (RECOMPILE).
+  ##
+  ## Pattern 1: `got 'X' but expected 'X'` with textually identical type strings.
+  ## Pattern 2: actualType == expectedType exactly (including any module prefix).
+  if "type mismatch" notin doc:
+    return false
+
+  # Pattern 1: older "got '...' but expected '...'" wire format
+  block:
+    const gotPfx = "got '"
+    const expPfx = "but expected '"
+    let gi = doc.find(gotPfx)
+    let ei = doc.find(expPfx)
+    if gi >= 0 and ei > gi:
+      let gotEnd = doc.find('\'', gi + gotPfx.len)
+      let expEnd = doc.find('\'', ei + expPfx.len)
+      if gotEnd > gi + gotPfx.len and expEnd > ei + expPfx.len:
+        let gotType = doc[gi + gotPfx.len ..< gotEnd]
+        let expType = doc[ei + expPfx.len ..< expEnd]
+        if gotType == expType:
+          return true
+
+  # Pattern 2: "Expression:" / "Expected one of" format — exact match only.
+  let parsed = tryParseMismatch(doc)
+  if parsed.isSome:
+    let p = parsed.get()
+    if p.mismatchPos > 0 and p.expectedType.len > 0:
+      for arg in p.args:
+        if arg.index == p.mismatchPos and arg.actualType == p.expectedType:
+          return true
+
+  return false
+
+proc isSplitIdentityTypeMismatch*(doc: string): bool =
+  ## Returns true when a diagnostic looks like a split-identity false positive:
+  ## a type mismatch where actual and expected refer to the same type name,
+  ## with at most a module-qualification difference.
+  ##
+  ## Two patterns are detected:
+  ##   Pattern 1 (older wire format): got 'X' but expected 'X' — identical strings.
+  ##   Pattern 2 (Expression format): actualType and expectedType are identical, OR
+  ##     actualType is module-qualified and its base name equals the unqualified
+  ##     expectedType (e.g. "suggestapi_types.NimsuggestSettings" vs "NimsuggestSettings").
+  ##
+  ## Pattern 2 loose matching can fire on genuine errors where two distinct types
+  ## from different modules share a base name.  The caller must treat a positive
+  ## result as advisory only — never as a trigger for destructive action.
+  if "type mismatch" notin doc:
+    return false
+
+  # Pattern 1: older "got '...' but expected '...'" wire format
+  block:
+    const gotPfx = "got '"
+    const expPfx = "but expected '"
+    let gi = doc.find(gotPfx)
+    let ei = doc.find(expPfx)
+    if gi >= 0 and ei > gi:
+      let gotEnd = doc.find('\'', gi + gotPfx.len)
+      let expEnd = doc.find('\'', ei + expPfx.len)
+      if gotEnd > gi + gotPfx.len and expEnd > ei + expPfx.len:
+        let gotType = doc[gi + gotPfx.len ..< gotEnd]
+        let expType = doc[ei + expPfx.len ..< expEnd]
+        if gotType == expType:
+          return true
+
+  # Pattern 2: "Expression:" / "Expected one of" format — reuse existing parser.
+  let parsed = tryParseMismatch(doc)
+  if parsed.isSome:
+    let p = parsed.get()
+    if p.mismatchPos > 0 and p.expectedType.len > 0:
+      for arg in p.args:
+        if arg.index == p.mismatchPos:
+          if arg.actualType == p.expectedType:
+            return true
+          # Module-qualified actual vs unqualified expected with the same base name.
+          # e.g. "suggestapi_types.NimsuggestSettings" vs "NimsuggestSettings"
+          let dotIdx = arg.actualType.rfind('.')
+          if dotIdx >= 0 and arg.actualType[dotIdx + 1 ..^ 1] == p.expectedType:
+            return true
+
+  return false
+
 proc formatTypeMismatch*(msg: string): string =
   ## Reformat a nimsuggest "type mismatch" message for cleaner display.
   ##

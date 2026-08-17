@@ -67,7 +67,7 @@ proc toDiagnosticJson*(
     let positions = asLspFilePosition.get()
 
     let jsonToSend = %*{
-      "uri": pathToUri(suggest.filePath),
+      "uri": toUri(suggest.filePath),
       "range": %*{
         "start": %*{
           "line": int(positions.start.line), 
@@ -85,7 +85,15 @@ proc toDiagnosticJson*(
         of "Warning": DiagnosticSeverity.Warning.int
         else: DiagnosticSeverity.Error.int
       ,
-      "message": formatTypeMismatch(suggest.doc),
+      "message": block:
+        let base = formatTypeMismatch(suggest.doc)
+        if isSplitIdentityTypeMismatch(suggest.doc):
+          base & "\nNote: nimsuggest may be registering the same type as two distinct " &
+            "types due to an internal module graph inconsistency. " &
+            "Consider restarting nimsuggest."
+        else:
+          base
+      ,
       "source": "nim",
       "code": "nimsuggest chk",
     }

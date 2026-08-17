@@ -19,7 +19,7 @@ proc registerMcpRoutes(srv: RpcSocketServer, ls: LanguageServer) =
 
 proc registerLspRoutes(srv: RpcSocketServer, ls: LanguageServer) =
   srv.register(
-    "initialize", wrapRpc(partial(lsp.initialize, (ls: ls, onExit: ls.onExit)))
+    "initialize", wrapRpc(partial(initialize, (ls: ls, onExit: ls.onExit)))
   ) #use from ls
   srv.register(
     "textDocument/completion",
@@ -85,12 +85,13 @@ proc registerLspRoutes(srv: RpcSocketServer, ls: LanguageServer) =
   srv.register("extension/suggest", wrapRpc(partial(lsp.extensionSuggest, ls)))
   srv.register("extension/tasks", wrapRpc(partial(lsp.tasks, ls)))
   srv.register("extension/runTask", wrapRpc(partial(lsp.runTask, ls)))
-  srv.register("extension/listTests", wrapRpc(partial(lsp.listTests, ls)))
-  srv.register("extension/runTests", wrapRpc(partial(lsp.runTests, ls)))
-  srv.register("extension/cancelTest", wrapRpc(partial(lsp.cancelTest, ls)))
+  # TESTS REMOVED
+  # srv.register("extension/listTests", wrapRpc(partial(lsp.listTests, ls)))
+  # srv.register("extension/runTests", wrapRpc(partial(lsp.runTests, ls)))
+  # srv.register("extension/cancelTest", wrapRpc(partial(lsp.cancelTest, ls)))
   #Notifications
   srv.register("$/cancelRequest", wrapRpc(partial(lsp.cancelRequest, ls)))
-  srv.register("initialized", wrapRpc(partial(lsp.initialized, ls)))
+  srv.register("initialized", wrapRpc(partial(initialized, ls)))
   srv.register("textDocument/didOpen", wrapRpc(partial(lsp.didOpen, ls)))
   srv.register("textDocument/didSave", wrapRpc(partial(lsp.didSave, ls)))
   srv.register("textDocument/didClose", wrapRpc(partial(lsp.didClose, ls)))
@@ -193,7 +194,7 @@ proc registerProcMonitor(ls: LanguageServer) =
     proc onCmdLineClientProcessExitAsync(): Future[void] {.async.} =
       debug "onCmdLineClientProcessExitAsync"
 
-      await ls.pool.stopNimsuggestProcesses()
+      await ls.pool.stopAllNimsuggestSlotsInPool()
       waitFor ls.onExit()
 
     proc onCmdLineClientProcessExit() {.closure.} =
@@ -223,7 +224,7 @@ proc main*(cmdLineParams: CommandLineParams): LanguageServer =
 
   let startupProgressToken = "startupMessage"
   result = initLanguageServer(
-    cmdLineParams, toFilePath(ensureStorageDir())
+    cmdLineParams, ensureStorageDir()
   )
   case result.transport.transportMode
   of stdio:
@@ -250,7 +251,7 @@ when isMainModule:
     when defined(posix):
       onSignal(SIGINT, SIGTERM, SIGHUP, SIGQUIT, SIGPIPE):
         debug "Terminated via signal", sig
-        ls.pool.stopNimsuggestProcessesP()
+        ls.pool.stopAllNimsuggestSlotsInPoolP()
         exitnow(1)
     runForever()
   except Exception as e:

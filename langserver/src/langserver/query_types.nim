@@ -39,6 +39,10 @@ type
       formatting*: DocumentFormattingParams
       formattingResponse*: Future[seq[TextEdit]]
 
+# === EXTENSION COMMANDS ===
+# See protocol/extensions.nim
+
+
 # === LANGUAGE SERVER QUERIES ===
 type
   LangserverQueryKind* {.pure.} = enum

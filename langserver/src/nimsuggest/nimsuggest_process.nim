@@ -2,8 +2,11 @@ import std/[options, strformat, strutils, sets, tables, times, json, sequtils]
 import chronos
 import chronicles
 
+import forest
+
 import ../utils/utils
 import ../utils/process_utils
+import ../utils/type_mismatch_format
 import ../configurations/configurations
 import ../protocol/types
 
@@ -14,7 +17,7 @@ proc runNimsuggestQuery*(
   ns: Nimsuggest, 
   q: NimsuggestQuery[NimsuggestFilePosition],
 ): Future[seq[Suggest]] {.async.} =
-  let path = q.uri.uriToPath
+  let path = toFilePathAbs(q.uri)
   case q.kind
   of NimsuggestQueryKind.SUGGEST:
     return await ns.sug(path, q.dirtyFile, q.position.line, q.position.col)
@@ -62,25 +65,25 @@ proc runNimsuggestQuery*(
     doAssert false, "SHUTDOWN must not reach runNimsuggestQuery"
 
 proc processNimsuggestQueries*(
-  slot: NimsuggestSlot, 
+  slot: NimsuggestSlot,
   pool: NimsuggestPool,
   openFiles: TableRef[FileUri, NlsFileInfo],
   config: NlsConfig,
-  notifyProc: proc(name: string, params: JsonNode) {.gcsafe, raises: [].} #Send a notification to the client
+  notifyProc: proc(name: string, params: JsonNode) {.gcsafe, raises: [].}, #Send a notification to the client
 ) {.async.} =
-  debug "processNimsuggestQueries: starting", projectFile = slot.projectFile
+  debug "processNimsuggestQueries: starting", projectFile = slot.spawnInfo.entryPoint
   var shutdownFut: Future[void] = nil
   while true:
-    debug "processNimsuggestQueries: waiting for query", projectFile = slot.projectFile, mailboxLen = slot.queryMailbox.len
+    debug "processNimsuggestQueries: waiting for query", projectFile = slot.spawnInfo.entryPoint, mailboxLen = slot.queryMailbox.len
 
     let originalQuery = await slot.queryMailbox.popFirst()
 
     if originalQuery.kind == NimsuggestQueryKind.SHUTDOWN:
-      debug "processNimsuggestQueries: received SHUTDOWN, exiting loop", projectFile = slot.projectFile
+      debug "processNimsuggestQueries: received SHUTDOWN, exiting loop", projectFile = slot.spawnInfo.entryPoint
       shutdownFut = originalQuery.shutdownFuture
       break
 
-    debug "processNimsuggestQueries: running query", kind = $originalQuery.kind, projectFile = slot.projectFile, uri = originalQuery.uri
+    debug "processNimsuggestQueries: running query", kind = $originalQuery.kind, projectFile = slot.spawnInfo.entryPoint, uri = originalQuery.uri
 
     # $/cancelRequest — skip queries already cancelled by the client.
     if originalQuery.cancelled:
@@ -101,9 +104,9 @@ proc processNimsuggestQueries*(
           let fileInfo = openFiles[originalQuery.uri]
           let timeSinceLastChange = now() - fileInfo.lastChanged
 
-          if timeSinceLastChange < pool.fileCheckDelay:
+          if timeSinceLastChange < config.fileCheckDelay:
             # Not enough time has elapsed
-            let timeoutLength = (pool.fileCheckDelay - timeSinceLastChange).inMilliseconds + 5
+            let timeoutLength = (config.fileCheckDelay - timeSinceLastChange).inMilliseconds + 5
             debug "processNimsuggestQueries: Running timeout for CHANGED.", timeout = timeoutLength, uri = originalQuery.uri
             # Start a blocking timer until the remaining time has elapsed
             await sleepAsync(timeoutLength)
@@ -191,8 +194,8 @@ proc processNimsuggestQueries*(
         let errMsg = slot.ns.read().errorMessage
         if pool.notifyProc != nil and errMsg.len > 0:
           pool.notifyProc("window/logMessage",
-            %*{"type": 1, "message": fmt"Nimsuggest ({slot.projectFile}): {errMsg}"})
-        let respawnWasSuccessful = await attemptCrashRespawn(slot, pool, config)
+            %*{"type": 1, "message": fmt"Nimsuggest ({slot.spawnInfo.entryPoint}): {errMsg}"})
+        let respawnWasSuccessful = await pool.attemptCrashRespawn(slot, config)
         if not respawnWasSuccessful:
           slot.crashedUris.incl(originalQuery.uri)
           if not originalQuery.responseFuture.finished:
@@ -208,7 +211,7 @@ proc processNimsuggestQueries*(
 
       else: 
         let q = convertedQuery.get()
-        debug "processNimsuggestQueries: query about to be run ", projectFile = slot.projectFile, kind = $q.kind, uri = $q.uri
+        debug "processNimsuggestQueries: query about to be run ", entryPoint = slot.spawnInfo.entryPoint, kind = $q.kind, uri = $q.uri
         try:
           # === RUNNING NIMSUGGEST QUERY ===
           let queryResponse: seq[Suggest] = await runNimsuggestQuery(slot.ns.read(), q)
@@ -225,23 +228,37 @@ proc processNimsuggestQueries*(
               id: 0,
               kind: NimsuggestQueryKind.CHECK_FILE,
               uri: q.uri,
-              dirtyFile: FilePath(""),
+              dirtyFile: FilePathAbs(""),
               responseFuture: newFuture[seq[Suggest]]("checkFile"),
             )
             
             slot.queryMailbox.addFirstNoWait(checkQuery)
 
-          of NimsuggestQueryKind.CHECK_FILE:  
+          of NimsuggestQueryKind.CHECK_FILE:
             if q.uri in openFiles:
               openFiles[q.uri].lastChecked = now()
 
-            let diagnosticsJson = convertNimSuggestResponseToDiagnostics(
-              queryResponse, q.uri, openFiles
-            )
-
-            notifyProc("textDocument/publishDiagnostics", diagnosticsJson)
-            
-            debug "processNimsuggestQueries: CHECK_FILE run, sending diagnostics ", uri = $q.uri, json = diagnosticsJson
+            # Exact split-identity errors are false positives that RECOMPILE fixes
+            # reliably. Suppress misleading diagnostics and trigger RECOMPILE instead.
+            # Loose module-qualifier matches (foo.Bar vs Bar) are NOT handled here —
+            # they appear as an advisory note in the diagnostic message only.
+            if queryResponse.anyIt(it.forth == "Error" and isExactSplitIdentityTypeMismatch(it.doc)):
+              debug "processNimsuggestQueries: exact split-identity detected, triggering RECOMPILE",
+                uri = $q.uri
+              let recompileQuery = NimsuggestQuery[LspFilePosition](
+                id: 0,
+                kind: NimsuggestQueryKind.RECOMPILE,
+                uri: q.uri,
+                dirtyFile: FilePathAbs(""),
+                responseFuture: newFuture[seq[Suggest]]("splitIdentityRecompile"),
+              )
+              slot.queryMailbox.addFirstNoWait(recompileQuery)
+            else:
+              let diagnosticsJson = convertNimSuggestResponseToDiagnostics(
+                queryResponse, q.uri, openFiles
+              )
+              notifyProc("textDocument/publishDiagnostics", diagnosticsJson)
+              debug "processNimsuggestQueries: CHECK_FILE run, sending diagnostics ", uri = $q.uri, json = diagnosticsJson
             
           of NimsuggestQueryKind.CHECK_PROJECT, NimsuggestQueryKind.RECOMPILE:
             let timeNow = now()
@@ -250,19 +267,19 @@ proc processNimsuggestQueries*(
 
             for (path, groupedSuggests) in groupBy(queryResponse, getFilepath):
               let diagnosticsJson = convertNimSuggestResponseToDiagnostics(
-                groupedSuggests, pathToUri(path), openFiles
+                groupedSuggests, toUri(path), openFiles
               )
-              debug "processQueries: sending diagnostics to file ",uri = pathToUri(path),  projectFile = slot.projectFile, kind = $q.kind
+              debug "processQueries: sending diagnostics to file ",uri = toUri(path),  projectFile = slot.spawnInfo.entryPoint, kind = $q.kind
               notifyProc("textDocument/publishDiagnostics", diagnosticsJson)
               
           else:
             discard
 
-          debug "processQueries: query finished running ", projectFile = slot.projectFile, kind = $q.kind
+          debug "processQueries: query finished running ", projectFile = slot.spawnInfo.entryPoint, kind = $q.kind
 
         except CatchableError as ex:
           debug "processQueries: query failed",
-            projectFile = slot.projectFile, kind = $q.kind, msg = ex.msg
+            projectFile = slot.spawnInfo.entryPoint, kind = $q.kind, msg = ex.msg
           
           slot.crashedUris.incl(q.uri)
           
@@ -280,19 +297,28 @@ proc processNimsuggestQueries*(
   if shutdownFut != nil:
     shutdownFut.complete()
 
+# These functions have to be in this file, not nimsuggest_slots, because they rely upon the `processNimsuggestQueries` function in this file.
 proc restartSlot*(
-  slot: NimsuggestSlot, pool: NimsuggestPool, config: NlsConfig,
-  openFiles: TableRef[FileUri, NlsFileInfo]
+  slot: NimsuggestSlot, 
+  pool: NimsuggestPool, 
+  openFiles: TableRef[FileUri, NlsFileInfo],
+  config: NlsConfig,
 ): Future[void] {.async.} =
-  discard await execStop(slot, pool)
-  if await execSpawn(slot, pool, slot.projectFile, config):
-    asyncSpawn processNimsuggestQueries(slot, pool, openFiles, config, pool.notifyProc)
+  let spawningInfo: NimsuggestSpawnInfo = slot.spawnInfo
+  discard await pool.stopNimsuggestSlot(slot)
+  slot.crashedUris.clear()
+  let successfulSpawn = await pool.spawnNewNimsuggestSlot(
+    spawningInfo, pool.nimsuggest, config
+  )
+  if successfulSpawn.isSome:
+    asyncSpawn slot.processNimsuggestQueries(pool, openFiles, config, pool.notifyProc)
 
 proc restartAllNimsuggestInstances*(
-  pool: NimsuggestPool, config: NlsConfig,
-  openFiles: TableRef[FileUri, NlsFileInfo]
+  pool: NimsuggestPool, 
+  openFiles: TableRef[FileUri, NlsFileInfo],
+  config: NlsConfig,
 ) =
   for projectFile in pool.slots.keys.toSeq():
     if pool.slots.hasKey(projectFile):
-      asyncSpawn restartSlot(pool.slots[projectFile], pool, config, openFiles)
+      asyncSpawn restartSlot(pool.slots[projectFile], pool, openFiles, config)
 

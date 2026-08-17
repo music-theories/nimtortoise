@@ -4,17 +4,17 @@ import ./langserver_types
 import ../utils/utils
 import ../protocol/types
 
-proc uriStorageLocation*(ls: LanguageServer, uri: FileUri): FilePath =
+proc uriStorageLocation*(ls: LanguageServer, uri: FileUri): FilePathAbs =
   # Use SHA-1 for a collision-resistant stash filename (40 hex chars).
   # std/hash is a 64-bit integer hash; two URIs could share it and silently
   # overwrite each other's edit buffer. SHA-1 collision probability is ~2^-80.
-  return FilePath(string(ls.files.storageDir) / ($secureHash(string(uri)) & ".nim"))
+  return ls.files.storageDir / FilePathRel($secureHash(string(uri)) & ".nim")
 
-proc uriToStash*(ls: LanguageServer, uri: FileUri): FilePath =
+proc uriToStash*(ls: LanguageServer, uri: FileUri): FilePathAbs =
   if ls.files.openFiles.hasKey(uri):
     return uriStorageLocation(ls, uri)
   else:
-    return FilePath("")
+    return FilePathAbs("")
 
 proc toUtf16Pos*(
   ls: LanguageServer, uri: FileUri, line: int, utf8Pos: int
@@ -33,28 +33,27 @@ proc getCharacter*(
   else:
     return none(int)
 
-proc getRootPath*(params: LspInitializeParams): Option[FilePath] = 
+proc getRootPath*(params: LspInitializeParams): Option[DirPathAbs] =
   if params.rootUri.isSome():
     let rootUri: FileUri = params.rootUri.get()
     if string(rootUri).len > 0:
-      let path = uriToPath(rootUri)
+      let path = toDirPathAbs(rootUri)
       debug "getRootPath: rootUri on LSPInitializeParams found ", path = path
       return some(path)
     else:
       debug "getRootPath: rootUri on LSPInitializeParams is none()."
-      return none(FilePath)
+      return none(DirPathAbs)
   else:
     let rootPathParam = params.rootPath
     if rootPathParam.isSome():
       let rootPath = rootPathParam.get()
-      if string(rootPath).len > 0:
-        let path = toFilePath(normalizedPath(rootPath))
+      if rootPath.len > 0:
+        let path = DirPathAbs(normalizedPath(rootPath))
         debug "getRootPath: rootUri on LSPInitializeParams found ", path = path
         return some(path)
       else:
         debug "getRootPath: rootPath on LSPInitializeParams has length 0."
-      return none(FilePath)
-
+      return none(DirPathAbs)
     else:
       debug "getRootPath: rootPath on LSPInitializeParams is none."
-      return none(FilePath)
+      return none(DirPathAbs)

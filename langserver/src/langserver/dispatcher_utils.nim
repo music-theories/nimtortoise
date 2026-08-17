@@ -1,7 +1,8 @@
 import std/[options, os, sets, tables, algorithm, sequtils, strutils, times]
 import chronos
 import chronicles
-import regex
+import forest
+
 import ../nimsuggest/[suggestapi_types, nimsuggest_types, nimsuggest_slots]
 import ../protocol/types
 import ./[langserver_types, langserver_utils]
@@ -25,7 +26,7 @@ proc checkNimsuggestSlotKnowsURI(slot: NimsuggestSlot, uri: FileUri): Future[Opt
         id: 0.uint,
         kind: NimsuggestQueryKind.KNOWN,
         uri: uri,
-        dirtyFile: FilePath(""),
+        dirtyFile: FilePathAbs(""),
         responseFuture: newFuture[seq[Suggest]]("known"),
       )
       slot.queryMailbox.addLastNoWait(knownQuery)
@@ -44,7 +45,7 @@ proc checkNimsuggestSlotKnowsURI(slot: NimsuggestSlot, uri: FileUri): Future[Opt
       id: 0.uint,
       kind: NimsuggestQueryKind.KNOWN,
       uri: uri,
-      dirtyFile: FilePath(""),
+      dirtyFile: FilePathAbs(""),
       responseFuture: newFuture[seq[Suggest]]("known"),
     )
     slot.queryMailbox.addLastNoWait(knownQuery)
@@ -71,7 +72,7 @@ proc isKnownByANimsuggestSlot*(pool: NimsuggestPool, uri: FileUri): Future[Optio
     if res.isSome:
       possibleNimsuggestSlots.add(res.get())
 
-  possibleNimsuggestSlots.sort(proc(a, b: NimsuggestSlot): int = cmp(string(a.projectFile), string(b.projectFile)))
+  possibleNimsuggestSlots.sort(proc(a, b: NimsuggestSlot): int = cmp(string(a.spawnInfo.entryPoint), string(b.spawnInfo.entryPoint)))
 
   if possibleNimsuggestSlots.len > 0:
     return some(possibleNimsuggestSlots[0])

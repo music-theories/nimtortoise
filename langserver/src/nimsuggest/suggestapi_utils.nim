@@ -124,7 +124,7 @@ proc parseSuggestDef*(line: string): Option[Suggest] =
     return none(Suggest)
   var sug = Suggest(
     qualifiedPath: tokens[2].parseQualifiedPath,
-    filePath: FilePath(tokens[4]),
+    filePath: FilePathAbs(tokens[4]),
     line: parseInt(tokens[5]),
     column: parseInt(tokens[6]),
     doc: tokens[7].unescape(),

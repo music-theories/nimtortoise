@@ -6,10 +6,10 @@
 import std/options
 import ../protocol/types
 
-type
-  NimbleDumpInfo* = object
-    srcDir*: string
-    name*: string
-    nimDir*: Option[string]
-    nimblePath*: FilePath
-    entryPoints*: seq[string] ## when it's empty, means the nimble version doesn't dump it.
+# type
+#   NimbleDumpInfo* = object
+#     srcDir*: string
+#     name*: string
+#     nimDir*: Option[string]
+#     nimblePath*: FilePathAbs
+#     entryPoints*: seq[string] ## when it's empty, means the nimble version doesn't dump it.

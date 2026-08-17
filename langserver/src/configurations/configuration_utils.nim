@@ -1,3 +1,5 @@
+import std/[times]
+import forest
 import ./configuration_types
 
 func `==`(a, b: NlsNimsuggestConfig): bool =
@@ -37,8 +39,8 @@ func `==`(a, b: NlsInlayHintsConfig): bool =
 proc isDifferentFrom*(newConfig: NlsConfig, currentConfig: NlsConfig): bool =
   ## Returns true if newConfig and currentConfig differ in any field value.
   let n = newConfig
-  n.projectMapping != currentConfig.projectMapping or
-  n.workingDirectoryMapping != currentConfig.workingDirectoryMapping or
+  # n.projectMapping != currentConfig.projectMapping or
+  # n.workingDirectoryMapping != currentConfig.workingDirectoryMapping or
   n.checkOnSave != currentConfig.checkOnSave or
   n.formatOnSave != currentConfig.formatOnSave or
   # n.langserverTimeout != currentConfig.langserverTimeout or

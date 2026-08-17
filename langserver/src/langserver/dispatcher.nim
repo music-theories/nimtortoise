@@ -8,7 +8,7 @@ import ../configurations/configurations
 import ../protocol/types
 import ../handlers/request_process
 import ../utils/utils
-import ./[langserver_types, query_types, langserver_nimsuggest, langserver_utils, capability_configs]
+import ./[langserver_types, query_types, langserver_utils, capability_configs]
 import ./[dispatcher_utils, dispatcher_did_open, dispatcher_did_change]
 
 
@@ -50,7 +50,7 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
     debug "processLangserverQueue: dequeued item", kind = $query.kind
     case query.kind
     of LangserverQueryKind.SHUTDOWN:
-      await ls.pool.stopNimsuggestProcesses()
+      await ls.pool.stopAllNimsuggestSlotsInPool()
       query.shutdown.complete(true)
       ls.isShutdown = true
       return 
@@ -60,19 +60,19 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
       # handler before any FILE_ACCESS (DID_CHANGE) in front of it was processed,
       # so dirtyFile may have been captured as "" even though changed=true by now.
       if q.kind == NimsuggestQueryKind.CHANGED and q.saved:
-        q.dirtyFile = FilePath("")
+        q.dirtyFile = FilePathAbs("")
       else:
         q.dirtyFile = ls.uriToStash(q.uri)
-      
+
       # First, check if the current file is owned by a nimsuggest instance
-      let path = uriToPath(q.uri)
+      let path = toFilePathAbs(q.uri)
       if q.uri in ls.files.openFiles:
         let fileInfo = ls.files.openFiles[q.uri]
         # If a slot is stopped, crashed or stopping, do not attempt to restart - this should happen when a user saves, open changes a file - otherwise any random dragging a mouse across a file would cause a restart. 
         # TODO/NOTE: Is KNOWN treated correctly?
         case fileInfo.slot.state
         of SlotState.READY, SlotState.SPAWNING:
-          debug "processLangserverQueue: dispatcher adding message to slot mailbox", uri = q.uri, kind = $q.kind, fileInfoIsNil = (fileInfo == nil), projectFile = fileInfo.slot.projectFile
+          debug "processLangserverQueue: dispatcher adding message to slot mailbox", uri = q.uri, kind = $q.kind, fileInfoIsNil = (fileInfo == nil), entryPoint = fileInfo.slot.spawnInfo.entryPoint
 
           fileInfo.slot.queryMailbox.addLastNoWait(q)
 
@@ -141,8 +141,8 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
               let chkQuery = NimsuggestQuery[LspFilePosition](
                 id: 0,
                 kind: NimsuggestQueryKind.CHECK_PROJECT,
-                uri: pathToUri(fileInfo.slot.projectFile),
-                dirtyFile: FilePath(""),
+                uri: toUri(fileInfo.slot.spawnInfo.entryPoint),
+                dirtyFile: FilePathAbs(""),
                 responseFuture: newFuture[seq[Suggest]]("checkProject"),
               )
               fileInfo.slot.queryMailbox.addLastNoWait(chkQuery)
@@ -162,8 +162,8 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
         if fileInfo.slot.ownedUris.len == 0 and ls.pool.slots.len > 1:
           # The ls.pool.slots.len > 1 qualification means that if there is only one slot left, it is persisted, so nimsuggest is not constantly spawning and stopping.
           debug "Stopping this slot:", uri = uri
-          discard await execStop(fileInfo.slot, ls.pool)
-          ls.pool.removeSlot(fileInfo.slot.projectFile)
+          discard await stopNimsuggestSlotAndRemoveFromPool(ls.pool, fileInfo.slot)
+          ls.pool.removeSlot(fileInfo.slot.spawnInfo.entryPoint)
         ls.files.openFiles.del(uri)
 
       of FileAccessQueryKind.WILL_SAVE_WAIT_UNTIL:
@@ -193,8 +193,8 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
           debug "File renamed", oldUri = oldUri, newUri = newUri
           let oldStash = ls.uriStorageLocation(oldUri)
           let newStash = ls.uriStorageLocation(newUri)
-          let oldPath: FilePath = uriToPath(oldUri)
-          let newPath: FilePath = uriToPath(newUri)
+          let oldPath = toFilePathAbs(oldUri)
+          let newPath = toFilePathAbs(newUri)
 
           if string(oldStash).fileExists:
             try:
@@ -203,9 +203,10 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
               debug "Failed to move stash file on rename",
                 oldStash = oldStash, newStash = newStash, msg = e.msg
 
-          if string(oldPath).endsWith(".nimble"):
-            ls.nimbleDumpCache.del(oldPath)
-            ls.nimbleDumpCache.del(uriToPath(newUri))
+          # TODO - need to update this and also ensure dependencies are recalculated.
+          # if string(oldPath).endsWith(".nimble"):
+          #   ls.nimbleDumpCache.del(oldPath)
+          #   ls.nimbleDumpCache.del(toFilePathAbs(newUri))
 
           if oldUri in ls.files.openFiles:
             let fileInfo = ls.files.openFiles[oldUri]
@@ -228,11 +229,11 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
 
             if string(newPath).endsWith(".nim"):
               # RECOMPILE The Nimsuggest Instance
-              debug "processCommands: sending recompile", projectFile = slot.projectFile
+              debug "processCommands: sending recompile", entryPoints = slot.spawnInfo.entryPoint
               let recompileQuery = NimsuggestQuery[LspFilePosition](
                 kind: NimsuggestQueryKind.RECOMPILE,
-                uri: pathToUri(slot.projectFile),
-                dirtyFile: FilePath(""),
+                uri: toUri(slot.spawnInfo.entryPoint),
+                dirtyFile: FilePathAbs(""),
                 responseFuture: newFuture[seq[Suggest]]("recompile"),
               )
               slot.queryMailbox.addLastNoWait(recompileQuery)
@@ -241,9 +242,11 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
         for f in q.deleteFiles.files:
           let uri = f.uri
           debug "File deleted", uri = uri
-          let path: FilePath = uriToPath(uri)
-          if string(path).endsWith(".nimble"):
-            ls.nimbleDumpCache.del(path)
+          let path = toFilePathAbs(uri)
+          # TODO 
+          # if string(path).endsWith(".nimble"):
+          #   ls.nimbleDumpCache.del(path)
+
           if uri in ls.files.openFiles:
             let fileInfo = ls.files.openFiles[uri]
             fileInfo.slot.unassignUri(uri)
@@ -252,8 +255,8 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
             if string(path).endsWith(".nim"):
               let recompileQuery = NimsuggestQuery[LspFilePosition](
                 kind: NimsuggestQueryKind.RECOMPILE,
-                uri: pathToUri(fileInfo.slot.projectFile),
-                dirtyFile: FilePath(""),
+                uri: toUri(fileInfo.slot.spawnInfo.entryPoint),
+                dirtyFile: FilePathAbs(""),
                 responseFuture: newFuture[seq[Suggest]]("recompile"),
               )
               fileInfo.slot.queryMailbox.addLastNoWait(recompileQuery)
@@ -280,7 +283,6 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
         let newConfigurationIsDifferent = isDifferentFrom(newConfiguration, oldConfiguration)
 
         if newConfigurationIsDifferent:
-          clearCompiledRegexCache()
           ls.configurations.currentConfig = newConfiguration
 
         ls.configurations.configReady.fire()

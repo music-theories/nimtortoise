@@ -1,5 +1,6 @@
 import std/[times]
 import chronos
+import forest
 
 type
   NlsNimsuggestConfig* = ref object of RootObj
@@ -35,18 +36,18 @@ type
 type
   NlsConfig* = ref object of RootObj
     # --- Files/Folders ---
-    projectMapping*: seq[NlsNimsuggestConfig]
-    workingDirectoryMapping*: seq[NlsWorkingDirectoryMaping]
+    # projectMapping*: seq[NlsNimsuggestConfig]
+    # workingDirectoryMapping*: seq[NlsWorkingDirectoryMaping]
     # --- Save Settings ---
     checkOnSave*: bool
     formatOnSave*: bool
     # --- Langserver settings --- 
     # langserverTimeout*: int
-    fileCheckDelay*: int
+    fileCheckDelay*: times.Duration # In milliseconds 
     # -- Nimsuggest Settings ---
     maxNimsuggestProcesses*: int
     maxNimsuggestCrashRetries*: int
-    nimsuggestPath*: string
+    nimsuggestPath*: FilePathAbs
     nimsuggestIdleTimeout*: times.Duration # In seconds
     nimsuggestRequestTimeout*: times.Duration # In seconds
     logNimsuggest*: bool

@@ -7,6 +7,13 @@ import ../protocol/[enums, types]
 import ../langserver/[langserver_types, langserver_utils, langserver_messaging]
 
 # === textDocument/formatting ===
+proc getNphPath*(): Option[string] =
+  let path = findExe "nph"
+  if path == "":
+    none(string)
+  else:
+    some path
+
 proc format*(
   ls: LanguageServer, nphPath: string, uri: FileUri
 ): Future[Option[TextEdit]] {.async.} =

@@ -2,6 +2,8 @@ import std/[strutils, strformat, strutils]
 import chronos, chronos/asyncproc
 import stew/[byteutils]
 import chronicles
+import forest
+
 import ../nimsuggest/suggestapi_types
 import ../utils/process_utils
 
@@ -25,7 +27,7 @@ proc extractMacroExpansion*(output: string, targetLine: int): string =
       result = result.replace("[ExpandMacro]", "")
 
 proc nimExpandMacro*(
-  nimPath: string, suggest: Suggest, filePath: string
+  nimExePath: FilePathAbs, suggest: Suggest, filePath: string
 ): Future[string] {.async.} =
   let
     macroName = suggest.qualifiedPath[suggest.qualifiedPath.len - 1]
@@ -33,7 +35,7 @@ proc nimExpandMacro*(
   debug "nimExpandMacro", macroName = macroName, line = line, filePath = filePath
   debug "Executing ", cmd = &"nim c --expandMacro:{macroName} {filePath}"
   let process = await startProcess(
-    nimPath,
+    string(nimExePath),
     arguments = @["c", "--expandMacro:" & macroName] & @[filePath],
     options = {UsePath, StdErrToStdOut},
     stdoutHandle = AsyncProcess.Pipe,
@@ -61,12 +63,12 @@ proc extractArcExpansion*(output: string, procName: string): string =
     result = result.replace(cond, "").strip()
 
 proc nimExpandArc*(
-  nimPath: string, suggest: Suggest, filePath: string
+  nimExePath: FilePathAbs, suggest: Suggest, filePath: string
 ): Future[string] {.async.} =
   let procName = suggest.qualifiedPath[suggest.qualifiedPath.len - 1]
   debug "nimExpandArc", procName = procName, filePath = filePath
   let process = await startProcess(
-    nimPath,
+    string(nimExePath),
     arguments = @["c", &"--expandArc:{procName}", "--compileOnly"] & @[filePath],
     options = {UsePath, StdErrToStdOut},
     stdoutHandle = AsyncProcess.Pipe,

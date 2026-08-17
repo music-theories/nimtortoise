@@ -7,6 +7,7 @@ import chronicles
 
 import forest
 
+import ../nph/formatting
 import ../nimble/nimble_types
 import ../protocol/[enums, types]
 import ../configurations/configurations
@@ -16,11 +17,11 @@ import ../utils/asyncprocmonitor
 
 import ./[
   query_types, langserver_messaging, 
-  capability_configs, langserver_nimsuggest,
+  capability_configs,
   langserver_utils, langserver_types
 ]
 
-proc initLanguageServer*(params: CommandLineParams, storageDir: FilePath): LanguageServer =
+proc initLanguageServer*(params: CommandLineParams, storageDir: DirPathAbs): LanguageServer =
   let currentConfig = initDefaultNlsConfig()
   let configReady = newAsyncEvent()
   result = LanguageServer(
@@ -45,7 +46,7 @@ proc initLanguageServer*(params: CommandLineParams, storageDir: FilePath): Langu
       responseNames: newTable[string, string](),
       projectErrors: @[],
     ),
-    nimbleDumpCache: initTable[FilePath, NimbleDumpInfo](),
+    # nimbleDumpCache: initTable[FilePathAbs, NimbleDumpInfo](),
     cmdLineClientProcessId: params.clientProcessId,
     lspQueue: newAsyncQueue[LspDispatchItem](),
     langserverQueue: newAsyncQueue[LangserverQuery](),
@@ -55,12 +56,8 @@ proc initLanguageServer*(params: CommandLineParams, storageDir: FilePath): Langu
   # initNimsuggestInstances will update maxSlots from config and spawn entry points.
   let ls = result
   result.pool = NimsuggestPool(
-    slots: initTable[FilePath, NimsuggestSlot](), 
+    slots: initTable[FilePathAbs, NimsuggestSlot](),
     maxSlots: currentConfig.maxNimsuggestProcesses, 
-    fileCheckDelay: initDuration(milliseconds = currentConfig.fileCheckDelay),
-    # timeout: currentConfig.langserverTimeout,
-    nimsuggestPath: toFilePath(currentConfig.nimsuggestPath),
-    nimVersion: "", # Set in initNimsuggestInstances
     notifyProc: proc(meth: string, params: JsonNode) {.gcsafe, raises: [].} =
     ls.notify(meth, params),
     statusChangedProc: proc() {.gcsafe, raises: [].} =
@@ -80,12 +77,7 @@ proc tick*(ls: LanguageServer): Future[void] {.async.} =
 # initialize = capability exchange
 # initialized = startup work begins
 
-proc getNphPath*(): Option[string] =
-  let path = findExe "nph"
-  if path == "":
-    none(string)
-  else:
-    some path
+
 
 # === initialize ===
 proc initialize*(
@@ -95,7 +87,7 @@ proc initialize*(
   # initialize — a request (client waits for a response). The client sends its capabilities and the server responds with its own capabilities. This stores lspInitializeParams, sets up the client process monitor, and returns LspServerCapabilities. Nimsuggest is not started here.
   proc onClientProcessExitAsync(): Future[void] {.async.} =
     debug "onClientProcessExitAsync"
-    await p.ls.pool.stopNimsuggestProcesses()
+    await p.ls.pool.stopAllNimsuggestSlotsInPool()
     await p.onExit()
 
   proc onClientProcessExit() {.closure, gcsafe.} =
@@ -233,11 +225,6 @@ proc initialized*(ls: LanguageServer, _: JsonNode): Future[void] {.async.} =
     debug "Client does not support workspace/configuration"
     ls.configurations.configReady.fire()
 
-  # await ls.initNimsuggestInstances()
-
-  ## Starts nimsuggest instances.
-  # let rootPath = getRootPath(ls.capabilities.lspInitializeParams)
-
   let paramsRootPath: Option[FileUri] = ls.capabilities.lspInitializeParams.rootUri
 
   if paramsRootPath.isNone():
@@ -247,7 +234,7 @@ proc initialized*(ls: LanguageServer, _: JsonNode): Future[void] {.async.} =
   else:
     let rootUri: FileUri = paramsRootPath.get()
     if string(rootUri).len > 0:
-      let path = uriToPath(rootUri)
+      let path = toDirPathAbs(rootUri)
       debug "getRootPath: rootUri on LSPInitializeParams found ", path = path
       ls.files.rootPath = path
     else:
@@ -258,32 +245,16 @@ proc initialized*(ls: LanguageServer, _: JsonNode): Future[void] {.async.} =
 
   # Update pool settings from config (pool was created with defaults in initLanguageServer)
   ls.pool.maxSlots = config.maxNimsuggestProcesses
-  ls.pool.fileCheckDelay = initDuration(milliseconds = config.fileCheckDelay)
 
-  # Get all nimble information
-  let dependencyTree = initForest(ls.files.rootPath)
+  # Get all nimble information and build dependency tree
+  ls.dependencies = await initForest(ls.files.rootPath)
+  let nimsuggestPath = await getNimSuggestPath(
+    ls.dependencies.nim, config
+  )
 
-
-  let foundNimbleFiles: seq[FilePath] = searchForNimbleFiles(ls.files.rootPath)
-  var nimsuggestSet = false
-
-  for i, nimbleFile in foundNimbleFiles:
-    let nimbleDumpInfo: NimbleDumpInfo = await getNimbleDumpInfo(ls.nimbleDumpCache, nimbleFile)
-
-    if not(nimbleFile in ls.nimbleDumpCache):
-      ls.nimbleDumpCache[nimbleFile] = nimbleDumpInfo
-
-    if nimsuggestSet == false:
-      # Resolve the nimsuggest binary path and Nim version now that config is available.
-      let (nimsuggestPath, nimVersion) = await getNimSuggestPathAndVersion(nimbleDumpInfo, config)
-      ls.pool.nimVersion = nimVersion
-      let nsPath = toFilePath(nimsuggestPath)
-
-      ls.pool.nimsuggestPath = nsPath
-      ls.pool.nimsuggestProtocol = detectNimsuggestProtocolVersion(nsPath)
-      ls.pool.nimsuggestCapabilities = getNimsuggestCapabilities(nsPath)
-
-      nimsuggestSet = true
+  ls.pool.nimsuggest.exePath = nimsuggestPath
+  ls.pool.nimsuggest.protocol = getNimsuggestProtocolVersion(nimsuggestPath)
+  ls.pool.nimsuggest.capabilities = getNimsuggestCapabilities(nimsuggestPath)
 
   if not ls.lsInitialized.finished:
     ls.lsInitialized.complete()

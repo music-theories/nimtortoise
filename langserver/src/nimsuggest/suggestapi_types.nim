@@ -2,6 +2,7 @@ import std/[options, times, deques]
 
 import chronos
 import chronos/asyncproc
+import forest
 
 import ../protocol/types
 
@@ -39,7 +40,7 @@ type
   Suggest* = ref object
     section*: IdeCmd
     qualifiedPath*: seq[string] # part of 'qualifiedPath'
-    filePath*: FilePath
+    filePath*: FilePathAbs
     line*: int # Starts at 1
     column*: int # Starts at 0
     doc*: string # Not escaped (yet)
@@ -88,3 +89,15 @@ type
     protocolVersion*: int
 
   NimSuggest* = ref NimsuggestImpl
+
+type
+  NimsuggestSettings* = object
+    exePath*: FilePathAbs # Path to nimsuggest binary.
+    protocol*: int # The version of the nimsuggest protocol
+    capabilities*: set[NimSuggestCapability] # Capabilities
+
+  NimsuggestSpawnInfo* = object
+    entryPoint*: FilePathAbs
+    workingDir*: DirPathAbs
+    nimbleFile*: Option[FilePathAbs]
+    paths*:      seq[DirPathAbs]

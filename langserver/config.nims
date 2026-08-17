@@ -4,4 +4,4 @@ when withDir(thisDir(), system.fileExists("nimble.paths")):
   include "nimble.paths"
 # end Nimble config
 
-switch("path", thisDir() & "/../nimforest/src")
+switch("path", thisDir() & "/../forest/src")

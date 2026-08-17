@@ -5,102 +5,154 @@ import chronicles
 import regex
 import stew/byteutils
 
+import forest
+
 import ../protocol/types
-# import ../utils/process_utils
 import ../utils/utils
 import ../configurations/configurations
+import ../nimsuggest/[nimsuggest_types, suggestapi_types]
+
 import ./[nimble_types]
 
+proc commonPrefixLen(a, b: string): int =
+  let aParts = a.split(DirSep)
+  let bParts = b.split(DirSep)
+  for i in 0 ..< min(aParts.len, bParts.len):
+    if aParts[i] == bParts[i]: inc result
+    else: break
 
-## BIG NOTE: You need to ensure that, on consolidation, you take into account the parameter mapping.
-## You also need to work out exactly what this workingDir thing is and where it is called.
-## This probably needs to work PER SLOT - as each slot as a workingDir on `NimsuggestSlot`.
-proc getWorkingDir*(rootPath: FilePath, path: FilePath, config: NlsConfig): string =
-  ## Gets working directory.
-  # let rootPath = uriToPath(rootUri)
-  # TODO/NOTE: I DO NOT UNDERSTAND WHAT THE WORKING DIR IS OR HOW IT SHOULD BE USED !!!!!!
-  let rootPathAsString = string(rootPath)
-  let pathRelativeToRoot = string(path).tryRelativeTo(rootPathAsString)
-  let mapping = config.workingDirectoryMapping
-  result = parentDir(string(path)) # This won't work - will only give back the directory the binary is running in.
-  
-  for m in mapping:
-    if pathRelativeToRoot.isSome() and m.projectFile == pathRelativeToRoot.get():
-      result = rootPathAsString / m.directory
-      break
+proc getNimsuggestSpawnInfo*(
+  fileOpened: FilePathAbs, 
+  rootPath: DirPathAbs, 
+  dependencies: Forest
+): NimsuggestSpawnInfo = 
+  ## Gets spawning info.
+  ## The working directory should be the directory to spawn the nimsuggest instance from, and should be the closest file with a .nimble file.
+  result = NimsuggestSpawnInfo(
+    entryPoint: FilePathAbs(""),
+    workingDir: DirPathAbs(""),
+    nimbleFile: none(FilePathAbs),
+    paths: @[]
+  )
 
-
-##[
-- GET ENTRY POINT
-- First check project mapping
-  - If there is a relevant project mapping, use that.  
-- If not, check nimble entry points by walking the directory structure from the seletced file up to the rootPath, looking for a suitable nimble file - or do we need to iterate over the nimble dump cache?
-]##
-
-
-# === FIND NIMBLE FILES ===
-proc searchForNimbleFiles*(rootPath: FilePath): seq[FilePath] = 
-  # Search rootPath first, then one level of subdirectories (handles workspaces
-  # where the nimble project root is a subfolder of the opened workspace).
-  var output: seq[string] = @[]
-  let rootPathAsString = string(rootPath)
-  output = walkFiles(rootPathAsString / "*.nimble").toSeq()
-  if output.len == 0:
-    for subdir in walkDirs(rootPathAsString / "*"):
-      output.add(walkFiles(subdir / "*.nimble").toSeq())
-  return map(output, x => toFilePath(x))
-
-
-proc findNimblePaths*(
-  fromFile: string, rootFolder: string
-): seq[string] =
-  ## Walk up from fromFile's directory looking for nimble.paths.
-  ## Returns the flags it contains (--noNimblePath and --path:... entries)
-  ## with any surrounding quotes stripped, ready to pass directly to nimsuggest.
-  var dir = fromFile.parentDir
+  # Step 1: Walk up from fileOpened to find a .nimble file or reach rootPath.
+  var nimbleFile = none(FilePathAbs)
+  var dir = parentDir(string(fileOpened))
   while dir.len > 0:
-    let pathsFile = dir / "nimble.paths"
-    if pathsFile.fileExists:
-      debug "Found nimble.paths for nimsuggest", path = pathsFile
-      for line in pathsFile.lines:
-        let trimmed = line.strip()
-        if trimmed.len == 0:
-          continue
-        if trimmed.startsWith("--path:"):
-          # nimble.paths wraps paths in quotes: --path:"/foo/bar"
-          # Strip them so the arg is passed cleanly to nimsuggest.
-          let val = trimmed[7 .. ^1]
-          if val.len >= 2 and val[0] == '"' and val[^1] == '"':
-            result.add("--path:" & val[1 .. ^2])
-          else:
-            result.add(trimmed)
-        else:
-          result.add(trimmed)
-      return
-    if dir == rootFolder:
+    for candidate in walkFiles(dir / "*.nimble"):
+      nimbleFile = some(FilePathAbs(candidate))
       break
-    let parent = dir.parentDir
+    if nimbleFile.isSome:
+      break
+    if dir == string(rootPath):
+      break
+    let parent = parentDir(dir)
     if parent == dir:
       break
     dir = parent
-  warn "No nimble.paths file found.  This may cause problems.  Consider running `nimble setup` before continuing."
 
-echo findNimblePaths("langserver/src/nimble_nimble_utils.nim", "langserver")
+  # Step 2: Cross-reference `nimble` field of `dependencies` to find entry points.
+  # workingDir defaults to parentDir(fileOpened); updated to nimble dir if found.
+  var workingDir = DirPathAbs(parentDir(string(fileOpened)))
+  var entryPoints: seq[FilePathAbs] = @[]
 
-# === PROJECT MAPPING ===
-var compiledRegexCache {.threadvar.}: Table[string, Regex2]
+  if nimbleFile.isSome:
+    let nf = nimbleFile.get()
+    result.nimbleFile = nimbleFile
+    workingDir = DirPathAbs(parentDir(string(nf)))
+    if nf in dependencies.nimble:
+      let dumpInfo = dependencies.nimble[nf]
+      let nimbleDir = parentDir(string(nf))
+      for ep in dumpInfo.entryPoints:
+        let abs = FilePathAbs((nimbleDir / string(ep)).normalizedPath)
+        if fileExists(string(abs)):
+          entryPoints.add(abs)
 
-proc getCompiledRegex(pattern: string): Regex2 =
-  ## Returns a cached compiled Regex2 for pattern, compiling it on first use.
-  ## Chronos is single-threaded cooperative, so no locking is needed.
-  if pattern notin compiledRegexCache:
-    compiledRegexCache[pattern] = re2(pattern)
-  compiledRegexCache[pattern]
+  result.workingDir = workingDir
 
-proc clearCompiledRegexCache*() =
-  ## Invalidate the regex cache. Call after workspace configuration changes so
-  ## that stale projectMapping patterns are not reused across config updates.
-  compiledRegexCache.clear()
+  # If no entry points found, treat fileOpened as its own entry point.
+  if entryPoints.len == 0:
+    result.entryPoint = fileOpened
+    result.paths = dependencies.paths.getOrDefault(fileOpened, @[])
+    return
+
+  # Step 3: Find the entry point closest to fileOpened that can reach it.
+  # "Closest" = longest common path prefix (most directory components shared).
+  # Prefer entry points that transitively import fileOpened; fall back to
+  # proximity alone for orphan files not reachable from any entry point.
+
+  var bestEntryPoint = FilePathAbs("")
+  var bestScore = -1
+  var anyReachable = false
+
+  for ep in entryPoints:
+    if isDependency(dependencies.trees, ep, fileOpened) or ep == fileOpened:
+      anyReachable = true
+      let score = commonPrefixLen(string(ep), string(fileOpened))
+      if score > bestScore:
+        bestScore = score
+        bestEntryPoint = ep
+
+  # Step 4: No entry point can reach fileOpened (orphan) - it becomes its own entry point.  No paths found in this case.  TODO - maybe do a nim dump to get paths?
+  if anyReachable:
+    result.entryPoint = fileOpened
+    result.paths = @[]
+
+  else:
+    # Step 5: Get lib search paths for this entry point from dependencies.paths.
+    result.entryPoint = bestEntryPoint
+    result.paths = dependencies.paths.getOrDefault(bestEntryPoint, @[])
+
+# proc findNimblePaths*(
+#   fromFile: string, rootFolder: string
+# ): seq[string] =
+#   ## Walk up from fromFile's directory looking for nimble.paths.
+#   ## Returns the flags it contains (--noNimblePath and --path:... entries)
+#   ## with any surrounding quotes stripped, ready to pass directly to nimsuggest.
+#   var dir = fromFile.parentDir
+#   while dir.len > 0:
+#     let pathsFile = dir / "nimble.paths"
+#     if pathsFile.fileExists:
+#       debug "Found nimble.paths for nimsuggest", path = pathsFile
+#       for line in pathsFile.lines:
+#         let trimmed = line.strip()
+#         if trimmed.len == 0:
+#           continue
+#         if trimmed.startsWith("--path:"):
+#           # nimble.paths wraps paths in quotes: --path:"/foo/bar"
+#           # Strip them so the arg is passed cleanly to nimsuggest.
+#           let val = trimmed[7 .. ^1]
+#           if val.len >= 2 and val[0] == '"' and val[^1] == '"':
+#             result.add("--path:" & val[1 .. ^2])
+#           else:
+#             result.add(trimmed)
+#         else:
+#           result.add(trimmed)
+#       return
+#     if dir == rootFolder:
+#       break
+#     let parent = dir.parentDir
+#     if parent == dir:
+#       break
+#     dir = parent
+#   warn "No nimble.paths file found.  This may cause problems.  Consider running `nimble setup` before continuing."
+
+# echo findNimblePaths("langserver/src/nimble_nimble_utils.nim", "langserver")
+
+# # === PROJECT MAPPING ===
+# var compiledRegexCache {.threadvar.}: Table[string, Regex2]
+
+# proc getCompiledRegex(pattern: string): Regex2 =
+#   ## Returns a cached compiled Regex2 for pattern, compiling it on first use.
+#   ## Chronos is single-threaded cooperative, so no locking is needed.
+#   if pattern notin compiledRegexCache:
+#     compiledRegexCache[pattern] = re2(pattern)
+#   compiledRegexCache[pattern]
+
+# proc clearCompiledRegexCache*() =
+#   ## Invalidate the regex cache. Call after workspace configuration changes so
+#   ## that stale projectMapping patterns are not reused across config updates.
+#   compiledRegexCache.clear()
 
 ##[
 Path: a filesystem path string, e.g.
@@ -110,62 +162,61 @@ file:///Users/dp/projects/monorepo/pkga/src/pkga.nim
 The URI has the file:// scheme prefix. uriToPath strips it; pathToUri adds it.
 ]##
 
-proc getEntryPointFromProjectMapping*(
-  filePath: FilePath, 
-  rootPath: FilePath, 
-  projectMapping:seq[NlsNimsuggestConfig]
-): FilePath =
-  ## ProjectMapping regex lookup only. No slot creation, no LRU fallback.
-  ## Returns FilePath("") if no mapping matches.
-  # let path = uriToPath(uri)
-  let pathAsString = string(filePath)
-  let rootPathAsString = string(rootPath)
-  let pathRelativeToRoot = tryRelativeTo(pathAsString, rootPathAsString)
-  echo "pathRelativeToRoot ", pathRelativeToRoot
-  for mapping in projectMapping:
-    var m: RegexMatch2
-    let compiledRegex = re2(mapping.fileRegex)  
-    echo "pathAsString ", pathAsString
-    if find(pathAsString, compiledRegex, m):
-      echo "m: ", $m
-      echo "mapping: ", $mapping.projectFile
-      if mapping.projectFile == "":
-        echo "empty projectFile"
-        return filePath  # regex matched but no projectFile — file is its own project
-      elif isAbsolute(mapping.projectFile):
-        echo "isAbsolute: ", isAbsolute(mapping.projectFile)
-        return FilePath(mapping.projectFile)
-      else: 
-        echo "other: "
-        return FilePath(rootPathAsString / mapping.projectFile)
-  echo "OH NO! "
-  return FilePath("")
+# proc getEntryPointFromProjectMapping*(
+#   filePath: FilePathAbs,
+#   rootPath: DirPathAbs,
+#   projectMapping: seq[NlsNimsuggestConfig]
+# ): FilePathAbs =
+#   ## ProjectMapping regex lookup only. No slot creation, no LRU fallback.
+#   ## Returns FilePathAbs("") if no mapping matches.
+#   let pathAsString = string(filePath)
+#   let rootPathAsString = string(rootPath)
+#   let pathRelativeToRoot = tryRelativeTo(pathAsString, rootPathAsString)
+#   echo "pathRelativeToRoot ", pathRelativeToRoot
+#   for mapping in projectMapping:
+#     var m: RegexMatch2
+#     let compiledRegex = re2(mapping.fileRegex)
+#     echo "pathAsString ", pathAsString
+#     if find(pathAsString, compiledRegex, m):
+#       echo "m: ", $m
+#       echo "mapping: ", $mapping.projectFile
+#       if mapping.projectFile == "":
+#         echo "empty projectFile"
+#         return filePath  # regex matched but no projectFile — file is its own project
+#       elif isAbsolute(mapping.projectFile):
+#         echo "isAbsolute: ", isAbsolute(mapping.projectFile)
+#         return FilePathAbs(mapping.projectFile)
+#       else:
+#         echo "other: "
+#         return rootPath / FilePathRel(mapping.projectFile)
+#   echo "OH NO! "
+#   return FilePathAbs("")
 
-let testProjectMapping: seq[NlsNimsuggestConfig] = @[
-  NlsNimsuggestConfig(
-    projectFile: "langserver/src/nimtortoise.nim",
-    fileRegex: "langserver/src/.*\\.nim"
-  ),
-  NlsNimsuggestConfig(
-    projectFile: "langserver/tests/all.nim",
-    fileRegex: "langserver/tests/.*\\.nim"
-  )
-]
+# let testProjectMapping: seq[NlsNimsuggestConfig] = @[
+#   NlsNimsuggestConfig(
+#     projectFile: "langserver/src/nimtortoise.nim",
+#     fileRegex: "langserver/src/.*\\.nim"
+#   ),
+#   NlsNimsuggestConfig(
+#     projectFile: "langserver/tests/all.nim",
+#     fileRegex: "langserver/tests/.*\\.nim"
+#   )
+# ]
 
-echo "ENTRY POINT ", getEntryPointFromProjectMapping(
-  FilePath("langserver/"),
-  FilePath(""),
-  testProjectMapping
-)
-let compiledRegex = re2("langserver/src/.*\\.nim")  
-# echo "pathAsString ", pathAsString
-echo regex.match("langserver/src/nimble/nimble_utils.nim", compiledRegex)
+# echo "ENTRY POINT ", getEntryPointFromProjectMapping(
+#   FilePathAbs("langserver/"),
+#   DirPathAbs(""),
+#   testProjectMapping
+# )
+# let compiledRegex = re2("langserver/src/.*\\.nim")  
+# # echo "pathAsString ", pathAsString
+# echo regex.match("langserver/src/nimble/nimble_utils.nim", compiledRegex)
 
-echo regex.match("langserver/tests/textensions.nim", compiledRegex)
+# echo regex.match("langserver/tests/textensions.nim", compiledRegex)
 
-echo regex.match("langserver/src/nimble_tortoise.nim", compiledRegex)
+# echo regex.match("langserver/src/nimble_tortoise.nim", compiledRegex)
 
-echo regex.match("vscode_extension/src/nimble/nimble_utils.nim", compiledRegex)
+# echo regex.match("vscode_extension/src/nimble/nimble_utils.nim", compiledRegex)
 
 # {
 #   "projectFile": "vscode_extension/src/vscode_nim_tortoise.nim",
@@ -176,16 +227,16 @@ echo regex.match("vscode_extension/src/nimble/nimble_utils.nim", compiledRegex)
 
 
 # === ENTRY POINTS ===
-proc getNimbleEntryPoints*(
-  dumpInfo: NimbleDumpInfo, nimbleProjectPath: string
-): seq[string] =
-  if dumpInfo.entryPoints.len > 0:
-    result = dumpInfo.entryPoints.mapIt(nimbleProjectPath / it)
-  else:
-    #Nimble doesnt include the entry points, returning the nimble project file as the entry point
-    let sourceDir = nimbleProjectPath / dumpInfo.srcDir
-    result = @[sourceDir / (dumpInfo.name & ".nim")]
-  result = result.filterIt(it.fileExists)
+# proc getNimbleEntryPoints*(
+#   dumpInfo: NimbleDumpInfo, nimbleProjectPath: string
+# ): seq[string] =
+#   if dumpInfo.entryPoints.len > 0:
+#     result = dumpInfo.entryPoints.mapIt(nimbleProjectPath / it)
+#   else:
+#     #Nimble doesnt include the entry points, returning the nimble project file as the entry point
+#     let sourceDir = nimbleProjectPath / dumpInfo.srcDir
+#     result = @[sourceDir / (dumpInfo.name & ".nim")]
+#   result = result.filterIt(it.fileExists)
 
 # proc getEntryPoints(
 #   ls: LanguageServer, rootPath: FilePath

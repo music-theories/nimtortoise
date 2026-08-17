@@ -5,6 +5,8 @@ import chronos/asyncproc
 import chronicles
 import stew/byteutils
 
+import forest
+
 import ../configurations/configurations
 import ../protocol/[enums, types]
 import ../utils/utils
@@ -12,8 +14,48 @@ import ../utils/process_utils
 import ../nimble/nimscript_utils
 import ./[suggestapi_utils, suggestapi_types]
 
-proc detectNimsuggestProtocolVersion*(
-  nimsuggestPath: FilePath, 
+proc getNimSuggestPath*(
+  nimInfo: NimInfo, conf: NlsConfig 
+): Future[FilePathAbs] {.async.} =
+  let nimsuggestPath = expandTilde(string(conf.nimsuggestPath))
+  if nimsuggestPath.len > 0:
+    debug "findNimsuggestPathAndVersion: Using nimsuggest", 
+      path = nimsuggestPath
+    return FilePathAbs(nimsuggestPath)
+
+  elif string(nimInfo.nimExe) != "":
+    let nimDir = parentDir(nimInfo.nimExe)
+    if dirExists(string(nimDir)):
+      let derivedNimuggestPath = string(nimDir) / "nimsuggest".addFileExt(ExeExt)
+      debug "findNimsuggestPathAndVersion: Found nim directory.", path = nimDir
+      if fileExists(derivedNimuggestPath):
+        debug "findNimsuggestPathAndVersion: Found nimsuggest.", path = derivedNimuggestPath
+        return FilePathAbs(string(nimDir) / "nimsuggest".addFileExt(ExeExt))
+        
+    debug "findNimsuggestPathAndVersion: Could not find nimsuggest via nimDir.  Searching using findExe"
+    let findExeNimsuggestPath = findExe("nimsuggest")
+    if findExeNimsuggestPath.len > 0:
+      debug "findNimsuggestPathAndVersion: found nimsuggest using findExe(). ", 
+        path = findExeNimsuggestPath
+      return FilePathAbs(findExeNimsuggestPath)
+
+    else:
+      let nimbleBinPath = getHomeDir() / ".nimble" / "bin" / "nimsuggest".addFileExt(ExeExt)
+      debug "findNimsuggestPathAndVersion: used findExe() to look for nimsuggest but couldn't find it. Looking in homeDir ", location = nimbleBinPath
+      # Fallback for restricted PATH environments (e.g. Dock launch on macOS where
+      # PATH is /usr/bin:/bin:/usr/sbin:/sbin and ~/.nimble/bin is not included,
+      # or Linux desktop launches that only source ~/.profile). Uses ExeExt so
+      # the check works on Windows ("nimsuggest.exe") too.
+      if fileExists(nimbleBinPath):
+        debug "findNimsuggestPathAndVersion: found nimsuggest in homeDir ", location = nimbleBinPath
+        return FilePathAbs(nimbleBinPath)
+      else:
+        debug "findNimsuggestPathAndVersion: Could not locate nimsuggest "
+        return FilePathAbs("")
+
+
+proc getNimsuggestProtocolVersion*(
+  nimsuggestPath: FilePathAbs,
 ): int {.gcsafe.} =
   var process = startProcess(
     command = string(nimsuggestPath),
@@ -32,7 +74,7 @@ proc detectNimsuggestProtocolVersion*(
     return parseInt(l)
 
 proc getNimsuggestCapabilities*(
-  nimsuggestPath: FilePath
+  nimsuggestPath: FilePathAbs
 ): set[NimSuggestCapability] {.gcsafe.} =
   proc parseCapability(c: string): Option[NimSuggestCapability] =
     debug "Parsing nimsuggest capability", capability = c
@@ -55,29 +97,31 @@ proc getNimsuggestCapabilities*(
       if cap.isSome:
         result.incl(cap.get)
 
+  # protocolVersion: int, 
+  # capabilities: set[NimSuggestCapability],
+
 proc buildNimsuggestArguments*(
-  fileToRun: FilePath,
-  protocolVersion: int, 
-  capabilities: set[NimSuggestCapability],
+  spawningInfo: NimsuggestSpawnInfo,
+  nimsuggestSettings: NimsuggestSettings,
   enableExceptionInlayHints: bool,
   enableLog: bool,
-  nimPaths: seq[string],
 ): seq[string] =
-  let isNimble = string(fileToRun).endsWith(".nimble")
-  let isNimScript = string(fileToRun).endsWith(".nims") or isNimble
+  let entryPoint = spawningInfo.entryPoint
+  let isNimble = string(entryPoint).endsWith(".nimble")
+  let isNimScript = string(entryPoint).endsWith(".nims") or isNimble
 
   var extraArgs = newSeq[string]()
   if isNimScript:
     extraArgs.add("--import: system/nimscript")
-  # Nimsuggest crashes when including the file. 
+
   if isNimble:
     let nimScriptApiPath = getNimScriptAPITemplatePath()
     extraArgs.add("--include: " & nimScriptApiPath)
 
-  var protocolToUse = protocolVersion
-  if protocolVersion > HighestSupportedNimSuggestProtocolVersion:
+  var protocolToUse = nimsuggestSettings.protocol
+  if nimsuggestSettings.protocol > HighestSupportedNimSuggestProtocolVersion:
     protocolToUse = HighestSupportedNimSuggestProtocolVersion
-  result = @[string(fileToRun), "--v" & $protocolToUse, "--autobind"] & extraArgs
+  result = @[string(entryPoint), "--v" & $protocolToUse, "--autobind"] & extraArgs
   
   if protocolToUse >= 4:
     result.add("--clientProcessId:" & $getCurrentProcessId())
@@ -85,13 +129,13 @@ proc buildNimsuggestArguments*(
   if enableLog:
     result.add("--log")
 
-  if nsExceptionInlayHints in capabilities:
+  if nsExceptionInlayHints in nimsuggestSettings.capabilities:
     if enableExceptionInlayHints:
       result.add("--exceptionInlayHints:on")
     else:
       result.add("--exceptionInlayHints:off")
 
-  debug "Nim Paths ", paths = nimPaths
+  debug "Nim Paths ", paths = spawningInfo.paths
 
-  for p in nimPaths:
-    result.add(p)
+  for p in spawningInfo.paths:
+    result.add($(p))

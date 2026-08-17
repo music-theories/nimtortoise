@@ -1,10 +1,10 @@
-import std/[json, sets, tables, times]
+import std/[json, sets, tables, times, options]
 import chronos
 import regex
 import ./suggestapi_types
 import ../protocol/types
 import ../utils/utils as globalUtils
-export FileUri, FilePath
+export FileUri, FilePathAbs, FilePathRel, DirPathAbs, DirPathRel
 
 # === NIMSUGGEST QUERIES ===
 # LSP File Position
@@ -46,7 +46,7 @@ type
     id*: uint
     uri*: FileUri
       ## Source URI. Used to resolve the on-disk path and stash path.
-    dirtyFile*: FilePath
+    dirtyFile*: FilePathAbs
       ## Stash path when openFiles[uri].changed is true, else "".
     responseFuture*: Future[seq[Suggest]]
       ## Completed by the query processor when nimsuggest replies.
@@ -105,13 +105,13 @@ if I have opened a file in the `tests` folder:
 - base nimble project folder: langserver (langserver/nimtortoise.nimble)
 ]##
 
-
 type
   NimsuggestSlot* = ref object
     state*: SlotState
     # entryFile*: FilePath # Entry-point .nim path. 
-    projectFile*: FilePath # Entry-point .nim path. Stable across restarts. Key in pool.slots.
-    workingDir*: FilePath  # Working directory passed to nimsuggest at spawn time. Stable across restarts.
+    spawnInfo*: NimsuggestSpawnInfo
+    # projectFile*: FilePathAbs # Entry-point .nim path. Stable across restarts. Key in pool.slots.
+    # workingDir*: DirPathAbs   # Working directory passed to nimsuggest at spawn time. Stable across restarts.
     # nimblePaths*: seq[string]
       ## A list of flags from any relevant nimble.paths files.   These are passed to nimsuggest when it runs.  I wonder if these should be part of the nimbleDumpCache?
       ## isEntryPoint*: bool
@@ -132,7 +132,7 @@ type
 
 type
   ProjectMapping* = object
-    projectFile*: FilePath
+    projectFile*: FilePathAbs
     fileRegex: Regex2
 
 # === NIMSUGGEST POOL TYPES ===
@@ -141,21 +141,24 @@ type
   StatusChangedProc* = proc() {.gcsafe, raises: [].}
 
   NimsuggestPool* = ref object
-    slots*: Table[FilePath, NimsuggestSlot]
-    projectMapping*: seq[ProjectMapping]
+    slots*: Table[FilePathAbs, NimsuggestSlot]
     maxSlots*: int
-    fileCheckDelay*: times.Duration # int   ## Quiet-period threshold in ms before per-file diagnostics run. Set in initNimsuggestInstances.
-    nimsuggestPath*: FilePath  ## Path to nimsuggest binary. Set in initNimsuggestInstances.
-    nimsuggestProtocol*: int
-    nimsuggestCapabilities*: set[NimSuggestCapability]
-    nimVersion*: string      ## Nim version string for logging.
-    # timeout*: int            ## Per-request timeout in ms.
+    nimsuggest*: NimsuggestSettings
     notifyProc*: NotifyProc
       ## Sends a JSON-RPC notification to the client (e.g. window/showMessage).
       ## Set by initLanguageServer. May be nil — check before calling.
     statusChangedProc*: StatusChangedProc
       ## Called when a slot transitions to READY or is removed.
       ## Triggers extension/statusUpdate. Set by initLanguageServer. May be nil.
+      ## 
+    
+    
+    # nimVersion*: string      ## Nim version string for logging.
+    # timeout*: int            ## Per-request timeout in ms.
+    # projectMapping*: seq[ProjectMapping]
+    # nimsuggestPath*: FilePathAbs  ## Path to nimsuggest binary. Set in initNimsuggestInstances.
+    # nimsuggestProtocol*: int
+    # nimsuggestCapabilities*: set[NimSuggestCapability]
 
 
 type
@@ -175,6 +178,6 @@ type
 type
   LanguageServerFiles* = object
     openFiles*:   TableRef[FileUri, NlsFileInfo]
-    storageDir*:  FilePath
-    rootPath*:    FilePath
+    storageDir*:  DirPathAbs
+    rootPath*:    DirPathAbs
   

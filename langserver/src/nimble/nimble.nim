@@ -4,7 +4,7 @@ import chronos/asyncproc
 import chronicles
 import stew/byteutils
 
-import nimforest/nimforest
+import forest
 
 import ../protocol/types
 import ../utils/process_utils
@@ -13,53 +13,53 @@ import ../utils/utils
 
 import ./[nimble_types, nimble_utils]
 
-proc getNimbleDumpInfo*(
-  nimbleDumpCache: Table[FilePath, NimbleDumpInfo],
-  nimbleFile: FilePath
-): Future[NimbleDumpInfo] {.async.} =
-  ## Runs nimble dump, which gets all the entryPoints/projectFiles. 
-  if nimbleFile in nimbleDumpCache:
-    return nimbleDumpCache[nimbleFile]
-  var process: AsyncProcessRef
-  try:
-    let workDir = parentDir(string(nimbleFile))
-    let nimbleDirEnv = getEnv("NIMBLE_DIR", "<not set>")
-    let homeEnv = getEnv("HOME", "<not set>")
-    let pathEnv = getEnv("PATH", "<not set>")
+# proc getNimbleDumpInfo*(
+#   nimbleDumpCache: Table[FilePathAbs, NimbleDumpInfo],
+#   nimbleFile: FilePathAbs
+# ): Future[NimbleDumpInfo] {.async.} =
+#   ## Runs nimble dump, which gets all the entryPoints/projectFiles. 
+#   if nimbleFile in nimbleDumpCache:
+#     return nimbleDumpCache[nimbleFile]
+#   var process: AsyncProcessRef
+#   try:
+#     let workDir = parentDir(string(nimbleFile))
+#     let nimbleDirEnv = getEnv("NIMBLE_DIR", "<not set>")
+#     let homeEnv = getEnv("HOME", "<not set>")
+#     let pathEnv = getEnv("PATH", "<not set>")
 
-    debug "getNimbleDumpInfo: environment",
-      nimbleFile = $nimbleFile, workDir = workDir,
-      NIMBLE_DIR = nimbleDirEnv, HOME = homeEnv, PATH = pathEnv
+#     debug "getNimbleDumpInfo: environment",
+#       nimbleFile = $nimbleFile, workDir = workDir,
+#       NIMBLE_DIR = nimbleDirEnv, HOME = homeEnv, PATH = pathEnv
 
-    process = await startProcess(
-      "nimble",
-      workingDir = workDir,
-      arguments = @["dump"],
-      options = {UsePath},
-      stderrHandle = AsyncProcess.Pipe,
-      stdoutHandle = AsyncProcess.Pipe,
-    )
-    let info = string.fromBytes(process.stdoutStream.read().await)
-    debug "getNimbleDumpInfo: result ", info
+#     process = await startProcess(
+#       "nimble",
+#       workingDir = workDir,
+#       arguments = @["dump"],
+#       options = {UsePath},
+#       stderrHandle = AsyncProcess.Pipe,
+#       stdoutHandle = AsyncProcess.Pipe,
+#     )
+#     let info = string.fromBytes(process.stdoutStream.read().await)
+#     debug "getNimbleDumpInfo: result ", info
 
-    for line in info.splitLines:
-      if line.startsWith("srcDir"):
-        result.srcDir = line[(1 + line.find '"') ..^ 2]
-      if line.startsWith("name"):
-        result.name = line[(1 + line.find '"') ..^ 2]
-      if line.startsWith("nimDir"):
-        result.nimDir = some(line[(1 + line.find '"') ..^ 2])
-      if line.startsWith("nimblePath"):
-        result.nimblePath = FilePath(line[(1 + line.find '"') ..^ 2])
-      if line.startsWith("entryPoints"):
-        result.entryPoints =
-          line[(1 + line.find '"') ..^ 2].split(',').mapIt(it.strip(chars = {' ', '"'}))
+#     for line in info.splitLines:
+#       if line.startsWith("srcDir"):
+#         result.srcDir = line[(1 + line.find '"') ..^ 2]
+#       if line.startsWith("name"):
+#         result.name = line[(1 + line.find '"') ..^ 2]
+#       if line.startsWith("nimDir"):
+#         result.nimDir = some(line[(1 + line.find '"') ..^ 2])
+#       if line.startsWith("nimblePath"):
+#         result.nimblePath = FilePathAbs(line[(1 + line.find '"') ..^ 2])
+#       if line.startsWith("entryPoints"):
+#         result.entryPoints =
+#           line[(1 + line.find '"') ..^ 2].split(',').mapIt(it.strip(chars = {' ', '"'}))
 
-  except CatchableError:
-    debug "Failed to get nimble dump info", nimbleFile = $nimbleFile
-  finally:
-    if process != nil:
-      await shutdownChildProcess(process)
+#   except CatchableError:
+#     debug "Failed to get nimble dump info", nimbleFile = $nimbleFile
+#   finally:
+#     if process != nil:
+#       await shutdownChildProcess(process)
 
 proc startNimbleProcess*(
   args: seq[string], workingDir: string
@@ -82,7 +82,9 @@ proc startNimbleProcess*(
     stderrHandle = AsyncProcess.Pipe,
   )
 
-proc getNimbleTasks*(nimbleDumpCache: Table[FilePath, NimbleDumpInfo]): Future[seq[NimbleTask]] {.async.} =
+proc getNimbleTasks*(
+  nimbleDumpCache: Table[FilePathAbs, NimbleDumpInfo]
+): Future[seq[NimbleTask]] {.async.} =
   # let rootPath: string = ls.capabilities.lspInitializeParams.getRootPath
   # debug "Received tasks ", rootPath = rootPath
   debug "tasks: deleting NIMBLE_DIR before nimble tasks",
@@ -91,7 +93,7 @@ proc getNimbleTasks*(nimbleDumpCache: Table[FilePath, NimbleDumpInfo]): Future[s
   delEnv "NIMBLE_DIR"
   
   for nimbleFile, dumpInfo in nimbleDumpCache:
-    let nimbleDirectory = parentDir(string(dumpInfo.nimblePath))
+    let nimbleDirectory = parentDir(string(nimbleFile))
     debug "Running `nimble tasks` in directory to get a list of its tasks", dir = nimbleDirectory
     let process = await startNimbleProcess(@["tasks"], workingDir = nimbleDirectory)
     let exitCode = await process.waitForExit(InfiniteDuration)

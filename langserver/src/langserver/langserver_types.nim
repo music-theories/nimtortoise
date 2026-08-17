@@ -3,6 +3,8 @@ import chronos
 import chronos/[asyncproc, threadsync]
 import json_rpc/servers/socketserver
 
+import forest
+
 import ../protocol/types
 import ../configurations/configuration_types
 import ../nimble/nimble_types
@@ -92,6 +94,7 @@ type
     capabilities*: LanguageServerCapabilities
     configurations*: LanguageServerConfigurations
     transport*: LanguageServerTransport
+    dependencies*: Forest
     files*: LanguageServerFiles
     pool*: NimsuggestPool
     messaging*: LanguageServerMessaging
@@ -105,9 +108,9 @@ type
     cmdLineClientProcessId*: Option[int]
 
     isShutdown*: bool
-    nimbleDumpCache*: Table[FilePath, NimbleDumpInfo]
     lsInitialized*: Future[void]
     
+    # nimbleDumpCache*: Table[FilePathAbs, NimbleDumpInfo]
     ## Completed after initNimsuggestInstances finishes (config + nimble dump + entry-point spawns).
     ## DID_OPEN polls this before the spawn path so files are routed to the correct
     ## pre-spawned entry-point slot rather than spawning nimsuggest using themselves.

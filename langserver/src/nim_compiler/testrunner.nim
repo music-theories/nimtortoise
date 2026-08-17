@@ -68,9 +68,9 @@ proc parseTestResults*(xmlContent: string): RunTestProjectResult =
       result.suites.add(suite)
 
 proc listTests*(
-  entryPoint: FilePath, 
-  nimPath: FilePath, 
-  workspaceRoot: FilePath
+  entryPoint: FilePathAbs,
+  nimPath: FilePathAbs,
+  workspaceRoot: DirPathAbs
 ): Future[TestProjectInfo] {.async.} =
   debug "TODO: Implement tests."
   return TestProjectInfo()

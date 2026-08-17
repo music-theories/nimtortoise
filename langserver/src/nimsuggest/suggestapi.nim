@@ -12,44 +12,45 @@ import ../nimble/nimscript_utils
 import ./[suggestapi_utils, suggestapi_types, suggestapi_queries]
 
 proc createNimsuggest*(
-  fileToRun: FilePath,
-  nimsuggestPath: FilePath,
-  workingDir: FilePath,
+  spawningInfo: NimsuggestSpawnInfo,
+  nimsuggestSettings: NimsuggestSettings,
   timeout: int,
   enableLog: bool,
   enableExceptionInlayHints: bool,
-  nimblePaths: seq[string],
-  protocolVersion: int,
-  capabilities: set[NimSuggestCapability],
 ): Future[NimSuggest] {.async.} =
   result = NimSuggest(
     timeout: timeout,
     requestQueue: initDeque[SuggestCall](),
-    capabilities: capabilities,
-    protocolVersion: protocolVersion,
+    capabilities: nimsuggestSettings.capabilities,
+    protocolVersion: nimsuggestSettings.protocol,
   )
 
   let args = buildNimsuggestArguments(
-    fileToRun, protocolVersion, capabilities, enableExceptionInlayHints, enableLog,
-    nimblePaths
+    spawningInfo,
+    nimsuggestSettings,
+    enableExceptionInlayHints, 
+    enableLog,
   )
 
   info "Starting nimsuggest",
-    root = fileToRun, timeout = timeout, path = nimsuggestPath, workingDir = workingDir
+    entryPoint = spawningInfo.entryPoint, 
+    workingDir = spawningInfo.workingDir,
+    paths = spawningInfo.paths,
+    timeout = timeout,
+    args = args
 
   result.process = await startProcess(
-    string(nimsuggestPath),
-    string(workingDir),
+    string(nimsuggestSettings.exePath),
+    string(spawningInfo.workingDir),
     arguments = args,
     options = {UsePath},
     stdoutHandle = AsyncProcess.Pipe,
     stderrHandle = AsyncProcess.Pipe,
   )
 
-  debug "Nimsuggest started with args", args = args
   asyncSpawn logNsError(result)
   let portLine = await result.process.stdoutStream.readLine(sep = "\n")
-  debug "Nimsuggest port", portLine = portLine
+  debug "Nimsuggest instance started on port", portLine = portLine
   try:
     result.port = portLine.parseInt
   except ValueError:
@@ -57,7 +58,6 @@ proc createNimsuggest*(
     error "Failed to parse nimsuggest port", portLine = portLine, nextLine = nextLine
     result.markFailed("Failed to parse nimsuggest port: " & portLine)
     raise newException(CatchableError, result.errorMessage)
-
 
 proc processQueue(self: Nimsuggest): Future[void] {.async.} =
   debug "processQueue", size = self.requestQueue.len
@@ -135,8 +135,8 @@ proc processQueue(self: Nimsuggest): Future[void] {.async.} =
 proc call*(
   self: Nimsuggest,
   command: string,
-  file: FilePath,
-  dirtyFile: FilePath,
+  file: FilePathAbs,
+  dirtyFile: FilePathAbs,
   line: int,
   column: int,
   tag = "",
@@ -159,26 +159,26 @@ proc call*(
 template createFullCommand(command: untyped) {.dirty.} =
   proc command*(
     self: Nimsuggest,
-    file: FilePath,
-    dirtyfile = FilePath(""),
+    file: FilePathAbs,
+    dirtyfile = FilePathAbs(""),
     line: int, col: int,
     tag = ""
   ): Future[seq[Suggest]] =
     return self.call(astToStr(command), file, dirtyfile, line, col, tag)
 
 template createFileOnlyCommand(command: untyped) {.dirty.} =
-  proc command*(self: Nimsuggest, file: FilePath, dirtyfile = FilePath("")): Future[seq[Suggest]] =
+  proc command*(self: Nimsuggest, file: FilePathAbs, dirtyfile = FilePathAbs("")): Future[seq[Suggest]] =
     return self.call(astToStr(command), file, dirtyfile, 0, 0)
 
 template createGlobalCommand(command: untyped) {.dirty.} =
   proc command*(self: Nimsuggest): Future[seq[Suggest]] =
-    return self.call(astToStr(command), FilePath("-"), FilePath(""), 0, 0)
+    return self.call(astToStr(command), FilePathAbs("-"), FilePathAbs(""), 0, 0)
 
 template createRangeCommand(command: untyped) {.dirty.} =
   proc command*(
     self: Nimsuggest,
-    file: FilePath,
-    dirtyfile = FilePath(""),
+    file: FilePathAbs,
+    dirtyfile = FilePathAbs(""),
     startLine, startCol, endLine, endCol: int,
     extra: string,
   ): Future[seq[Suggest]] =
@@ -209,7 +209,7 @@ createFileOnlyCommand(globalSymbols)
 createGlobalCommand(recompile)
 createRangeCommand(inlayHints)
 
-proc isKnown*(nimsuggest: Nimsuggest, filePath: FilePath): Future[bool] {.async.} =
+proc isKnown*(nimsuggest: Nimsuggest, filePath: FilePathAbs): Future[bool] {.async.} =
   let fut = nimsuggest.known(filePath)
   let res = await process_utils.withTimeout(fut, REQUEST_TIMEOUT)
   if res.isNone:

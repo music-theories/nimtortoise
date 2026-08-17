@@ -1,7 +1,7 @@
 import ./[
   dispatcher, dispatcher_utils, dispatcher_did_open, dispatcher_did_change,
   init_langserver, langserver_types, langserver_utils,
-  langserver_nimsuggest, langserver_messaging, 
+  langserver_messaging, 
   query_types,
   transports,
   capability_configs,
@@ -10,6 +10,6 @@ import ./[
 export   
   dispatcher, dispatcher_utils, dispatcher_did_open, dispatcher_did_change,
   init_langserver, langserver_types, langserver_utils,
-  langserver_nimsuggest, langserver_messaging, 
+  langserver_messaging, 
   query_types,
   transports, capability_configs
