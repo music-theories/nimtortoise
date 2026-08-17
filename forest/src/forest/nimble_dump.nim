@@ -51,8 +51,15 @@ proc parseNimbleFile*(nimbleFile: FilePathAbs): NimbleDumpInfo =
   ## Reads the .nimble file directly — no subprocess.
   result.name = splitFile(string(nimbleFile)).name
   let content = readFile(string(nimbleFile))
-  result.entryPoints   = extractStringSeq(content, "entryPoints")
+  result.srcDir         = DirPathRel(string(extractSingleString(content, "srcDir")))
+  result.bin            = extractStringSeq(content, "bin")
+  result.entryPoints    = extractStringSeq(content, "entryPoints")
   result.testEntryPoint = extractSingleString(content, "testEntryPoint")
+  # Synthesise entry points from srcDir + bin (mirrors what Nimble itself does)
+  for binEntry in result.bin:
+    let ep = FilePathRel((string(result.srcDir) / string(binEntry) & ".nim").normalizedPath)
+    if ep notin result.entryPoints:
+      result.entryPoints.add(ep)
 
 proc getEntryPoints*(
   nimbleFiles: Table[FilePathAbs, NimbleDumpInfo]

@@ -1,11 +1,10 @@
 import std/[os, tables, unittest]
-import ../src/nimforest/dependency_tree
-import ../src/resources/resources
+import forest
 
 let entryFile = FilePathAbs(
   absolutePath(currentSourcePath().parentDir() / ".." / ".." / "langserver" / "src" / "nimtortoise.nim")
 )
-let dg = initDependencyGraph(@[entryFile], @[], DirPathAbs(""))
+let dg = initDependencyGraph(@[entryFile], DirPathAbs(""))
 
 proc p(rel: string): FilePathAbs =
   ## Absolute path for a src-relative filename, matching the graph's keys.

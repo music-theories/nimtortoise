@@ -3,11 +3,18 @@ import chronos
 import ./[forest_types]
 import ../resources/resources
 
+const NimCacheDirs = ["nimbledeps", "pkgs2", "pkgcache", "nimbleDir"]
+
+proc isInCacheDir(p: string): bool =
+  for part in p.split(DirSep):
+    if part in NimCacheDirs:
+      return true
+
 proc getAllFiles*(rootPath: DirPathAbs, suffix: string): seq[FilePathAbs] =
   # Full recursive search across all subdirectory levels.
   let ext = suffix[1..^1]  # strip leading '*' from e.g. "*.nimble"
   for p in walkDirRec(string(rootPath), yieldFilter = {pcFile}):
-    if p.endsWith(ext):
+    if p.endsWith(ext) and not isInCacheDir(p):
       result.add(FilePathAbs(p))
 
 proc getAllNimsFiles*(rootPath: DirPathAbs): seq[FilePathAbs] =
@@ -22,6 +29,10 @@ proc toJsonHook*(f: Forest): JsonNode =
   for k, d in f.nimble.pairs:
     let entry = newJObject()
     entry["name"] = newJString(d.name)
+    entry["srcDir"] = newJString(string(d.srcDir))
+    let bins = newJArray()
+    for b in d.bin: bins.add newJString(string(b))
+    entry["bin"] = bins
     let eps = newJArray()
     for p in d.entryPoints: eps.add newJString(string(p))
     entry["entryPoints"] = eps

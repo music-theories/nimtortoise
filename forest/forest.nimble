@@ -5,8 +5,9 @@ author        = "David Pocknee"
 description   = "A library to map and traverse the dependency trees of nim files."
 license       = "MIT"
 srcDir        = "src"
-installExt    = @["nim"]
+binDir        = "bin"
 bin           = @["forest"]
+installExt    = @["nim"]
 entryPoints   = @["src/forest.nim", "tests/tdependency_tree.nim"]
 # testEntryPoint = "tests/tdependency_tree.nim"
 

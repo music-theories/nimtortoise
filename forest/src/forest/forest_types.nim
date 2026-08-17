@@ -17,7 +17,9 @@ type
 
 type
   NimbleDumpInfo* = object
-    name*:           string
+    name*:    string
+    srcDir*:  DirPathRel
+    bin*:     seq[FilePathRel]
     entryPoints*:    seq[FilePathRel]  ## relative to nimble file dir
     testEntryPoint*: FilePathRel       ## relative to nimble file dir
 
@@ -44,7 +46,7 @@ type
     entryPoints*: seq[FilePathAbs]
 
 type 
- Forest* = object
+  Forest* = object
     root*:   DirPathAbs
     nimble*: Table[FilePathAbs, NimbleDumpInfo]
     paths*:  Table[FilePathAbs, seq[DirPathAbs]]

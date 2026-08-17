@@ -30,7 +30,6 @@ proc initForest*(
       nimbleInfo.entryPoints, rootPath
     )
     result.nimble = nimbleInfo.dump
-    result.trees = dependencyGraph.graph
 
     for entryPoint, nimDump in nimDumpInfo:
       let source = readFile(string(entryPoint))
@@ -38,10 +37,10 @@ proc initForest*(
         let modulePath = importName.replace('.', DirSep)
         for path in nimDump.libPaths:
           if path.isInside(rootPath):
-            if entryPoint in result.paths:
+            if entryPoint notin result.paths:
+              result.paths[entryPoint] = @[]
+            if path notin result.paths[entryPoint]:
               result.paths[entryPoint].add(path)
-            else: 
-              result.paths[entryPoint] = @[path]
 
             let candidate = FilePathAbs(
               (string(path) / modulePath & ".nim").normalizedPath
@@ -51,3 +50,5 @@ proc initForest*(
                 dependencyGraph.graph[entryPoint] = @[]
               if candidate notin dependencyGraph.graph[entryPoint]:
                 dependencyGraph.graph[entryPoint].add(candidate)
+
+    result.trees = dependencyGraph.graph
