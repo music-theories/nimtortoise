@@ -1,9 +1,9 @@
-import std/[options, tables, os, sets, strformat, times, json, sequtils]
+import std/[options, tables, sets, strformat, times, json, sequtils]
 import chronos
 import chronicles
 import forest 
 
-import ./[suggestapi, suggestapi_types, suggestapi_utils, suggestapi_queries, nimsuggest_types]
+import ./[suggestapi, suggestapi_types, nimsuggest_types]
 import ../configurations/configurations
 import ../nimble/nimble_utils
 import ../protocol/types

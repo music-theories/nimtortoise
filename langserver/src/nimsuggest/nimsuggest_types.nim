@@ -1,4 +1,4 @@
-import std/[json, sets, tables, times, options]
+import std/[json, sets, tables, times]
 import chronos
 import regex
 import ./suggestapi_types
@@ -180,4 +180,3 @@ type
     openFiles*:   TableRef[FileUri, NlsFileInfo]
     storageDir*:  DirPathAbs
     rootPath*:    DirPathAbs
-  

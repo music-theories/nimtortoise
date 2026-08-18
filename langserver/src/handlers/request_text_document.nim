@@ -5,7 +5,6 @@ import chronicles
 import json_serialization
 
 import ../nim_compiler/nim_expand
-import ../nim_compiler/nim_compiler
 import ../nimsuggest/nimsuggest
 import ../langserver/langserver
 import ../configurations/configurations
@@ -494,23 +493,30 @@ proc inlayHint*(
 ): Future[seq[InlayHint]] {.async.} =
   debug "inlayHint received..."
   let configuration = ls.configurations.currentConfig
+  if not inlayHintsEnabled(configuration):
+    return @[]
+
+  # nimsuggest flags: typeHints=on by default, exceptionHints=off by default.
+  # +parameterHints is not a recognised nimsuggest flag and is silently ignored.
+  var inlayHintsOptions = ""
+  if not configuration.inlayHints.typeHints.enable:
+    inlayHintsOptions &= " -typeHints"
+  if configuration.inlayHints.exceptionHints.enable:
+    inlayHintsOptions &= " +exceptionHints"
 
   let query = ls.initNimsuggestInlayHintQuery(
-    id, 
+    id,
     params.textDocument.uri,
     params.`range`.start.line,
     params.`range`.start.character,
     params.`range`.`end`.line,
     params.`range`.`end`.character,
-    " +exceptionHints +parameterHints",
+    inlayHintsOptions,
   )
   let responses = await ls.addQueryToQueue(query)
-  # nsProtocolVersion is valid now — slot is READY after queryInlayHints returns
-  # let protocolVersion = nsProtocolVersion(
-  #   ls.pool, ls.files.openFiles, params.textDocument.uri
-  # )
-  # if protocolVersion < 4:
-  #   return @[]
+  
+  if ls.pool.nimsuggest.protocol < 4:
+    return @[]
 
   return processInlayHintResponses(
     responses, params.textDocument.uri,

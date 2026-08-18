@@ -1,8 +1,6 @@
-import std/[options, os, strutils, strscans, strformat, json, tables, sequtils]
+import std/[options, json, tables]
 import chronos
-import chronos/asyncproc
 import chronicles
-import stew/byteutils
 import forest
 
 import ../protocol/[types]
@@ -79,6 +77,7 @@ proc executeCommand*(
         ls.pool.slots[projectFile],
         ls.pool,
         ls.files.openFiles,
+        ls.dependencies,
         ls.configurations.currentConfig,
       )
 
@@ -142,13 +141,17 @@ proc extensionSuggest*(ls: LanguageServer, params: SuggestParams): Future[Sugges
         ls.pool.slots[projectFilePath],
         ls.pool,
         ls.files.openFiles,
+        ls.dependencies,
         ls.configurations.currentConfig,
       )
     else:
       debug "extensionSuggest: no slot found for project", projectFile = params.projectFile
   of saRestartAll:
     restartAllNimsuggestInstances(
-      ls.pool, ls.files.openFiles, ls.configurations.currentConfig, 
+      ls.pool, 
+      ls.files.openFiles, 
+      ls.dependencies, 
+      ls.configurations.currentConfig, 
     )
   of saNone:
     discard
@@ -158,16 +161,12 @@ proc extensionSuggest*(ls: LanguageServer, params: SuggestParams): Future[Sugges
 # === extension/listTasks ===
 proc listTasks*(ls: LanguageServer, conf: JsonNode): Future[seq[NimbleTask]] {.async.} =  
   await ls.lsInitialized
-  # TODO - temporarily removed to fix other things
-  return @[]
-  # return await getNimbleTasks(ls.dependencies.nimble)
+  return await getNimbleTasks(ls.dependencies.nimble)
 
 # === extension/tasks ===
 proc tasks*(ls: LanguageServer, conf: JsonNode): Future[seq[NimbleTask]] {.async.} =  
   await ls.lsInitialized
-  # TODO - temporarily removed to fix other things
-  return @[]
-  # return await getNimbleTasks(ls.dependencies.nimble)
+  return await getNimbleTasks(ls.dependencies.nimble)
 
 
 # === extension/runTask ===

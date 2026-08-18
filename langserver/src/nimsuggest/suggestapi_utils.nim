@@ -1,4 +1,4 @@
-import std/[os, osproc, sequtils, sets, streams, strformat, strutils, times, deques, options, json]
+import std/[sets, strformat, strutils, times, options, json]
 
 import chronos
 import chronos/asyncproc
@@ -7,8 +7,6 @@ import stew/byteutils
 
 import ../protocol/[enums, types]
 import ../utils/utils
-import ../utils/process_utils
-import ../nimble/nimscript_utils
 import ./suggestapi_types
 
 func canHandleUnknown*(ns: Nimsuggest): bool =
@@ -161,6 +159,12 @@ proc markFailed*(self: NimSuggest, errMessage: string) {.raises: [].} =
     return
   self.failed = true
   self.errorMessage = errMessage
+  # Kill the OS process so it cannot spin at 99% CPU after the TCP connection
+  # is closed (e.g. after a timeout the process retries send() in a tight loop
+  # on a dead socket, burning CPU until manually killed).  Redundant on a
+  # genuine crash (process already dead), but harmless — kill() on a dead pid
+  # just returns an error which we discard.
+  discard self.process.kill()
 
 proc toString*(bytes: openarray[byte]): string =
   result = newString(bytes.len)

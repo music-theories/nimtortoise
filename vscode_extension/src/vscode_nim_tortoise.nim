@@ -112,12 +112,14 @@ proc activate*(ctx: VscodeExtensionContext): void {.async.} =
   nimbleWatcher.onDidChange(proc(uri: VscodeUri) =
     # console.log("*********nimbleWatcher.onDidChange called", uri)
     if uri.path == vscode.window.activeTextEditor.document.uri.path:
-      discard refreshNimbleTasks()
+      discard 
+      # We will now change to wait for user input.
+      # discard refreshNimbleTasks()
     #TODO update tasks here
       # provideNimbleTasksDecorations(ctx, vscode.window.activeTextEditor.document)
   )
   ctx.subscriptions.add(nimbleWatcher)
-  initializeTests(ctx, nimUtils.ext)
+  # initializeTests(ctx, nimUtils.ext)
 
 proc deactivate*(): void {.async.} =
   await stopLanguageServer(nimUtils.ext)

@@ -1,10 +1,6 @@
-import std/[options, json, os]
+import std/json
 import chronos
-import chronos/asyncproc
 import chronicles
-import ../protocol/[types, enums]
-import ../utils/asyncprocmonitor
-import ../nimsuggest/nimsuggest
 import ../langserver/[langserver_types, query_types]
 
 # === initialize ===

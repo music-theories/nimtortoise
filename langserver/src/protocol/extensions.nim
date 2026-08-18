@@ -1,4 +1,3 @@
-import tables, options
 import ./primitives
 export primitives
 

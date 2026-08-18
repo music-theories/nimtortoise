@@ -377,12 +377,12 @@
                 },
                 "nimTortoise.inlayHints.typeHints.enable": {
                     "type": "boolean",
-                    "default": true,
+                    "default": false,
                     "description": "Enable inlay type hints."
                 },
                 "nimTortoise.inlayHints.parameterHints.enable": {
                     "type": "boolean",
-                    "default": true,
+                    "default": false,
                     "description": "Enable inlay parameter hints."
                 },
                 "nimTortoise.inlayHints.exceptionHints.enable": {

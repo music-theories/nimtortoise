@@ -1,15 +1,15 @@
-import std/[options, sets, strutils, tables, os, sequtils, times, json]
+import std/[options, sets, strutils, tables, os, json]
 import chronos
 import chronicles
 import ../nph/formatting
 import ../nimsuggest/nimsuggest
-import ../nimble/nimble_utils
+
 import ../configurations/configurations
 import ../protocol/types
-import ../handlers/request_process
+
 import ../utils/utils
 import ./[langserver_types, query_types, langserver_utils, capability_configs]
-import ./[dispatcher_utils, dispatcher_did_open, dispatcher_did_change]
+import ./[dispatcher_did_open, dispatcher_did_change]
 
 
 proc waitForLsInitialized*(ls: LanguageServer): Future[void] {.async.} =

@@ -307,10 +307,10 @@ proc newNimbleTaskItem*(task: NimbleTask): LspItem =
   cast[LspItem](item)
 
 proc newRefreshNimbleTasksItem*(): LspItem =
-  let item = vscode.newTreeItem("Refresh Nimble Tasks", TreeItemCollapsibleState_None)
+  let item = vscode.newTreeItem("Get Nimble Tasks", TreeItemCollapsibleState_None)
   item.command = newJsObject()
   item.command.command = "nimTortoise.onRefreshNimbleTasks".cstring
-  item.command.title = "Refresh Nimble Tasks".cstring
+  item.command.title = "Get Nimble Tasks".cstring
   item.iconPath = vscode.themeIcon("refresh", vscode.themeColor("notificationsInfoIcon.foreground"))
   cast[LspItem](item)
 

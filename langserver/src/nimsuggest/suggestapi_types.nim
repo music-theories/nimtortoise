@@ -1,4 +1,4 @@
-import std/[options, times, deques]
+import std/[options, deques]
 
 import chronos
 import chronos/asyncproc

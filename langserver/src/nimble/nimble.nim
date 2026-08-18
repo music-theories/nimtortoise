@@ -1,4 +1,4 @@
-import std/[os, sequtils, strutils, tables, options, strscans]
+import std/[os, strutils, tables, strscans]
 import chronos
 import chronos/asyncproc
 import chronicles
@@ -11,7 +11,6 @@ import ../utils/process_utils
 import ../utils/utils
 
 
-import ./[nimble_types, nimble_utils]
 
 # proc getNimbleDumpInfo*(
 #   nimbleDumpCache: Table[FilePathAbs, NimbleDumpInfo],

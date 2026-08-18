@@ -1,4 +1,4 @@
-import std/[options, os, sets, tables, algorithm, sequtils, strutils, times]
+import std/[options, tables, algorithm, sequtils, strutils, times]
 import chronos
 import chronicles
 import forest

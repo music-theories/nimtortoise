@@ -75,6 +75,7 @@ proc createNewSuggestSlotAndConsolidate(
     asyncSpawn spawnedSlot.processNimsuggestQueries(
       ls.pool, 
       ls.files.openFiles,
+      ls.dependencies,
       ls.configurations.currentConfig,
       ls.notify,
     )
@@ -101,6 +102,7 @@ proc createNewSuggestSlotAndConsolidate(
     asyncSpawn spawnedSlot.processNimsuggestQueries(
       ls.pool, 
       ls.files.openFiles,
+      ls.dependencies,
       ls.configurations.currentConfig,
       ls.notify,
     )
@@ -198,6 +200,7 @@ proc processDidOpenQuery*(
 
             asyncSpawn processNimsuggestQueries(
               newSlot, ls.pool, ls.files.openFiles,
+              ls.dependencies,
               ls.configurations.currentConfig,
               ls.notify,
             )

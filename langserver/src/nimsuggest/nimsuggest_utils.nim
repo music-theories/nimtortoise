@@ -1,15 +1,11 @@
-import std/[os, sequtils, strutils, tables, options]
+import std/[strutils, tables, options]
 import chronos
 import chronicles
 
 import forest
 
-import ../utils/process_utils
 import ../utils/utils
 import ../protocol/types
-import ../nim_compiler/nim_compiler
-import ../nimble/[nimble_types, nimble]
-import ../configurations/configurations
 
 import ./[suggestapi_types, nimsuggest_types]
 

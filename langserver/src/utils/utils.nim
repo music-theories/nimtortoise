@@ -1,4 +1,4 @@
-import std/[unicode, uri, strformat, os, strutils, options, json, jsonutils, net]
+import std/[unicode, uri, os, strutils, options, json, jsonutils, net]
 # import with
 import chronos, chronicles
 import "$nim/compiler/pathutils"

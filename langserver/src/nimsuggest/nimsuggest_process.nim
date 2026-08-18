@@ -1,4 +1,4 @@
-import std/[options, strformat, strutils, sets, tables, times, json, sequtils]
+import std/[options, strformat, sets, tables, times, json, sequtils]
 import chronos
 import chronicles
 
@@ -10,7 +10,15 @@ import ../utils/type_mismatch_format
 import ../configurations/configurations
 import ../protocol/types
 
-import ./[suggestapi, suggestapi_types, nimsuggest_types, nimsuggest_slots, diagnostics, nimsuggest_utils]
+import ./[suggestapi, suggestapi_utils, suggestapi_types, nimsuggest_types, nimsuggest_slots, diagnostics, nimsuggest_utils]
+
+# Interactive queries that take longer than this with an empty result indicate
+# nimsuggest is spinning in unbounded generic instantiation that terminates via
+# stack overflow before the per-request TCP timeout fires.  One such response
+# is enough to call markFailed and trigger crash-recovery — healthy nimsuggest
+# always returns quickly on these query kinds after the first CHANGED compiles
+# the module graph.
+# const SlowEmptyThresholdMs = 10_000
 
 # === PROCESSING ===
 proc runNimsuggestQuery*(
@@ -68,6 +76,7 @@ proc processNimsuggestQueries*(
   slot: NimsuggestSlot,
   pool: NimsuggestPool,
   openFiles: TableRef[FileUri, NlsFileInfo],
+  dependencies: Forest,
   config: NlsConfig,
   notifyProc: proc(name: string, params: JsonNode) {.gcsafe, raises: [].}, #Send a notification to the client
 ) {.async.} =
@@ -216,15 +225,56 @@ proc processNimsuggestQueries*(
         debug "processNimsuggestQueries: query about to be run ", entryPoint = slot.spawnInfo.entryPoint, kind = $q.kind, uri = $q.uri
         try:
           # === RUNNING NIMSUGGEST QUERY ===
+          let queryStartTime = now()
           let queryResponse: seq[Suggest] = await runNimsuggestQuery(slot.ns.read(), q)
+          let elapsedMs = inMilliseconds(now() - queryStartTime)
           q.responseFuture.complete(queryResponse)
           slot.lastCmdTime = now()
-          # HERE IS WHERE YOU NEED TO SEND THE DIAGNOSTICS!
+
+          # Detect slow-empty: an interactive query that took >SlowEmptyThresholdMs
+          # and returned nothing means nimsuggest is stuck in unbounded generic
+          # instantiation terminated by stack overflow (not our TCP timeout).
+          # Call markFailed so crash-recovery restarts the slot.
+          # case q.kind
+          # of NimsuggestQueryKind.HOVER, NimsuggestQueryKind.SUGGEST,
+          #    NimsuggestQueryKind.DEFINITION, NimsuggestQueryKind.DECLARATION,
+          #    NimsuggestQueryKind.TYPE_DEFINITION, NimsuggestQueryKind.SIGNATURE_HELP,
+          #    NimsuggestQueryKind.DOCUMENT_HIGHLIGHT:
+          #   if queryResponse.len == 0 and elapsedMs > SlowEmptyThresholdMs:
+          #     debug "processNimsuggestQueries: slow empty — triggering markFailed",
+          #       kind = $q.kind, elapsedMs = elapsedMs,
+          #       entryPoint = slot.spawnInfo.entryPoint
+          #     slot.ns.read().markFailed(
+          #       fmt"slow empty response ({elapsedMs}ms) on {q.kind}: nimsuggest unresponsive")
+          # else:
+          #   discard
+
           case q.kind
           of NimsuggestQueryKind.CHANGED: 
             # The change was successful, therefore check the file.
             if q.uri in openFiles:
               openFiles[q.uri].lastChanged = now()
+            
+            debug "processNimsuggestQueries: check for dependencies to update "
+            let fileJustChanged = toFilePathAbs(q.uri)
+            for openFile, openFileInfo in openFiles:
+              if openFile != q.uri:
+                let fileToCheck = toFilePathAbs(openFile)
+                let isDependency = dependencies.trees.checkDependency(
+                  fileJustChanged.isADependencyOf(fileToCheck)
+                )
+
+                if isDependency:
+                  debug "processNimsuggestQueries: dependency found.  Sending CHECK_FILE command. ", dependency = openFile, fileJustChanged = q.uri
+                  let dependencyCheckQuery = NimsuggestQuery[LspFilePosition](
+                    id: 0,
+                    kind: NimsuggestQueryKind.CHECK_FILE,
+                    uri: openFile,
+                    dirtyFile: FilePathAbs(""),
+                    responseFuture: newFuture[seq[Suggest]]("checkFile"),
+                  )
+                  if openFileInfo.slot.isLive():
+                    openFileInfo.slot.queryMailbox.addFirstNoWait(dependencyCheckQuery)
 
             let checkQuery = NimsuggestQuery[LspFilePosition](
               id: 0,
@@ -240,27 +290,27 @@ proc processNimsuggestQueries*(
             if q.uri in openFiles:
               openFiles[q.uri].lastChecked = now()
 
-            # Exact split-identity errors are false positives that RECOMPILE fixes
-            # reliably. Suppress misleading diagnostics and trigger RECOMPILE instead.
-            # Loose module-qualifier matches (foo.Bar vs Bar) are NOT handled here —
-            # they appear as an advisory note in the diagnostic message only.
-            # if queryResponse.anyIt(it.forth == "Error" and isExactSplitIdentityTypeMismatch(it.doc)):
-            #   debug "processNimsuggestQueries: exact split-identity detected, triggering RECOMPILE",
-            #     uri = $q.uri
-            #   let recompileQuery = NimsuggestQuery[LspFilePosition](
-            #     id: 0,
-            #     kind: NimsuggestQueryKind.RECOMPILE,
-            #     uri: q.uri,
-            #     dirtyFile: FilePathAbs(""),
-            #     responseFuture: newFuture[seq[Suggest]]("splitIdentityRecompile"),
-            #   )
-            #   slot.queryMailbox.addFirstNoWait(recompileQuery)
-            # else:
             let diagnosticsJson = convertNimSuggestResponseToDiagnostics(
               queryResponse, q.uri, openFiles
             )
             notifyProc("textDocument/publishDiagnostics", diagnosticsJson)
             debug "processNimsuggestQueries: CHECK_FILE run, sending diagnostics ", uri = $q.uri, json = diagnosticsJson
+            
+            # Exact split-identity errors are false positives that RECOMPILE fixes
+            # reliably. Suppress misleading diagnostics and trigger RECOMPILE instead.
+            # Loose module-qualifier matches (foo.Bar vs Bar) are NOT handled here —
+            # they appear as an advisory note in the diagnostic message only.
+            if queryResponse.anyIt(it.forth == "Error" and isExactSplitIdentityTypeMismatch(it.doc)):
+              debug "processNimsuggestQueries: exact split-identity detected, triggering RECOMPILE",
+                uri = $q.uri
+              let recompileQuery = NimsuggestQuery[LspFilePosition](
+                id: 0,
+                kind: NimsuggestQueryKind.RECOMPILE,
+                uri: q.uri,
+                dirtyFile: FilePathAbs(""),
+                responseFuture: newFuture[seq[Suggest]]("splitIdentityRecompile"),
+              )
+              slot.queryMailbox.addLastNoWait(recompileQuery)  
             
           of NimsuggestQueryKind.CHECK_PROJECT, NimsuggestQueryKind.RECOMPILE:
             let timeNow = now()
@@ -305,6 +355,7 @@ proc restartSlot*(
   slot: NimsuggestSlot, 
   pool: NimsuggestPool, 
   openFiles: TableRef[FileUri, NlsFileInfo],
+  dependencies: Forest,
   config: NlsConfig,
 ): Future[void] {.async.} =
   let spawningInfo: NimsuggestSpawnInfo = slot.spawnInfo
@@ -314,14 +365,21 @@ proc restartSlot*(
     spawningInfo, pool.nimsuggest, config
   )
   if successfulSpawn.isSome:
-    asyncSpawn slot.processNimsuggestQueries(pool, openFiles, config, pool.notifyProc)
+    asyncSpawn slot.processNimsuggestQueries(
+      pool, openFiles, dependencies, config, pool.notifyProc
+    )
 
 proc restartAllNimsuggestInstances*(
   pool: NimsuggestPool, 
   openFiles: TableRef[FileUri, NlsFileInfo],
+  dependencies: Forest,
   config: NlsConfig,
 ) =
   for projectFile in pool.slots.keys.toSeq():
     if pool.slots.hasKey(projectFile):
-      asyncSpawn restartSlot(pool.slots[projectFile], pool, openFiles, config)
+      asyncSpawn restartSlot(
+        pool.slots[projectFile], pool, openFiles, 
+        dependencies,
+        config
+      )
 

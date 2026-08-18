@@ -7,7 +7,6 @@ import forest
 
 import ../protocol/types
 import ../configurations/configuration_types
-import ../nimble/nimble_types
 import ../nimsuggest/nimsuggest_types
 import ../configurations/configuration_types
 import ./[query_types]

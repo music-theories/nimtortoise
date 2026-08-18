@@ -1,11 +1,11 @@
-import std/[options, sets, tables, sequtils, times, strutils]
+import std/[tables, sequtils, times, strutils]
 import chronos
 import chronicles
 import ../nimsuggest/nimsuggest
 import ../protocol/types
 import ../utils/utils
 import ./[langserver_types, query_types]
-import ./[dispatcher_utils, langserver_utils]
+import ./[langserver_utils]
 
 proc saveFileChangesToStash(
   ls: LanguageServer,

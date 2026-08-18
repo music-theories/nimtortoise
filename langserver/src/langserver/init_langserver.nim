@@ -1,4 +1,4 @@
-import std/[macros, options, tables, setutils, json, times, os]
+import std/[macros, options, tables, setutils, json]
 
 import chronos
 import json_serialization
@@ -8,7 +8,7 @@ import chronicles
 import forest
 
 import ../nph/formatting
-import ../nimble/nimble_types
+
 import ../protocol/[enums, types]
 import ../configurations/configurations
 import ../nimsuggest/nimsuggest
@@ -18,7 +18,7 @@ import ../utils/asyncprocmonitor
 import ./[
   query_types, langserver_messaging, 
   capability_configs,
-  langserver_utils, langserver_types
+  langserver_types
 ]
 
 proc initLanguageServer*(params: CommandLineParams, storageDir: DirPathAbs): LanguageServer =

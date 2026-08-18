@@ -1,18 +1,15 @@
-import std/[os, sequtils, strutils, tables, options, strscans, sugar]
+import std/[os, strutils, tables, options]
 import chronos
-import chronos/asyncproc
+
 import chronicles
-import regex
-import stew/byteutils
 
 import forest
 
 import ../protocol/types
 import ../utils/utils
-import ../configurations/configurations
+
 import ../nimsuggest/[nimsuggest_types, suggestapi_types]
 
-import ./[nimble_types]
 
 proc commonPrefixLen(a, b: string): int =
   let aParts = a.split(DirSep)

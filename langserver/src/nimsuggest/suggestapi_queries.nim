@@ -1,62 +1,64 @@
-import std/[os, osproc, sequtils, sets, streams, strformat, strutils, times, deques, options, json]
+import std/[os, osproc, sequtils, streams, strutils, options, json]
 
 import chronos
-import chronos/asyncproc
+
 import chronicles
-import stew/byteutils
 
 import forest
 
 import ../configurations/configurations
-import ../protocol/[enums, types]
+import ../protocol/types
 import ../utils/utils
-import ../utils/process_utils
+
 import ../nimble/nimscript_utils
-import ./[suggestapi_utils, suggestapi_types]
+import ./[suggestapi_types]
 
 proc getNimSuggestPath*(
-  nimInfo: NimInfo, conf: NlsConfig 
+  nimInfo: NimInfo, conf: NlsConfig
 ): Future[FilePathAbs] {.async.} =
   let nimsuggestPath = expandTilde(string(conf.nimsuggestPath))
   if nimsuggestPath.len > 0:
-    debug "findNimsuggestPathAndVersion: Using nimsuggest", 
+    debug "findNimsuggestPathAndVersion: Using nimsuggest",
       path = nimsuggestPath
     return FilePathAbs(nimsuggestPath)
 
-  elif string(nimInfo.nimExe) != "":
+  if string(nimInfo.nimExe) != "":
     let nimDir = parentDir(nimInfo.nimExe)
     if dirExists(string(nimDir)):
       let derivedNimuggestPath = string(nimDir) / "nimsuggest".addFileExt(ExeExt)
       debug "findNimsuggestPathAndVersion: Found nim directory.", path = nimDir
       if fileExists(derivedNimuggestPath):
         debug "findNimsuggestPathAndVersion: Found nimsuggest.", path = derivedNimuggestPath
-        return FilePathAbs(string(nimDir) / "nimsuggest".addFileExt(ExeExt))
-        
-    debug "findNimsuggestPathAndVersion: Could not find nimsuggest via nimDir.  Searching using findExe"
-    let findExeNimsuggestPath = findExe("nimsuggest")
-    if findExeNimsuggestPath.len > 0:
-      debug "findNimsuggestPathAndVersion: found nimsuggest using findExe(). ", 
-        path = findExeNimsuggestPath
-      return FilePathAbs(findExeNimsuggestPath)
+        return FilePathAbs(derivedNimuggestPath)
 
-    else:
-      let nimbleBinPath = getHomeDir() / ".nimble" / "bin" / "nimsuggest".addFileExt(ExeExt)
-      debug "findNimsuggestPathAndVersion: used findExe() to look for nimsuggest but couldn't find it. Looking in homeDir ", location = nimbleBinPath
-      # Fallback for restricted PATH environments (e.g. Dock launch on macOS where
-      # PATH is /usr/bin:/bin:/usr/sbin:/sbin and ~/.nimble/bin is not included,
-      # or Linux desktop launches that only source ~/.profile). Uses ExeExt so
-      # the check works on Windows ("nimsuggest.exe") too.
-      if fileExists(nimbleBinPath):
-        debug "findNimsuggestPathAndVersion: found nimsuggest in homeDir ", location = nimbleBinPath
-        return FilePathAbs(nimbleBinPath)
-      else:
-        debug "findNimsuggestPathAndVersion: Could not locate nimsuggest "
-        return FilePathAbs("")
+  # Fallbacks: always try findExe and ~/.nimble/bin regardless of whether nim
+  # was found (e.g. projects without a .nimble file give empty nimInfo.nimExe).
+  debug "findNimsuggestPathAndVersion: Searching using findExe"
+  let findExeNimsuggestPath = findExe("nimsuggest")
+  if findExeNimsuggestPath.len > 0:
+    debug "findNimsuggestPathAndVersion: found nimsuggest using findExe(). ",
+      path = findExeNimsuggestPath
+    return FilePathAbs(findExeNimsuggestPath)
+
+  let nimbleBinPath = getHomeDir() / ".nimble" / "bin" / "nimsuggest".addFileExt(ExeExt)
+  debug "findNimsuggestPathAndVersion: used findExe() to look for nimsuggest but couldn't find it. Looking in homeDir ", location = nimbleBinPath
+  # Fallback for restricted PATH environments (e.g. Dock launch on macOS where
+  # PATH is /usr/bin:/bin:/usr/sbin:/sbin and ~/.nimble/bin is not included,
+  # or Linux desktop launches that only source ~/.profile). Uses ExeExt so
+  # the check works on Windows ("nimsuggest.exe") too.
+  if fileExists(nimbleBinPath):
+    debug "findNimsuggestPathAndVersion: found nimsuggest in homeDir ", location = nimbleBinPath
+    return FilePathAbs(nimbleBinPath)
+
+  debug "findNimsuggestPathAndVersion: Could not locate nimsuggest "
+  return FilePathAbs("")
 
 
 proc getNimsuggestProtocolVersion*(
   nimsuggestPath: FilePathAbs,
 ): int {.gcsafe.} =
+  if string(nimsuggestPath) == "":
+    return 3
   var process = startProcess(
     command = string(nimsuggestPath),
     args = @["--info:protocolVer"],
@@ -76,6 +78,8 @@ proc getNimsuggestProtocolVersion*(
 proc getNimsuggestCapabilities*(
   nimsuggestPath: FilePathAbs
 ): set[NimSuggestCapability] {.gcsafe.} =
+  if string(nimsuggestPath) == "":
+    return {}
   proc parseCapability(c: string): Option[NimSuggestCapability] =
     debug "Parsing nimsuggest capability", capability = c
     try:

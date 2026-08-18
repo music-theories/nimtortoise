@@ -1,14 +1,13 @@
-import std/[os, osproc, sequtils, sets, streams, strformat, strutils, times, deques, options, json]
+import std/[strformat, strutils, times, deques, options]
 
 import chronos
 import chronos/asyncproc
 import chronicles
-import stew/byteutils
 
-import ../protocol/[enums, types]
+import ../protocol/types
 import ../utils/utils
 import ../utils/process_utils
-import ../nimble/nimscript_utils
+
 import ./[suggestapi_utils, suggestapi_types, suggestapi_queries]
 
 proc createNimsuggest*(
@@ -112,6 +111,7 @@ proc processQueue(self: Nimsuggest): Future[void] {.async.} =
               res.add(sug)
               
             of "inlayHints":
+              if lineStr == ".": continue
               let val = parseSuggestInlayHint(lineStr)
               res.add(Suggest(inlayHintInfo: val))
             else:

@@ -1,10 +1,10 @@
-import std/[json, sequtils, strformat, sets, options, strutils]
+import std/[json, sequtils, options, strutils]
 import chronos
 import chronicles
 import ../protocol/types
 import ../langserver/langserver
 import ../nimsuggest/nimsuggest
-import ../utils/process_utils
+
 import ../utils/utils
 import ./[queries_nimsuggest, request_text_document]
 
