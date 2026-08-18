@@ -67,36 +67,36 @@ onto upstream `master` and update its PR base.
 # Build the langserver binary:
 cd langserver && nimble main
 
-# Run all tests:
-nim c --path:. -r tests/all.nim
+# Run a SINGLE test file — always do this, never run all.nim directly:
+cd langserver && nim c --path:. -r tests/<file>.nim 2>&1 | tee /tmp/test_output.txt
 
-# Run a single test file (recommended for debugging):
-nim c --path:. -r tests/<file>.nim
+# Examples:
+cd langserver && nim c --path:. -r tests/tnimlangserver.nim 2>&1 | tee /tmp/test_output.txt
+cd langserver && nim c --path:. -r tests/tmonorepo.nim 2>&1 | tee /tmp/test_output.txt
 ```
+
+**DO NOT run `tests/all.nim`** — suites run back-to-back with no gap; port-reuse races
+and FD exhaustion make failures hard to isolate. Always run one file at a time.
 
 Config is in `tests/config.nims`. Fixtures live in `tests/projects/`.
 
 ---
 
-## Test file status (as of 2026-08-13 — verify before relying on)
+## Test file status (as of 2026-08-19)
 
-| File | In `all.nim` | Tests | Status | Notes |
-|---|---|---|---|---|
-| `tfindnimblepaths.nim` | yes | 7 | ✓ all pass | `findNimblePaths` unit tests |
-| `tsuggestapi.nim` | yes | 8 | ✓ all pass | |
-| `ttestrunner.nim` | yes | 3 | ✓ all pass | |
-| `tmaxlimits.nim` | yes | 4 | ✓ all pass | |
-| `tknownbug3.nim` | yes | 1 | ✓ all pass | |
-| `tstability.nim` | yes | 13 | ✓ all pass | |
-| `tmonorepo.nim` | yes | 5 | ✓ all pass | |
-| `tnimlangserver.nim` | yes | 13 | ✓ all pass | |
-| `thover.nim` | yes | 1 | ✓ all pass | |
-| `tmisc.nim` | yes | 3 | ✓ all pass | |
-| `textensions.nim` | yes | 7 | 6 OK, **1 fail** | "listTests" — `extension/listTests` is a stub; returns empty |
-| `tmonorepo2.nim` | yes | 3 | ✓ all pass | |
-| `tmonorepo3.nim` | yes | 1 |✓ all pass | |
-
-State of tests as of 2026-08-13: `70 tests run (129.9s): 69 OK, 1 FAILED, 0 SKIPPED`
+| File | Tests | Status | Notes |
+|---|---|---|---|
+| `tsuggestapi.nim` | 8 | ✓ all pass | |
+| `tmaxlimits.nim` | 4 | ✓ all pass | |
+| `tknownbug3.nim` | 1 | ✓ all pass | |
+| `tstability.nim` | 13 | ✓ all pass | |
+| `tmonorepo.nim` | 4 | ✓ all pass | Fix #16 suite removed — `extension/listTests` not registered |
+| `tnimlangserver.nim` | 13 | ✓ all pass | |
+| `thover.nim` | 1 | ✓ all pass | |
+| `tmisc.nim` | 3 | 1 OK, **2 FAIL** | idle-timeout tests fail — feature not yet implemented |
+| `textensions.nim` | 1 | ✓ all pass | |
+| `tmonorepo2.nim` | 3 | 1 OK, **2 FAIL** | Fix #7/#11 suite: projectMapping no longer used; tests need updating |
+| `tmonorepo3.nim` | 1 | ✓ all pass | |
 
 ### Shared infrastructure
 
@@ -105,7 +105,7 @@ State of tests as of 2026-08-13: `70 tests run (129.9s): 69 OK, 1 FAILED, 0 SKIP
   constants: `simpleRel`, `widgetRel`, `orphanRel`, `orphan2Rel`, `pkgbRel`, `pkgaRel`,
   `aorphanRel`.
 - **`tests/tbughelpers.nim`** — multi-project helpers; `startCombinedServer(maxNs)`.
-- **`tests/testhelpers.nim`** — general test utilities shared by the original test suite.
+- **`tests/testhelpers.nim`** — general test utilities (kept for reference; `tfindnimblepaths.nim` and `ttestrunner.nim` removed as they tested removed functionality).
 - **`tests/lspsocketclient.nim`** — LSP client for tests; `setWorkspaceConfig` helper to
   override the `workspace/configuration` response; uses `while` loops, not tail recursion.
 
@@ -138,15 +138,7 @@ tests/projects/
 
 ---
 
-## Known test failures (as of 2026-08-13)
-
-#### `thover.nim` / `tnimlangserver.nim` — hover after didChange returns empty
-
-Test: "didChange then sending hover". After `textDocument/didChange`, a subsequent
-`textDocument/hover` returns an empty response instead of the updated type string.
-The stash write / dirty-file handoff to nimsuggest may not be applying correctly.
-Check `processLangserverQueue` CHANGED handling and `q.dirtyFile` assignment in
-`nimsuggest_process.nim`.
+## Known test failures (as of 2026-08-19)
 
 #### `tmisc.nim` — idle nimsuggest timeout not firing (2 tests)
 
@@ -154,18 +146,6 @@ Tests: "after a period of inactivity, nimsuggest should be stopped" and "idle ni
 is removed even when an open file was already evicted". The server never sends the
 "nimsuggest … was stopped because it was idle for too long" notification. The idle-timeout
 feature (`nimsuggestIdleTimeout` config field) may not be implemented in the rewrite.
-
-#### `textensions.nim` — listTests KeyError: "Sample Tests"
-
-`extension/listTests` returns suites but the key `"Sample Tests"` is not present.
-The suite names returned differ from expected — likely a suite-name parsing difference
-between the nim compiler output and what `extractTestInfo` produces. Check
-`src/nim_compiler/testrunner.nim`'s `extractTestInfo` proc.
-
-#### `tmonorepo2.nim` / `tmonorepo3.nim` — hang / timeout
-
-Both tests hang when run. The root cause is unknown — likely a deadlock or missing
-notification in the combined-server config setup path.
 
 ---
 
