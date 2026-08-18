@@ -85,7 +85,6 @@ proc attemptCrashRespawn*(
         pool.nimsuggest,
         spawnTimeoutMs,
         config.logNimsuggest,
-        config.inlayHints.exceptionHints.enable
       )
 
       debug "attemptCrashRespawn: createNimsuggest succeeded", 
@@ -162,7 +161,6 @@ proc spawnNewNimsuggestSlot*(
       spawningInfo, nimsuggestSettings,
       spawnTimeoutMs,
       config.logNimsuggest,
-      config.inlayHints.exceptionHints.enable,
       onProcessStart = proc(p: AsyncProcessRef) {.gcsafe, raises: [].} =
         newSlot.spawnProcess = some(p),
     )
@@ -180,6 +178,17 @@ proc spawnNewNimsuggestSlot*(
         %*{"type": 3, "message": fmt"Nimsuggest initialized for {newSlot.spawnInfo.entryPoint}"})
     return some(newSlot)
 
+  except NimsuggestSpawnTimeoutError as ex:
+    newSlot.state = SlotState.CRASHED
+    let timeoutSecs = int(inSeconds(config.nimsuggestSpawnTimeout))
+    error "spawnNewNimsuggestSlot: timed out",
+      projectFile = newSlot.spawnInfo.entryPoint, timeoutSecs = timeoutSecs, msg = ex.msg
+    if pool.notifyProc != nil:
+      pool.notifyProc("window/logMessage", %*{
+        "type": 2,
+        "message": fmt"Nimsuggest for {newSlot.spawnInfo.entryPoint} timed out after {timeoutSecs}s. " &
+                   "If this is a large project, try increasing nimTortoise.nimsuggestSpawnTimeout.",
+      })
   except CatchableError as ex:
     newSlot.state = SlotState.CRASHED
     error "spawnNewNimsuggestSlot: spawn failed",

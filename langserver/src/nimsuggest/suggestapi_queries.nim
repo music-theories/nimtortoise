@@ -107,7 +107,7 @@ proc getNimsuggestCapabilities*(
 proc buildNimsuggestArguments*(
   spawningInfo: NimsuggestSpawnInfo,
   nimsuggestSettings: NimsuggestSettings,
-  enableExceptionInlayHints: bool,
+  # enableExceptionInlayHints: bool,
   enableLog: bool,
 ): seq[string] =
   let entryPoint = spawningInfo.entryPoint
@@ -133,11 +133,12 @@ proc buildNimsuggestArguments*(
   if enableLog:
     result.add("--log")
 
-  if nsExceptionInlayHints in nimsuggestSettings.capabilities:
-    if enableExceptionInlayHints:
-      result.add("--exceptionInlayHints:on")
-    else:
-      result.add("--exceptionInlayHints:off")
+  # if nsExceptionInlayHints in nimsuggestSettings.capabilities:
+  #   if enableExceptionInlayHints:
+  #     result.add("--exceptionInlayHints:on")
+  #   else:
+  # THIS NEEDS TO ALWAYS BE OFF TO PREVENT THE COMPILER SHITTING THE BED ON LARGE CODEBASES WITH GENERICS, MACROS AND TEMPLATES. 
+  result.add("--exceptionInlayHints:off")
 
   debug "Nim Paths ", paths = spawningInfo.paths
   # COMMENTED OUT TO SEE IF THIS MAKES ANY DIFFERENCE

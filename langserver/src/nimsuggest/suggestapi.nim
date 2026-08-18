@@ -20,7 +20,6 @@ proc createNimsuggest*(
   nimsuggestSettings: NimsuggestSettings,
   timeout: int,
   enableLog: bool,
-  enableExceptionInlayHints: bool,
   onProcessStart: proc(p: AsyncProcessRef) {.gcsafe, raises: [].} = nil,
 ): Future[NimSuggest] {.async.} =
   result = NimSuggest(
@@ -33,7 +32,6 @@ proc createNimsuggest*(
   let args = buildNimsuggestArguments(
     spawningInfo,
     nimsuggestSettings,
-    enableExceptionInlayHints, 
     enableLog,
   )
 

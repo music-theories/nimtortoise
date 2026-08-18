@@ -1,4 +1,4 @@
-import std/[options, sets, tables, sequtils, strutils]
+import std/[options, sets, tables, sequtils, strutils, strformat, json]
 import chronos
 import chronicles
 import ../nimsuggest/nimsuggest
@@ -70,47 +70,38 @@ proc startSlotConsumer(
   )
   discard await ls.consolidateNimsuggestInstances(slot)
 
-proc attemptModuleSpawnInBackground(
-  ls: LanguageServer,
-  spawnInfo: NimsuggestSpawnInfo,
-) {.async.} =
-  ## Attempts to spawn nimsuggest with the full module entry point in the
-  ## background. If it succeeds, consolidateNimsuggestInstances migrates all
-  ## file-based slots to the module slot. If it fails, the entry point is added
-  ## to pool.crashedSlots so subsequent opens skip the background attempt.
-  debug "attemptModuleSpawnInBackground: starting",
-    entryPoint = spawnInfo.entryPoint
-  let moduleSlot = await spawnNewNimsuggestSlot(
-    ls.pool, spawnInfo, ls.pool.nimsuggest, ls.configurations.currentConfig)
-
-  if moduleSlot.isNone:
-    warn "attemptModuleSpawnInBackground: failed, adding to crashedSlots",
-      entryPoint = spawnInfo.entryPoint
-    ls.pool.crashedSlots.incl(spawnInfo.entryPoint)
-    return
-
-  info "attemptModuleSpawnInBackground: succeeded, consolidating",
-    entryPoint = spawnInfo.entryPoint
-  asyncSpawn moduleSlot.get().processNimsuggestQueries(
-    ls.pool, ls.files.openFiles, ls.dependencies,
-    ls.configurations.currentConfig, ls.notify)
-  discard await ls.consolidateNimsuggestInstances(moduleSlot.get())
-
 proc createSlotWithFallback(
   ls: LanguageServer,
   spawnInfo: NimsuggestSpawnInfo,
   filePath: FilePathAbs,
   params: TextDocumentItem,
 ): Future[Option[NimsuggestSlot]] {.async.} =
-  ## Tier 1 (immediate): spawn nimsuggest with filePath as entry point and the
-  ## nimble dir as workingDir. This picks up config.nims path resolution without
-  ## touching the (potentially broken) module entry point. Fast (~10s).
+  ## Tier 1: spawn nimsuggest with the module entry point. This gives full
+  ## project-wide IntelliSense and is now reliable since --exceptionInlayHints
+  ## is always off. Skipped if the entry point is known-crashed or already
+  ## being spawned by a concurrent open.
   ##
-  ## Tier 2 (background): if filePath != module entry point, asyncSpawn an
-  ## attempt at the module entry point for richer project context. On success,
-  ## consolidateNimsuggestInstances migrates all file-based slots automatically.
-  ## On failure, the entry point is added to pool.crashedSlots.
+  ## Tier 2: if Tier 1 fails or is skipped and filePath differs from the module
+  ## entry point, fall back to spawning with the opened file as entry point.
   let nimbleDir = parentDir(spawnInfo.nimbleFile.get())
+
+  if spawnInfo.entryPoint notin ls.pool.crashedSlots and
+     not ls.pool.slots.hasKey(spawnInfo.entryPoint):
+    let moduleSlot = await spawnNewNimsuggestSlot(
+      ls.pool, spawnInfo, ls.pool.nimsuggest, ls.configurations.currentConfig)
+    if moduleSlot.isSome:
+      await ls.startSlotConsumer(moduleSlot.get(), params)
+      return moduleSlot
+    ls.pool.crashedSlots.incl(spawnInfo.entryPoint)
+    ls.notify("window/logMessage", %*{
+      "type": 4,
+      "message": fmt"Could not start nimsuggest for project {spawnInfo.entryPoint}. " &
+        "IntelliSense will be served per-file instead of per-project.",
+    })
+
+  if filePath == spawnInfo.entryPoint:
+    return none(NimsuggestSlot)
+
   let fileInfo = NimsuggestSpawnInfo(
     entryPoint: filePath,
     workingDir: nimbleDir,
@@ -118,23 +109,11 @@ proc createSlotWithFallback(
     paths: @[],
     extraArgs: @[],
   )
-  let slot = await spawnNewNimsuggestSlot(
+  let fileSlot = await spawnNewNimsuggestSlot(
     ls.pool, fileInfo, ls.pool.nimsuggest, ls.configurations.currentConfig)
-
-  if slot.isNone:
-    return none(NimsuggestSlot)
-
-  await ls.startSlotConsumer(slot.get(), params)
-
-  # Background: attempt the real module entry point for full project context.
-  # Only if the opened file is not itself the module entry point, the entry
-  # point is not known-broken, and no background spawn is already running.
-  if filePath != spawnInfo.entryPoint and
-     spawnInfo.entryPoint notin ls.pool.crashedSlots and
-     not ls.pool.slots.hasKey(spawnInfo.entryPoint):
-    asyncSpawn ls.attemptModuleSpawnInBackground(spawnInfo)
-
-  return slot
+  if fileSlot.isSome:
+    await ls.startSlotConsumer(fileSlot.get(), params)
+  return fileSlot
 
 proc createOrphanSlot(
   ls: LanguageServer,

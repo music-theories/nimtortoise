@@ -337,6 +337,11 @@
                     "default": 30,
                     "description": "Timeout in seconds to wait for nimsuggest to respond to a request."
                 },
+                "nimTortoise.nimsuggestSpawnTimeout": {
+                    "type": "integer",
+                    "default": 60,
+                    "description": "Timeout in seconds for nimsuggest to start up. Increase this for large projects (e.g. the Nim compiler) where the initial compilation takes longer than 60 seconds."
+                },
                 "nimTortoise.inlayHints.typeHints.enable": {
                     "type": "boolean",
                     "default": false,

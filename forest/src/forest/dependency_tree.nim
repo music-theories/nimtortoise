@@ -66,9 +66,25 @@ proc extractImports*(source: string): seq[string] {.raises: [].} =
   var inMultiline = false    # true after a bare "import" line
   var inBracket = false      # true inside a multi-line bracket import
   var bracketPrefix = ""     # path prefix before "[", e.g. "./" or "../utils/"
+  var inRunnableExamples = false  # true inside a runnableExamples block
 
   for line in source.splitLines:
     let stripped = line.strip()
+
+    # ── runnableExamples block ───────────────────────────────────────────────
+    # runnableExamples blocks contain example code with their own imports that
+    # are not real module-level imports. Skip everything inside them.
+    if inRunnableExamples:
+      # A non-indented non-empty line ends the block.
+      if line.len > 0 and line[0] notin {' ', '\t'}:
+        inRunnableExamples = false
+        # Fall through: re-process this line as a normal statement.
+      else:
+        continue
+
+    if stripped == "runnableExamples:" or stripped.startsWith("runnableExamples("):
+      inRunnableExamples = true
+      continue
 
     # ── multi-line bracket mode ──────────────────────────────────────────────
     if inBracket:

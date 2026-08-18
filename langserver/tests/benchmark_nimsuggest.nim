@@ -30,7 +30,7 @@ proc benchmarkNimsuggest(
       nimsuggestSettings,
       spawnTimeoutMs,
       enableLog,
-      enableExceptionInlayHints,
+      # enableExceptionInlayHints,
       onProcessStart = proc(p: AsyncProcessRef) {.gcsafe, raises: [].} = discard
     )
     let elapsed = now() - startTime
@@ -60,6 +60,40 @@ let noPathsSpawnInfo = NimsuggestSpawnInfo(
 
 waitFor benchmarkNimsuggest(
   noPathsSpawnInfo, 
+  {nsCon, nsExceptionInlayHints, nsUnknownFile},
+  enableLog = true,
+  enableExceptionInlayHints = false
+)
+
+let nimbleEntryAddress = FilePathAbs("/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/user_interfaces.nim")
+
+let nimbleEntryPoint = NimsuggestSpawnInfo(
+  entryPoint: nimbleEntryAddress,
+  workingDir: nimbleDir,
+  nimbleFile: some(nimbleFile),
+  paths: @[],
+  # extraArgs: @["--skipParentCfg", "--noNimblePath"]
+  extraArgs: @[],
+)
+
+waitFor benchmarkNimsuggest(
+  nimbleEntryPoint, 
+  {nsCon, nsExceptionInlayHints, nsUnknownFile},
+  enableLog = true,
+  enableExceptionInlayHints = true # NEEDS TO BE FALSE false
+)
+
+let nimbleEntryPointWithFlag = NimsuggestSpawnInfo(
+  entryPoint: nimbleEntryAddress,
+  workingDir: nimbleDir,
+  nimbleFile: some(nimbleFile),
+  paths: @[],
+  # extraArgs: @["--skipParentCfg", "--noNimblePath"]
+  extraArgs: @["--maxLoopIterationsVM:10000"],
+)
+
+waitFor benchmarkNimsuggest(
+  nimbleEntryPointWithFlag, 
   {nsCon, nsExceptionInlayHints, nsUnknownFile},
   enableLog = true,
   enableExceptionInlayHints = false
