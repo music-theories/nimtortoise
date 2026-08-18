@@ -2,16 +2,6 @@ import std/[times]
 import forest
 import ./configuration_types
 
-func `==`(a, b: NlsNimsuggestConfig): bool =
-  if a.isNil and b.isNil: return true
-  if a.isNil or b.isNil: return false
-  a.projectFile == b.projectFile and a.fileRegex == b.fileRegex
-
-func `==`(a, b: NlsWorkingDirectoryMaping): bool =
-  if a.isNil and b.isNil: return true
-  if a.isNil or b.isNil: return false
-  a.projectFile == b.projectFile and a.directory == b.directory
-
 func `==`(a, b: NlsInlayTypeHintsConfig): bool =
   if a.isNil and b.isNil: return true
   if a.isNil or b.isNil: return false

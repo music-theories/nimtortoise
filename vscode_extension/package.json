@@ -268,44 +268,6 @@
             "type": "object",
             "title": "Nim Tortoise configuration",
             "properties": {
-                "nimTortoise.projectMapping": {
-                    "type": "array",
-                    "default": [],
-                    "description": "Per-file project mapping using regex. Each entry maps source files to a nimsuggest entry point, e.g. {\"fileRegex\": \"src/(.*).nim\", \"projectFile\": \"src/main.nim\"}.",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "fileRegex": {
-                                "type": "string",
-                                "description": "Regex matched against the source file path"
-                            },
-                            "projectFile": {
-                                "type": "string",
-                                "description": "Nimsuggest entry point to use for matching files"
-                            }
-                        }
-                    },
-                    "scope": "resource"
-                },
-                "nimTortoise.workingDirectoryMapping": {
-                    "type": "array",
-                    "default": [],
-                    "description": "Override the working directory used when running nimsuggest for a given project file. Each entry maps a project file path to a working directory.",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "projectFile": {
-                                "type": "string",
-                                "description": "Project file path (relative to workspace root)"
-                            },
-                            "directory": {
-                                "type": "string",
-                                "description": "Working directory to use (relative to workspace root)"
-                            }
-                        }
-                    },
-                    "scope": "resource"
-                },
                 "nimTortoise.checkOnSave": {
                     "type": "boolean",
                     "default": false,
