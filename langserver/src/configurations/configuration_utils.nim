@@ -39,6 +39,7 @@ proc isDifferentFrom*(newConfig: NlsConfig, currentConfig: NlsConfig): bool =
   n.nimsuggestPath != currentConfig.nimsuggestPath or
   n.nimsuggestIdleTimeout != currentConfig.nimsuggestIdleTimeout or
   n.nimsuggestRequestTimeout != currentConfig.nimsuggestRequestTimeout or
+  n.nimsuggestSpawnTimeout != currentConfig.nimsuggestSpawnTimeout or
   n.logNimsuggest != currentConfig.logNimsuggest or
   n.inlayHints != currentConfig.inlayHints or
   n.notificationVerbosity != currentConfig.notificationVerbosity or

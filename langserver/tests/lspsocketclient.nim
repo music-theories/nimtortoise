@@ -13,8 +13,12 @@ import ../src/utils/utils
 import ../src/nimtortoise
 
 # fixture paths are still under tests/ (shared with original test suite)
+# proc fixtureUri*(path: string): FileUri =
+#   result = toUri(FilePathAbs(getCurrentDir() / "tests" / path))
+
+# fixtureUri that resolves from repo root, NOT tests/ (overrides lspsocketclient version)
 proc fixtureUri*(path: string): FileUri =
-  result = pathToUri(FilePath(getCurrentDir() / "tests" / path))
+  toUri(FilePathAbs(getCurrentDir() / path))
 
 type
   NotificationRpc* = proc(params: JsonNode): Future[void] {.async.}
@@ -158,17 +162,6 @@ proc initialize*(
     LspInitializeResult, Joptions(allowMissingKeys: true)
   )
 
-proc createDidOpenParams*(file: string): DidOpenTextDocumentParams =
-  return
-    DidOpenTextDocumentParams %* {
-      "textDocument": {
-        "uri": fixtureUri(file),
-        "languageId": "nim",
-        "version": 0,
-        "text": readFile("tests" / file),
-      }
-    }
-
 proc positionParams*(uri: FileUri, line, character: int): TextDocumentPositionParams =
   return
     TextDocumentPositionParams %*
@@ -230,3 +223,126 @@ proc waitForNotificationMessage*(
     client, "window/showMessage", (json: JsonNode) => json["message"].to(string) == msg,
     timeoutMs,
   )
+
+proc stopServer*(client: LspSocketClient) =
+  ## Cleanly shut down the language server via the LSP wire protocol.
+  ## `shutdown` stops all nimsuggest processes; `exit` closes the transport.
+  ## The sleepAsync gives Chronos one scheduler pass to flush the exit handler and
+  ## close all sockets + pipe FDs, preventing both FD accumulation and port reuse
+  ## across successive test suites.
+  discard waitFor client.call("shutdown", newJNull())
+  client.notify("exit", newJNull())
+  waitFor sleepAsync(200)
+
+proc startServer*(): (CommandLineParams, LanguageServer, LspSocketClient) =
+  let cmdParams = CommandLineParams(
+    # mode: some lsp,
+    transport: some socket,
+    port: getNextFreePort()
+  )
+  let ls = main(cmdParams)
+  let client = newLspSocketClient()
+  waitFor client.connect("localhost", cmdParams.port)
+  client.registerNotification(
+    "window/showMessage", "window/logMessage", "window/workDoneProgress/create",
+    "workspace/configuration", "extension/statusUpdate",
+    "textDocument/publishDiagnostics", "$/progress",
+  )
+  return (cmdParams, ls, client)
+
+
+# Override createDidOpenParams to read from repo root
+proc createDidOpenParams*(file: FilePathAbs): DidOpenTextDocumentParams =
+  DidOpenTextDocumentParams %* {
+    "textDocument": {
+      "uri": toUri(file),
+      "languageId": "nim",
+      "version": 0,
+      "text": readFile(string(file)),
+    }
+  }
+
+# proc createDidOpenParams*(file: string): DidOpenTextDocumentParams =
+#   return
+#     DidOpenTextDocumentParams %* {
+#       "textDocument": {
+#         "uri": fixtureUri(file),
+#         "languageId": "nim",
+#         "version": 0,
+#         "text": readFile("tests" / file),
+#       }
+#     }
+
+proc generateSimpleNimblePaths*() =
+  let dir = absolutePath("tests" / "projects" / "simple")
+  writeFile(dir / "nimble.paths", "--noNimblePath\n")
+
+proc generateMonorepoNimblePaths*() =
+  let dir = absolutePath("tests" / "projects" / "monorepo")
+  let pkgbSrc = dir / "pkgb" / "src"
+  writeFile(
+    dir / "nimble.paths",
+    "--noNimblePath\n--path:\"" & pkgbSrc & "\"\n"
+  )
+
+proc doInitialize*(client: LspSocketClient, rootRelPath: string) =
+  let initParams = LspInitializeParams %* {
+    "processId": %getCurrentProcessId(),
+    "rootUri": fixtureUri(rootRelPath),
+    "capabilities": {
+      "window": {"workDoneProgress": true},
+      "workspace": {"configuration": true}
+    }
+  }
+  discard waitFor client.initialize(initParams)
+
+proc waitForNsInit*(client: LspSocketClient, absProjectFile: string): bool =
+  waitFor client.waitForNotificationMessage(
+    "Nimsuggest initialized for " & absProjectFile,
+    timeoutMs = 30000,
+  )
+
+proc waitForInstanceCount*(client: LspSocketClient, n: int, timeoutMs = 30000): bool =
+  waitFor client.waitForNotification(
+    "extension/statusUpdate",
+    proc(j: JsonNode): bool =
+      let ports = j["nimsuggestInstances"].elems.mapIt(it["port"].getInt)
+      ports.deduplicate.len == n,
+    0
+  )
+
+# proc sendDidOpen*(client: LspSocketClient, relPath: string) =
+#   client.notify("textDocument/didOpen", %createDidOpenParams(relPath))
+
+proc sendHover*(client: LspSocketClient, relPath: string, line, col: int): JsonNode =
+  let uri = fixtureUri(relPath)
+  waitFor client.call("textDocument/hover", %positionParams(uri, line, col))
+
+proc sendCompletion*(client: LspSocketClient, relPath: string, line, col: int): JsonNode =
+  let uri = fixtureUri(relPath)
+  let params = CompletionParams %* {
+    "position": {"line": line, "character": col},
+    "textDocument": {"uri": uri}
+  }
+  waitFor client.call("textDocument/completion", %params)
+
+proc sendDidChange*(client: LspSocketClient, relPath: string, version: int, newText: string) =
+  let uri = fixtureUri(relPath)
+  client.notify("textDocument/didChange", %* {
+    "textDocument": {"uri": uri, "version": version},
+    "contentChanges": [{"text": newText}]
+  })
+
+proc sendDidSave*(client: LspSocketClient, relPath: string, text: string) =
+  let uri = fixtureUri(relPath)
+  client.notify("textDocument/didSave", %* {
+    "textDocument": {"uri": uri},
+    "text": text
+  })
+
+proc sendDidRename*(client: LspSocketClient, oldRelPath, newRelPath: string) =
+  let oldUri = fixtureUri(oldRelPath)
+  let newUri = fixtureUri(newRelPath)
+  client.notify("workspace/didRenameFiles", %* {
+    "files": [{"oldUri": oldUri, "newUri": newUri}]
+  })

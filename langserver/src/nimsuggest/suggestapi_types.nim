@@ -101,3 +101,7 @@ type
     workingDir*: DirPathAbs
     nimbleFile*: Option[FilePathAbs]
     paths*:      seq[DirPathAbs]
+    extraArgs*:  seq[string]
+      ## Extra compiler flags appended after --path entries.
+      ## Use @["--skipParentCfg", "--noNimblePath"] for fallback spawns to
+      ## prevent config.nims from silently re-injecting all --path flags.

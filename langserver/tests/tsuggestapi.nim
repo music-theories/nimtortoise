@@ -16,12 +16,21 @@ const inputLineWithEndLine = "outline	skEnumField	system.bool.true	bool	basic_ty
 
 suite "Nimsuggest tests":
   let
-    helloWorldFile = FilePath(getCurrentDir() / "tests/projects/hw/hw.nim")
+    helloWorldFile = FilePathAbs(getCurrentDir() / "tests/projects/hw/hw.nim")
     nimSuggest = createNimsuggest(
-      helloWorldFile, "nimsuggest", "", 120_000,
-      proc(self: Nimsuggest) {.gcsafe, raises: [].} = discard,
-      proc(self: Project) {.gcsafe, raises: [].} = discard,
-    ).waitFor.ns.waitFor
+      NimsuggestSpawnInfo(
+        entryPoint: helloWorldFile,
+        workingDir: DirPathAbs(getCurrentDir()),
+        nimbleFile: none(FilePathAbs),
+        paths: @[],
+      ),
+      NimsuggestSettings(
+        exePath: FilePathAbs("nimsuggest"),
+        protocol: HighestSupportedNimSuggestProtocolVersion,
+        capabilities: {},
+      ),
+      120_000, false, false,
+    ).waitFor
 
   test "Parsing qualified path":
     echo "    >> Parsing qualified path"
@@ -31,7 +40,7 @@ suite "Nimsuggest tests":
   test "Parsing suggest":
     echo "    >> Parsing suggest"
     doAssert parseSuggestDef(inputLine).get[] == Suggest(
-      filePath: FilePath("hw/hw.nim"),
+      filePath: FilePathAbs("hw/hw.nim"),
       qualifiedPath: @["hw", "a"],
       symKind: "skProc",
       line: 1,
@@ -44,7 +53,7 @@ suite "Nimsuggest tests":
     echo "    >> Parsing suggest with endLine"
     let res = parseSuggestDef(inputLineWithEndLine).get
     doAssert res[] == Suggest(
-      filePath: FilePath("basic_types.nim"),
+      filePath: FilePathAbs("basic_types.nim"),
       qualifiedPath: @["system", "bool", "true"],
       symKind: "skEnumField",
       line: 46,
@@ -89,29 +98,31 @@ suite "Nimsuggest error handling":
     # same project twice, concurrently. Suspend the child before issuing a
     # command so the command is in flight when the process is killed and both
     # paths run deterministically.
-    let helloWorldFile = FilePath(getCurrentDir() / "tests/projects/hw/hw.nim")
-    let project = createNimsuggest(
-      helloWorldFile, "nimsuggest", "", 
-      120_000,
-      proc(self: Nimsuggest) {.gcsafe, raises: [].} = discard,
-      proc(self: Project) {.gcsafe, raises: [].} = discard,
+    let helloWorldFile = FilePathAbs(getCurrentDir() / "tests/projects/hw/hw.nim")
+    let ns = createNimsuggest(
+      NimsuggestSpawnInfo(
+        entryPoint: helloWorldFile,
+        workingDir: DirPathAbs(getCurrentDir()),
+        nimbleFile: none(FilePathAbs),
+        paths: @[],
+      ),
+      NimsuggestSettings(
+        exePath: FilePathAbs("nimsuggest"),
+        protocol: HighestSupportedNimSuggestProtocolVersion,
+        capabilities: {},
+      ),
+      120_000, false, false,
     ).waitFor
-    let ns = project.ns.waitFor
-    var errorCount = 0
-    project.errorCallback = some(
-      proc(pr: Project) {.gcsafe, raises: [].} =
-        inc errorCount
-    )
 
-    discard project.process.suspend()
-    let fut = ns.def(helloWorldFile, helloWorldFile, 2, 10)
+    discard ns.process.suspend()
+    let fut = ns.def(helloWorldFile, FilePathAbs(""), 2, 10)
     waitFor sleepAsync(200)
-    discard project.process.kill()
+    discard ns.process.kill()
 
     # Fix #17: socket-close no longer fails the future; it completes with @[].
-    # The error callback is what signals the crash, not an exception.
+    # ns.failed is set by markFailed, which fires once on crash.
     let res = waitFor fut
     check res.len == 0
     waitFor sleepAsync(300)
 
-    check errorCount == 1
+    check ns.failed == true

@@ -5,6 +5,7 @@ import ../nph/formatting
 import ../nimsuggest/nimsuggest
 
 import ../configurations/configurations
+import ../nimble/nimble_utils
 import ../protocol/types
 
 import ../utils/utils
@@ -149,6 +150,18 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
           
           of SlotState.STOPPING, SlotState.STOPPED, SlotState.CRASHED:
             discard
+
+          # Clear this file's module entry point from crashedSlots — the user
+          # may have fixed the underlying compiler issue (e.g. removed a
+          # problematic import), so give the background spawn another chance.
+          let savedFilePath = toFilePathAbs(uri)
+          let savedSpawnInfo = getNimsuggestSpawnInfo(
+            savedFilePath, ls.files.rootPath, ls.dependencies)
+          if savedSpawnInfo.entryPoint != savedFilePath and
+             savedSpawnInfo.entryPoint in ls.pool.crashedSlots:
+            debug "didSave: clearing crashedSlots for module entry point",
+              entryPoint = savedSpawnInfo.entryPoint
+            ls.pool.crashedSlots.excl(savedSpawnInfo.entryPoint)
 
       of FileAccessQueryKind.DID_CLOSE:
         let uri = q.didClose.textDocument.uri

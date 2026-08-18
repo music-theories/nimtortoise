@@ -67,7 +67,7 @@ suite "Nimlangserver misc":
     client.notify("initialized", newJObject())
 
     let helloWorldFile = "projects/hw/hw.nim"
-    let hwAbsFile = uriToPath(helloWorldFile.fixtureUri())
+    let hwAbsFile = toFilePathAbs(helloWorldFile.fixtureUri())
     client.notify("textDocument/didOpen", %createDidOpenParams(helloWorldFile))
 
     check waitFor client.waitForNotificationMessage(
@@ -108,7 +108,7 @@ suite "Nimlangserver idle nimsuggest cleanup":
     client.notify("initialized", newJObject())
 
     let helloWorldFile = "projects/hw/hw.nim"
-    let hwAbsFile = uriToPath(helloWorldFile.fixtureUri())
+    let hwAbsFile = toFilePathAbs(helloWorldFile.fixtureUri())
     client.notify("textDocument/didOpen", %createDidOpenParams(helloWorldFile))
     check waitFor client.waitForNotificationMessage(
       fmt"Nimsuggest initialized for {hwAbsFile}"
@@ -152,7 +152,7 @@ suite "Nimlangserver fail count":
     discard waitFor client2.initialize(initParams2)
     client2.notify("initialized", newJObject())
     let helloWorldFile2 = "projects/hw/hw.nim"
-    let hwAbsFile2 = uriToPath(helloWorldFile2.fixtureUri())
+    let hwAbsFile2 = toFilePathAbs(helloWorldFile2.fixtureUri())
     client2.notify("textDocument/didOpen", %createDidOpenParams(helloWorldFile2))
     check waitFor client2.waitForNotificationMessage(
       fmt"Nimsuggest initialized for {hwAbsFile2}"

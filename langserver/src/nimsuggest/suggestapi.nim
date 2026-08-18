@@ -10,12 +10,18 @@ import ../utils/process_utils
 
 import ./[suggestapi_utils, suggestapi_types, suggestapi_queries]
 
+type NimsuggestSpawnTimeoutError* = object of CatchableError
+  ## Raised when nimsuggest does not print its port within the configured
+  ## timeout. This indicates the Nim compiler is stuck (e.g. infinite loop in
+  ## semForObjectFields). Callers should NOT retry with the same --path flags.
+
 proc createNimsuggest*(
   spawningInfo: NimsuggestSpawnInfo,
   nimsuggestSettings: NimsuggestSettings,
   timeout: int,
   enableLog: bool,
   enableExceptionInlayHints: bool,
+  onProcessStart: proc(p: AsyncProcessRef) {.gcsafe, raises: [].} = nil,
 ): Future[NimSuggest] {.async.} =
   result = NimSuggest(
     timeout: timeout,
@@ -31,24 +37,36 @@ proc createNimsuggest*(
     enableLog,
   )
 
-  info "Starting nimsuggest",
-    entryPoint = spawningInfo.entryPoint, 
-    workingDir = spawningInfo.workingDir,
-    paths = spawningInfo.paths,
-    timeout = timeout,
-    args = args
+  info "Starting nimsuggest:"
+  info "- entryPoint ", entryPoint = spawningInfo.entryPoint
+  info "- workingDir", workingDir = spawningInfo.workingDir
+  # info "- paths", paths = spawningInfo.paths
+  info "- args", args = args
+  info "- timeout", timeout = timeout
 
   result.process = await startProcess(
     string(nimsuggestSettings.exePath),
     string(spawningInfo.workingDir),
     arguments = args,
-    options = {UsePath},
+    options = {UsePath, ProcessGroup},
     stdoutHandle = AsyncProcess.Pipe,
     stderrHandle = AsyncProcess.Pipe,
   )
 
+  if onProcessStart != nil:
+    onProcessStart(result.process)
+
   asyncSpawn logNsError(result)
-  let portLine = await result.process.stdoutStream.readLine(sep = "\n")
+  # let portLine = await result.process.stdoutStream.readLine(sep = "\n")
+
+  let portLineFut = result.process.stdoutStream.readLine(sep = "\n")
+  let portLineOpt = await process_utils.withTimeout(portLineFut, timeout)
+  if portLineOpt.isNone:
+    await shutdownChildProcess(result.process)
+    result.markFailed(fmt"timeout ({timeout}ms) waiting for nimsuggest port")
+    raise newException(NimsuggestSpawnTimeoutError, result.errorMessage)
+  let portLine = portLineOpt.get()
+
   debug "Nimsuggest instance started on port", portLine = portLine
   try:
     result.port = portLine.parseInt
@@ -56,6 +74,7 @@ proc createNimsuggest*(
     let nextLine = await result.process.stdoutStream.readLine(sep = "\n")
     error "Failed to parse nimsuggest port", portLine = portLine, nextLine = nextLine
     result.markFailed("Failed to parse nimsuggest port: " & portLine)
+    await shutdownChildProcess(result.process)
     raise newException(CatchableError, result.errorMessage)
 
 proc processQueue(self: Nimsuggest): Future[void] {.async.} =

@@ -140,6 +140,9 @@ proc buildNimsuggestArguments*(
       result.add("--exceptionInlayHints:off")
 
   debug "Nim Paths ", paths = spawningInfo.paths
+  # COMMENTED OUT TO SEE IF THIS MAKES ANY DIFFERENCE
+  # for p in spawningInfo.paths:
+  #   result.add("--path:" & $(p))
 
-  for p in spawningInfo.paths:
-    result.add("--path:" & $(p))
+  for arg in spawningInfo.extraArgs:
+    result.add(arg)

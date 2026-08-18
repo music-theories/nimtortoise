@@ -1,5 +1,6 @@
-import std/[json, sets, tables, times]
+import std/[json, sets, tables, times, options]
 import chronos
+import chronos/asyncproc
 import regex
 import ./suggestapi_types
 import ../protocol/types
@@ -123,6 +124,11 @@ type
     ns*: Future[NimSuggest]
       ## pending = SPAWNING, completed = READY, failed = CRASHED.
       ## SlotState is the sole lifecycle authority; ns is the async handle.
+    spawnProcess*: Option[AsyncProcessRef]
+      ## Set immediately after startProcess forks the OS process, before the
+      ## port is read.  Allows stopNimsuggestSlot to kill a SPAWNING slot
+      ## (e.g. nimsuggest stuck in a CPU loop) by sending SIGKILL to its
+      ## process group before the 120 s port-read timeout expires.
     queryMailbox*: AsyncQueue[NimsuggestQuery[LspFilePosition]]
       ## IDE query commands. processQueries dequeues and dispatches to TCP.
     lastCmdTime*: DateTime
@@ -142,6 +148,10 @@ type
 
   NimsuggestPool* = ref object
     slots*: Table[FilePathAbs, NimsuggestSlot]
+    crashedSlots*: HashSet[FilePathAbs]
+      ## Module entry points that failed (timed out or crashed) during background
+      ## spawn this session. Background spawn is skipped for these until the user
+      ## saves a file in the project, which clears the entry from this set.
     maxSlots*: int
     nimsuggest*: NimsuggestSettings
     notifyProc*: NotifyProc

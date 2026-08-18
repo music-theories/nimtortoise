@@ -55,61 +55,99 @@ proc consolidateNimsuggestInstances(
   
   return slotsToRemove
 
-proc createNewSuggestSlotAndConsolidate(
+proc startSlotConsumer(
   ls: LanguageServer,
-  filePath: FilePathAbs,
-  params: TextDocumentItem
-): Future[Option[NimsuggestSlot]] {.async.} =
-  let successfulSpawn = await spawnNewNimsuggestSlot(
-    ls.pool, 
-    filePath, 
-    ls.files.rootPath, 
-    ls.pool.nimsuggest,
+  slot: NimsuggestSlot,
+  params: TextDocumentItem,
+) {.async.} =
+  ls.addFileToOpenFiles(slot, params)
+  asyncSpawn slot.processNimsuggestQueries(
+    ls.pool,
+    ls.files.openFiles,
     ls.dependencies,
-    ls.configurations.currentConfig
+    ls.configurations.currentConfig,
+    ls.notify,
   )
-  if successfulSpawn.isSome():
-    debug "createNewSuggestSlotAndConsolidate:add file to open files", filePath = $(filePath)
-    let spawnedSlot = successfulSpawn.get()
-    ls.addFileToOpenFiles(spawnedSlot, params)
-    asyncSpawn spawnedSlot.processNimsuggestQueries(
-      ls.pool, 
-      ls.files.openFiles,
-      ls.dependencies,
-      ls.configurations.currentConfig,
-      ls.notify,
-    )
-    # Consolidation: for each other slot, check if the new slot subsumes it.
-    discard await ls.consolidateNimsuggestInstances(spawnedSlot)
-  
-  return successfulSpawn
+  discard await ls.consolidateNimsuggestInstances(slot)
 
-proc createNewSuggestSlotAndConsolidate(
+proc attemptModuleSpawnInBackground(
   ls: LanguageServer,
   spawnInfo: NimsuggestSpawnInfo,
-  params: TextDocumentItem
+) {.async.} =
+  ## Attempts to spawn nimsuggest with the full module entry point in the
+  ## background. If it succeeds, consolidateNimsuggestInstances migrates all
+  ## file-based slots to the module slot. If it fails, the entry point is added
+  ## to pool.crashedSlots so subsequent opens skip the background attempt.
+  debug "attemptModuleSpawnInBackground: starting",
+    entryPoint = spawnInfo.entryPoint
+  let moduleSlot = await spawnNewNimsuggestSlot(
+    ls.pool, spawnInfo, ls.pool.nimsuggest, ls.configurations.currentConfig)
+
+  if moduleSlot.isNone:
+    warn "attemptModuleSpawnInBackground: failed, adding to crashedSlots",
+      entryPoint = spawnInfo.entryPoint
+    ls.pool.crashedSlots.incl(spawnInfo.entryPoint)
+    return
+
+  info "attemptModuleSpawnInBackground: succeeded, consolidating",
+    entryPoint = spawnInfo.entryPoint
+  asyncSpawn moduleSlot.get().processNimsuggestQueries(
+    ls.pool, ls.files.openFiles, ls.dependencies,
+    ls.configurations.currentConfig, ls.notify)
+  discard await ls.consolidateNimsuggestInstances(moduleSlot.get())
+
+proc createSlotWithFallback(
+  ls: LanguageServer,
+  spawnInfo: NimsuggestSpawnInfo,
+  filePath: FilePathAbs,
+  params: TextDocumentItem,
 ): Future[Option[NimsuggestSlot]] {.async.} =
-  let successfulSpawn = await spawnNewNimsuggestSlot(
-    ls.pool, 
-    spawnInfo,
-    ls.pool.nimsuggest,
-    ls.configurations.currentConfig
+  ## Tier 1 (immediate): spawn nimsuggest with filePath as entry point and the
+  ## nimble dir as workingDir. This picks up config.nims path resolution without
+  ## touching the (potentially broken) module entry point. Fast (~10s).
+  ##
+  ## Tier 2 (background): if filePath != module entry point, asyncSpawn an
+  ## attempt at the module entry point for richer project context. On success,
+  ## consolidateNimsuggestInstances migrates all file-based slots automatically.
+  ## On failure, the entry point is added to pool.crashedSlots.
+  let nimbleDir = parentDir(spawnInfo.nimbleFile.get())
+  let fileInfo = NimsuggestSpawnInfo(
+    entryPoint: filePath,
+    workingDir: nimbleDir,
+    nimbleFile: spawnInfo.nimbleFile,
+    paths: @[],
+    extraArgs: @[],
   )
-  if successfulSpawn.isSome():
-    debug "createNewSuggestSlotAndConsolidate:add file to open files", entryPoint = spawnInfo.entryPoint
-    let spawnedSlot = successfulSpawn.get()
-    ls.addFileToOpenFiles(spawnedSlot, params)
-    asyncSpawn spawnedSlot.processNimsuggestQueries(
-      ls.pool, 
-      ls.files.openFiles,
-      ls.dependencies,
-      ls.configurations.currentConfig,
-      ls.notify,
-    )
-    # Consolidation: for each other slot, check if the new slot subsumes it.
-    discard await ls.consolidateNimsuggestInstances(spawnedSlot)
-  
-  return successfulSpawn
+  let slot = await spawnNewNimsuggestSlot(
+    ls.pool, fileInfo, ls.pool.nimsuggest, ls.configurations.currentConfig)
+
+  if slot.isNone:
+    return none(NimsuggestSlot)
+
+  await ls.startSlotConsumer(slot.get(), params)
+
+  # Background: attempt the real module entry point for full project context.
+  # Only if the opened file is not itself the module entry point, the entry
+  # point is not known-broken, and no background spawn is already running.
+  if filePath != spawnInfo.entryPoint and
+     spawnInfo.entryPoint notin ls.pool.crashedSlots and
+     not ls.pool.slots.hasKey(spawnInfo.entryPoint):
+    asyncSpawn ls.attemptModuleSpawnInBackground(spawnInfo)
+
+  return slot
+
+proc createOrphanSlot(
+  ls: LanguageServer,
+  filePath: FilePathAbs,
+  params: TextDocumentItem,
+): Future[Option[NimsuggestSlot]] {.async.} =
+  ## Spawns nimsuggest with filePath as its own entry point (no project context).
+  let slot = await spawnNewNimsuggestSlot(
+    ls.pool, filePath, ls.files.rootPath,
+    ls.pool.nimsuggest, ls.dependencies, ls.configurations.currentConfig)
+  if slot.isSome:
+    await ls.startSlotConsumer(slot.get(), params)
+  return slot
     
 
 proc processDidOpenQuery*(
@@ -170,80 +208,31 @@ proc processDidOpenQuery*(
     # does it have a relevant nimble file?
     if spawnInfo.nimbleFile.isNone():
       debug "didOpen: File has no related nimble file.  It is a true orphan. Spawning standalone nimsuggest for it.", entryPoint = filePath
-      discard await createNewSuggestSlotAndConsolidate(
-        ls, filePath, q.didOpen.textDocument
-      )
-    
+      discard await createOrphanSlot(ls, filePath, q.didOpen.textDocument)
+
     else:
       if spawnInfo.entryPoint == filePath:
         debug "didOpen: This uri IS the projectFile/entryPoint.  Spawning new nimsuggest for this.", uri = uri, entryPoint = spawnInfo.entryPoint
-        # Importantly, we've already checked if this uri is known, so we're just now checking if it knows any other nimsuggest instances that can be consolidated into it.
-        discard await createNewSuggestSlotAndConsolidate(ls, spawnInfo, q.didOpen.textDocument)
+        discard await createSlotWithFallback(ls, spawnInfo, filePath, q.didOpen.textDocument)
 
       else:
-        # File maps to a specific project entry point (via projectMapping regex) TODO - no longer using prejectMapping ... Would this branch even be possible ...
+        # File is part of a project whose entry point is a different file.
         debug "didOpen: It is PART of a module and has a projectFile/entryPoint (not itself)", uri = uri, entryPoint = spawnInfo.entryPoint
-        if ls.pool.slots.hasKey(spawnInfo.entryPoint):
-          debug "didOpen: Nimsuggest slot for the projectFile/entryPoint already running, assigning the uri to this slot", uri = uri, entryPoint = spawnInfo.entryPoint
-          ls.addFileToOpenFiles(ls.pool.slots[spawnInfo.entryPoint], q.didOpen.textDocument)
-          
+        let existingModuleSlot = ls.pool.slots.getOrDefault(spawnInfo.entryPoint)
+        if existingModuleSlot != nil and existingModuleSlot.state == SlotState.READY:
+          # Module slot is fully live — assign directly; consolidation already ran.
+          debug "didOpen: Module slot is READY, assigning uri to it", uri = uri, entryPoint = spawnInfo.entryPoint
+          ls.addFileToOpenFiles(existingModuleSlot, q.didOpen.textDocument)
         else:
-          debug "didOpen: The uri's projectFile/entryPoint does not have a nimsuggest slot, so spawn it ", entryPoint = spawnInfo.entryPoint
-          let slotSpawnSuccessful = await spawnNewNimsuggestSlot(
-            ls.pool, spawnInfo, 
-            ls.pool.nimsuggest, 
-            ls.configurations.currentConfig
-          )
-          if slotSpawnSuccessful.isSome():
-            # Starts mailbox
-            let newSlot = slotSpawnSuccessful.get()
-
-            asyncSpawn processNimsuggestQueries(
-              newSlot, ls.pool, ls.files.openFiles,
-              ls.dependencies,
-              ls.configurations.currentConfig,
-              ls.notify,
-            )
-            debug "didOpen: Successfully spawned a new nimsuggest slot ", entryPoint = spawnInfo.entryPoint, uri = uri
-
-            ls.addFileToOpenFiles(newSlot, q.didOpen.textDocument)
-            discard await ls.consolidateNimsuggestInstances(newSlot)
+          # No module slot, or it is still SPAWNING in the background.
+          # Give this file its own immediate file-based slot rather than waiting.
+          debug "didOpen: Spawning file-based slot immediately", entryPoint = spawnInfo.entryPoint, uri = uri
+          let spawnResult = await createSlotWithFallback(ls, spawnInfo, filePath, q.didOpen.textDocument)
+          if spawnResult.isSome():
+            debug "didOpen: Successfully spawned a new nimsuggest slot", entryPoint = spawnInfo.entryPoint, uri = uri
             discard ls.queryFile(uri, NimsuggestQueryKind.CHECK_FILE)
-
-            # debug "didOpen: Ensure the projectFile/entryPoint ACTUALLY knows the uri ", entryPoint = spawnInfo.entryPoint
-
-            # let projectKnownQuery = NimsuggestQuery[LspFilePosition](
-            #   id: 0.uint,
-            #   kind: NimsuggestQueryKind.KNOWN,
-            #   uri: uri,
-            #   dirtyFile: FilePathAbs(""),
-            #   responseFuture: newFuture[seq[Suggest]]("known"),
-            # )
-            # newSlot.queryMailbox.addLastNoWait(projectKnownQuery)
-
-            # let projectResponse = await projectKnownQuery.responseFuture
-
-            # let thisProjectKnowsTheFile = checkNimsuggestKnownResponse(projectResponse)
-
-            # if thisProjectKnowsTheFile:
-            #   debug "didOpen: The project DOES know the uri.", fileThatKnows = newSlot.spawnInfo.entryPoint,  fileThatIsKnown = uri
-            #   ls.addFileToOpenFiles(newSlot, q.didOpen.textDocument)
-            #   discard await ls.consolidateNimsuggestInstances(newSlot)
-            #   discard ls.queryFile(uri, NimsuggestQueryKind.CHECK_FILE)
-
-            # else:
-            #   debug "didOpen: The project does NOT know the current file.  This means it is within the module's folders but not connected to it. It is an orphan.  Spin up a new standalone nimsuggest for it."
-            #   # v4 unknown-file workaround: nimsuggest compiled the project entry point
-            #   # but won't index files it hasn't served yet — queries return length=0.
-            #   # Use filePath (the opened file) as the standalone entry point, not the
-            #   # project entry point, so nimsuggest compiles it directly.
-            #   discard await stopNimsuggestSlotAndRemoveFromPool(ls.pool, newSlot)
-            #   discard await createNewSuggestSlotAndConsolidate(
-            #     ls, filePath, q.didOpen.textDocument
-            #   )
           else:
-            debug "didOpen: Spawning projectFile/entryPoint was NOT successful.", entryPoint = spawnInfo.entryPoint
-            ls.pool.removeSlot(spawnInfo.entryPoint)
+            debug "didOpen: Spawning was NOT successful.", entryPoint = spawnInfo.entryPoint
 
     let needToEvict = ls.pool.maxSlots > 0 and ls.pool.slots.len > ls.pool.maxSlots      
     debug "didOpen: Should slot be evicted?", maxSlots = ls.pool.maxSlots, filledSlots = ls.pool.slots.len, needToEvict = needToEvict
@@ -256,5 +245,5 @@ proc processDidOpenQuery*(
           pendingQ.responseFuture.complete(@[])
 
       debug "didOpen: Stopping and removing from slot: ", entryPoint = slotToEvict.spawnInfo.entryPoint
-      let successfulStop = await stopNimsuggestSlotAndRemoveFromPool(ls.pool, slotToEvict)
+      discard await stopNimsuggestSlotAndRemoveFromPool(ls.pool, slotToEvict)
 

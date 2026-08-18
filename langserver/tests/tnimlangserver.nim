@@ -87,7 +87,7 @@ suite "Suggest API selection":
     let helloWorldFile = "projects/hw/hw.nim"
     client.notify("textDocument/didOpen", %createDidOpenParams(helloWorldFile))
 
-    let hwAbsFile = helloWorldFile.fixtureUri.uriToPath
+    let hwAbsFile = helloWorldFile.fixtureUri.toFilePathAbs
     check waitFor client.waitForNotificationMessage(
       fmt"Nimsuggest initialized for {hwAbsFile}",
     )
@@ -130,7 +130,7 @@ suite "LSP features":
   let didOpenParams = createDidOpenParams("projects/hw/hw.nim")
   client.notify("textDocument/didOpen", %didOpenParams)
   discard waitFor client.waitForNotificationMessage(
-    fmt"Nimsuggest initialized for {uriToPath(helloWorldUri)}",
+    fmt"Nimsuggest initialized for {toFilePathAbs(helloWorldUri)}",
   )
 
   test "Sending hover.":

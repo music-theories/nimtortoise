@@ -24,6 +24,7 @@ proc initDefaultNlsConfig*(): NlsConfig =
     nimsuggestPath: FilePathAbs(""), # OR should it be "nimsuggest"?
     nimsuggestIdleTimeout: initDuration(seconds = 1800), 
     nimsuggestRequestTimeout: initDuration(seconds = 30), 
+    nimsuggestSpawnTimeout: initDuration(seconds = 60),
     logNimsuggest: true, 
     inlayHints: NlsInlayHintsConfig(
       typeHints: NlsInlayTypeHintsConfig(
@@ -72,6 +73,8 @@ proc nlsConfigFromJson*(json: JsonNode): NlsConfig =
     result.nimsuggestPath = FilePathAbs(json["nimsuggestPath"].getStr())
   if json.hasKey("nimsuggestIdleTimeout"):
     result.nimsuggestIdleTimeout = initDuration(seconds = json["nimsuggestIdleTimeout"].getInt())
+  if json.hasKey("nimsuggestSpawnTimeout"):
+    result.nimsuggestSpawnTimeout = initDuration(seconds = json["nimsuggestSpawnTimeout"].getInt())
   if json.hasKey("nimsuggestRequestTimeout"):
     result.nimsuggestRequestTimeout = initDuration(seconds = json["nimsuggestRequestTimeout"].getInt())
   if json.hasKey("logNimsuggest"):

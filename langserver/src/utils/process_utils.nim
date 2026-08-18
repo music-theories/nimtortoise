@@ -5,6 +5,16 @@ import json_rpc/private/jrpc_sys
 import macros
 import stew/byteutils
 
+when defined(posix):
+  import posix
+
+  proc killProcessGroup*(pid: int) =
+    ## Send SIGKILL to the entire process group of `pid`.
+    ## Used to kill a zombie nimsuggest (stuck in a CPU loop) and any
+    ## children it may have spawned.  Safe to call from a signal handler
+    ## because killpg(2) is async-signal-safe.
+    discard posix.killpg(posix.Pid(pid), cint(SIGKILL))
+
 proc shutdownChildProcess*(p: AsyncProcessRef): Future[void] {.async.} =
   try:
     debug "Shutting down process with pid: ", pid = p.processID()
