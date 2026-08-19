@@ -48,7 +48,7 @@ type
     maxNimsuggestProcesses*: int
     maxNimsuggestCrashRetries*: int
     nimsuggestPath*: FilePathAbs
-    nimsuggestSpawnTimeout*: times.Duration
+    nimsuggestSpawnTimeout*: times.Duration # in seconds
     nimsuggestIdleTimeout*: times.Duration # In seconds
     nimsuggestRequestTimeout*: times.Duration # In seconds
     logNimsuggest*: bool

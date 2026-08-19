@@ -10,7 +10,7 @@ import ../utils/type_mismatch_format
 import ../configurations/configurations
 import ../protocol/types
 
-import ./[suggestapi, suggestapi_utils, suggestapi_types, nimsuggest_types, nimsuggest_slots, diagnostics, nimsuggest_utils]
+import ./[suggestapi, suggestapi_types, nimsuggest_types, nimsuggest_slots, diagnostics, nimsuggest_utils]
 
 # Interactive queries that take longer than this with an empty result indicate
 # nimsuggest is spinning in unbounded generic instantiation that terminates via
@@ -103,7 +103,7 @@ proc processNimsuggestQueries*(
 
     case originalQuery.kind
     of NimsuggestQueryKind.CHANGED:
-      if mailboxHasChangedQueryForSameUriAnyOtherUri(slot, originalQuery.uri) and (originalQuery.saved == false):
+      if mailboxHasChangedQueryForSameUriAnyOtherUri(slot, originalQuery.uri) and (originalQuery.saved == false) and (not originalQuery.isInternal):
         # If there is a later changed query for the same uri queued, drop this one.  There must be no CHANGED queries to other URIs in between, though.
         debug "processNimsuggestQueries: There is a later CHANGED query for the same uri.", uri = originalQuery.uri
         originalQuery.responseFuture.complete(@[])
@@ -113,7 +113,7 @@ proc processNimsuggestQueries*(
           let fileInfo = openFiles[originalQuery.uri]
           let timeSinceLastChange = now() - fileInfo.lastChanged
 
-          if timeSinceLastChange < config.fileCheckDelay:
+          if timeSinceLastChange < config.fileCheckDelay and not originalQuery.isInternal:
             # Not enough time has elapsed
             let timeoutLength = (config.fileCheckDelay - timeSinceLastChange).inMilliseconds + 5
             debug "processNimsuggestQueries: Running timeout for CHANGED.", timeout = timeoutLength, uri = originalQuery.uri
@@ -123,9 +123,10 @@ proc processNimsuggestQueries*(
             slot.queryMailbox.addFirstNoWait(originalQuery)
             continue
           # else: enough time has passed, continue with processing the query...
-        else:
+        elif not originalQuery.isInternal:
           debug "processNimsuggestQueries: Skipping query, file is no longer open.", uri = originalQuery.uri
           continue
+        # internal cache-refresh queries proceed even for files not in openFiles
 
     
     of NimsuggestQueryKind.CHECK_FILE:
@@ -250,41 +251,83 @@ proc processNimsuggestQueries*(
           #   discard
 
           case q.kind
-          of NimsuggestQueryKind.CHANGED: 
-            # The change was successful, therefore check the file.
-            if q.uri in openFiles:
+          of NimsuggestQueryKind.CHANGED:
+            if q.uri in openFiles and not q.isInternal:
               openFiles[q.uri].lastChanged = now()
-            
-            debug "processNimsuggestQueries: check for dependencies to update "
-            let fileJustChanged = toFilePathAbs(q.uri)
-            for openFile, openFileInfo in openFiles:
-              if openFile != q.uri:
-                let fileToCheck = toFilePathAbs(openFile)
-                let isDependency = dependencies.trees.checkDependency(
-                  fileJustChanged.isADependencyOf(fileToCheck)
-                )
 
-                if isDependency:
-                  debug "processNimsuggestQueries: dependency found.  Sending CHECK_FILE command. ", dependency = openFile, fileJustChanged = q.uri
-                  let dependencyCheckQuery = NimsuggestQuery[LspFilePosition](
-                    id: 0,
-                    kind: NimsuggestQueryKind.CHECK_FILE,
-                    uri: openFile,
-                    dirtyFile: FilePathAbs(""),
-                    responseFuture: newFuture[seq[Suggest]]("checkFile"),
+            # Internal intermediate cache-refresh queries: no cascade, no self-check.
+            if q.isInternal:
+              debug "processNimsuggestQueries: intermediate cache refresh complete", uri = q.uri
+            else:
+              debug "processNimsuggestQueries: check for dependencies to update "
+              let fileJustChanged = toFilePathAbs(q.uri)
+              for openFile, openFileInfo in openFiles:
+                if openFile != q.uri:
+                  let fileToCheck = toFilePathAbs(openFile)
+                  let isDependency = dependencies.trees.checkDependency(
+                    fileJustChanged.isADependencyOf(fileToCheck)
                   )
-                  if openFileInfo.slot.isLive():
-                    openFileInfo.slot.queryMailbox.addFirstNoWait(dependencyCheckQuery)
 
-            let checkQuery = NimsuggestQuery[LspFilePosition](
-              id: 0,
-              kind: NimsuggestQueryKind.CHECK_FILE,
-              uri: q.uri,
-              dirtyFile: FilePathAbs(""),
-              responseFuture: newFuture[seq[Suggest]]("checkFile"),
-            )
-            
-            slot.queryMailbox.addFirstNoWait(checkQuery)
+                  if isDependency:
+                    debug "processNimsuggestQueries: dependency found. Sending CHECK_FILE command.",
+                      dependency = openFile, fileJustChanged = q.uri
+
+                    # Push CHECK_FILE first; queries pushed after run before it (addFirstNoWait).
+                    let dependencyCheckQuery = NimsuggestQuery[LspFilePosition](
+                      id: 0,
+                      kind: NimsuggestQueryKind.CHECK_FILE,
+                      uri: openFile,
+                      dirtyFile: FilePathAbs(""),
+                      responseFuture: newFuture[seq[Suggest]]("checkFile"),
+                    )
+                    if openFileInfo.slot.isLive():
+                      openFileInfo.slot.queryMailbox.addFirstNoWait(dependencyCheckQuery)
+
+                    # Force-recompile the dependent from disk using the updated intermediate
+                    # caches so chkFile sees a fresh compiled state for this file.
+                    # Runs just before CHECK_FILE (pushed after it, runs before it).
+                    let dependentRefreshQuery = NimsuggestQuery[LspFilePosition](
+                      id: 0,
+                      kind: NimsuggestQueryKind.CHANGED,
+                      uri: openFile,
+                      dirtyFile: fileToCheck,
+                      isInternal: true,
+                      responseFuture: newFuture[seq[Suggest]]("dependentRefresh"),
+                    )
+                    if openFileInfo.slot.isLive():
+                      openFileInfo.slot.queryMailbox.addFirstNoWait(dependentRefreshQuery)
+
+                    # Refresh intermediate modules to clear nimsuggest's stale module cache.
+                    # intermediates[0] is closest to changedFile and must execute first.
+                    # countdown + addFirstNoWait ensures execution order matches index order.
+                    # Final execution order: [intermediates..., dependentRefresh, CHECK_FILE]
+                    let intermediates = dependencies.trees.findIntermediatePath(
+                      fileToCheck, fileJustChanged
+                    )
+                    if intermediates.len > 0:
+                      debug "processNimsuggestQueries: refreshing intermediate modules for cache invalidation",
+                        count = intermediates.len, dependency = openFile
+                    for i in countdown(intermediates.len - 1, 0):
+                      let intermed = intermediates[i]
+                      let intermediateQuery = NimsuggestQuery[LspFilePosition](
+                        id: 0,
+                        kind: NimsuggestQueryKind.CHANGED,
+                        uri: toUri(intermed),
+                        dirtyFile: intermed,
+                        isInternal: true,
+                        responseFuture: newFuture[seq[Suggest]]("intermediateChanged"),
+                      )
+                      if openFileInfo.slot.isLive():
+                        openFileInfo.slot.queryMailbox.addFirstNoWait(intermediateQuery)
+
+              let checkQuery = NimsuggestQuery[LspFilePosition](
+                id: 0,
+                kind: NimsuggestQueryKind.CHECK_FILE,
+                uri: q.uri,
+                dirtyFile: FilePathAbs(""),
+                responseFuture: newFuture[seq[Suggest]]("checkFile"),
+              )
+              slot.queryMailbox.addFirstNoWait(checkQuery)
 
           of NimsuggestQueryKind.CHECK_FILE:
             if q.uri in openFiles:

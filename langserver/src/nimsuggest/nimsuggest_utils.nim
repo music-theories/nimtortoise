@@ -137,7 +137,8 @@ proc toNimsuggestQuery*(
       responseFuture: q.responseFuture,
       cancelled: q.cancelled,
       kind: NimsuggestQueryKind.CHANGED,
-      saved: q.saved
+      saved: q.saved,
+      isInternal: q.isInternal,
     ))
   of NimsuggestQueryKind.SHUTDOWN:
     return none(NimsuggestQuery[NimsuggestFilePosition])

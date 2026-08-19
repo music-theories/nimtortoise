@@ -81,6 +81,9 @@ type
         ## execStop awaits this to know the OS process is confirmed dead.
     of NimsuggestQueryKind.CHANGED:
       saved*: bool
+      isInternal*: bool
+        ## True for intermediate cache-refresh queries. Bypasses the openFiles
+        ## guard and the post-CHANGED dependency cascade.
 
 # === NIMSUGGEST SLOT TYPES ====
 type
