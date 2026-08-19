@@ -87,7 +87,8 @@ proc processMessage(client: LspSocketClient, msg: string) {.raises: [].} =
           error "Method not implemented ", meth = meth
     elif "id" in serverReq:
       let id = serverReq["id"].jsonTo(int)
-      client.responses[id].complete(serverReq["result"])
+      let resultNode = if "result" in serverReq: serverReq["result"] else: newJNull()
+      client.responses[id].complete(resultNode)
     else:
       error "Unknown msg", msg = msg
   except CatchableError as exc:
@@ -219,8 +220,10 @@ proc waitForNotification*(
 proc waitForNotificationMessage*(
     client: LspSocketClient, msg: string, timeoutMs: int = 10000
 ): Future[bool] {.async.} =
+  ## Waits for a matching `window/logMessage` notification from the server.
+  ## The server sends all status/init messages via window/logMessage (not showMessage).
   return await waitForNotification(
-    client, "window/showMessage", (json: JsonNode) => json["message"].to(string) == msg,
+    client, "window/logMessage", (json: JsonNode) => json["message"].to(string) == msg,
     timeoutMs,
   )
 

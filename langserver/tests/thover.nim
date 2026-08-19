@@ -1,49 +1,17 @@
-import std/[options, json, os, jsonutils, sequtils, strutils, sugar, strformat]
+import std/[options, json, jsonutils, sequtils, strutils, sugar, strformat]
 
 import json_rpc/[rpcclient]
 import chronicles
-import lspsocketclient
 import unittest2
 
-import ../src/configurations/configurations
-import ../src/langserver/langserver
-import ../src/nimsuggest/nimsuggest
-import ../src/protocol/[types]
-import ../src/utils/utils
-import ../src/utils/process_utils
-import ../src/nimtortoise
-
-from fixhelpers import stopServer
+import fixhelpers
 
 suite "LSP features (failing)":
-  let helloWorldUri = fixtureUri("projects/hw/hw.nim")
-  let cmdParams = CommandLineParams(transport: some socket, port: getNextFreePort())
-  let ls = main(cmdParams)
-  let client = newLspSocketClient()
-  client.registerNotification(
-    "window/showMessage",
-    "window/workDoneProgress/create",
-    "workspace/configuration",
-    "extension/statusUpdate",
-    "textDocument/publishDiagnostics",
-    "$/progress"
-  )
-  waitFor client.connect("localhost", cmdParams.port)
-
-  let initParams = LspInitializeParams %* {
-      "processId": %getCurrentProcessId(),
-      "rootUri": fixtureUri("projects/hw/"),
-      "capabilities": {
-          "window": {
-            "workDoneProgress": false
-          },
-        "workspace": {"configuration": true}
-      }
-  }
-  discard waitFor client.initialize(initParams)
+  let helloWorldUri = fixtureUri("tests/projects/hw/hw.nim")
+  let (cmdParams, ls, client) = startServer()
+  doInitialize(client, "tests/projects/hw")
   client.notify("initialized", newJObject())
-  let didOpenParams = createDidOpenParams("projects/hw/hw.nim")
-  client.notify("textDocument/didOpen", %didOpenParams)
+  sendDidOpen(client, "tests/projects/hw/hw.nim")
   discard waitFor client.waitForNotificationMessage(
     fmt"Nimsuggest initialized for {toFilePathAbs(helloWorldUri)}",
   )
@@ -62,7 +30,7 @@ suite "LSP features (failing)":
     }
     client.notify("textDocument/didChange", %didChangeParams)
     sleep(1000)
-    let hoverParams = positionParams(fixtureUri("projects/hw/hw.nim"), 2, 0)
+    let hoverParams = positionParams(helloWorldUri, 2, 0)
     let hoverResponse = client.call("textDocument/hover", %hoverParams).waitFor
     check contains($hoverResponse, "hw.a: proc ()")
 

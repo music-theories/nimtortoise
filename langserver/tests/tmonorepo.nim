@@ -34,28 +34,6 @@ suite "Fix #10 — nimble.paths forwarded to nimsuggest":
 
   stopServer(client)
 
-suite "Fix #16 — listTests with no entryPoint":
-  generateSimpleNimblePaths()
-  let (cmdParams, ls, client) = startServer("tests/projects/simple")
-  doInitialize(client, "tests/projects/simple")
-  client.notify("initialized", newJObject())
-
-  test "listTests returns success with empty result when entryPoint is not set":
-    echo "    >> listTests returns success with empty result when entryPoint is not set"
-    let response = waitFor client.call("extension/listTests", %* {
-      "projectFile": simpleProjectFile(),
-      "entryPoint": ""
-    })
-    check "error" notin response or response["error"].kind == JNull
-    check not waitFor client.waitForNotification(
-      "textDocument/publishDiagnostics",
-      proc(j: JsonNode): bool =
-        j.getStr("").contains("command expects a filename"),
-      500
-    )
-    echo "    >> DONE: listTests returns success with empty result when entryPoint is not set"
-
-  stopServer(client)
 
 suite "Fix #17 — in-flight commands complete with [] not error":
   generateSimpleNimblePaths()

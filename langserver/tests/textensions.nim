@@ -4,10 +4,7 @@ import chronos
 import chronicles
 import unittest2
 
-import nimtortoise
-
-import ./[lspsocketclient, client_utils, testhelpers]
-# from fixhelpers import stopServer
+import ./fixhelpers
 
 suite "Nimlangserver extensions":
   let (cmdParameters, ls, client) = startServer()
@@ -29,7 +26,7 @@ suite "Nimlangserver extensions":
     check initializeResult.capabilities.textDocumentSync.isSome
 
     let helloWorldFile = string(helloWorldDir) / "hw.nim"
-    client.notify("textDocument/didOpen", %createDidOpenParams(helloWorldFile))
+    sendDidOpen(client, helloWorldFile)
 
     # Wait for initial nimsuggest spawn.
     let hwAbsFile = FilePathAbs(helloWorldFile)

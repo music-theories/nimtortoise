@@ -29,7 +29,7 @@ suite "Nimsuggest tests":
         protocol: HighestSupportedNimSuggestProtocolVersion,
         capabilities: {},
       ),
-      120_000, false, false,
+      120_000, false,
     ).waitFor
 
   test "Parsing qualified path":
@@ -111,7 +111,7 @@ suite "Nimsuggest error handling":
         protocol: HighestSupportedNimSuggestProtocolVersion,
         capabilities: {},
       ),
-      120_000, false, false,
+      120_000, false,
     ).waitFor
 
     discard ns.process.suspend()

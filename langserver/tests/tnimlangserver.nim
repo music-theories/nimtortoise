@@ -1,137 +1,60 @@
-import std/[options, json, os, jsonutils, sequtils, strutils, sugar, strformat]
+import std/[options, json, jsonutils, sequtils, strutils, sugar, strformat]
 
 import json_rpc/[rpcclient]
 import chronicles
-import lspsocketclient
 import unittest2
 
-import ../src/configurations/configurations
-import ../src/langserver/langserver
-import ../src/nimsuggest/nimsuggest
-import ../src/protocol/[types]
-import ../src/utils/utils
-import ../src/utils/process_utils
-import ../src/nimtortoise
-
-from fixhelpers import stopServer
-
-## tnimlangserver.nim — rewrite-compatible port of tests/tnimlangserver.nim
-##
-## API changes from original:
-##   ls.isShutdown         — unchanged (field on LanguageServer)
-##   main(cmdParams)       — unchanged (from src/nimtortoise)
+import fixhelpers
 
 suite "Nimlangserver":
-  let cmdParams = CommandLineParams(transport: some socket, port: getNextFreePort())
-  let ls = main(cmdParams)
-  let client = newLspSocketClient()
-  client.registerNotification(
-    "window/showMessage",
-    "window/workDoneProgress/create",
-    "workspace/configuration",
-    "extension/statusUpdate",
-    "textDocument/publishDiagnostics",
-    "$/progress"
-  )
-  waitFor client.connect("localhost", cmdParams.port)
+  let (cmdParams, ls, client) = startServer()
+  let initParams = LspInitializeParams %* {
+      "processId": %getCurrentProcessId(),
+      "rootUri": fixtureUri("tests/projects/hw/"),
+      "capabilities": {
+        "window": {"workDoneProgress": true},
+        "workspace": {"configuration": true}
+      }
+  }
+  let initializeResult = waitFor client.initialize(initParams)
 
   test "initialize from the client should call initialized on the server":
     echo "    >> initialize from the client should call initialized on the server"
-    let initParams = LspInitializeParams %* {
-        "processId": %getCurrentProcessId(),
-        "rootUri": fixtureUri("projects/hw/"),
-        "capabilities": {
-          "window": {
-            "workDoneProgress": true
-          },
-          "workspace": {"configuration": true}
-        }
-    }
-    let initializeResult = waitFor client.initialize(initParams)
     check initializeResult.capabilities.textDocumentSync.isSome
 
+  # Send initialized so lsInitialized completes before stopServer hits the 60s timeout.
+  client.notify("initialized", newJObject())
   stopServer(client)
 
 
-let helloWorldUri = fixtureUri("projects/hw/hw.nim")
+let helloWorldUri = fixtureUri("tests/projects/hw/hw.nim")
 
 
 suite "Suggest API selection":
-  let cmdParams = CommandLineParams(transport: some socket, port: getNextFreePort())
-  let ls = main(cmdParams)
-  let client = newLspSocketClient()
-  client.registerNotification(
-    "window/showMessage",
-    "window/workDoneProgress/create",
-    "workspace/configuration",
-    "extension/statusUpdate",
-    "textDocument/publishDiagnostics",
-    "$/progress"
-  )
-  waitFor client.connect("localhost", cmdParams.port)
-  let initParams = LspInitializeParams %* {
-        "processId": %getCurrentProcessId(),
-        "rootUri": fixtureUri("projects/hw/"),
-        "capabilities": {
-          "window": {
-            "workDoneProgress": true
-          },
-          "workspace": {"configuration": true}
-        }
-  }
-  discard waitFor client.initialize(initParams)
+  let (cmdParams, ls, client) = startServer()
+  doInitialize(client, "tests/projects/hw")
   client.notify("initialized", newJObject())
 
   test "Suggest api":
     echo "    >> Suggest api"
-    let helloWorldFile = "projects/hw/hw.nim"
-    client.notify("textDocument/didOpen", %createDidOpenParams(helloWorldFile))
+    sendDidOpen(client, "tests/projects/hw/hw.nim")
 
-    let hwAbsFile = helloWorldFile.fixtureUri.toFilePathAbs
-    check waitFor client.waitForNotificationMessage(
-      fmt"Nimsuggest initialized for {hwAbsFile}",
-    )
+    check waitForNsInit(client, string(helloWorldUri.toFilePathAbs))
 
-    client.notify("textDocument/didOpen",
-                  %createDidOpenParams("projects/hw/useRoot.nim"))
+    sendDidOpen(client, "tests/projects/hw/useRoot.nim")
     let
-      hoverParams = positionParams("projects/hw/hw.nim".fixtureUri, 2, 0)
+      hoverParams = positionParams(helloWorldUri, 2, 0)
       hover = client.call("textDocument/hover", %hoverParams).waitFor
     check hover.kind == JNull
 
   stopServer(client)
 
 suite "LSP features":
-  let cmdParams = CommandLineParams(transport: some socket, port: getNextFreePort())
-  let ls = main(cmdParams)
-  let client = newLspSocketClient()
-  client.registerNotification(
-    "window/showMessage",
-    "window/workDoneProgress/create",
-    "workspace/configuration",
-    "extension/statusUpdate",
-    "textDocument/publishDiagnostics",
-    "$/progress"
-  )
-  waitFor client.connect("localhost", cmdParams.port)
-
-  let initParams = LspInitializeParams %* {
-      "processId": %getCurrentProcessId(),
-      "rootUri": fixtureUri("projects/hw/"),
-      "capabilities": {
-          "window": {
-            "workDoneProgress": false
-          },
-        "workspace": {"configuration": true}
-      }
-  }
-  discard waitFor client.initialize(initParams)
+  let (cmdParams, ls, client) = startServer()
+  doInitialize(client, "tests/projects/hw")
   client.notify("initialized", newJObject())
-  let didOpenParams = createDidOpenParams("projects/hw/hw.nim")
-  client.notify("textDocument/didOpen", %didOpenParams)
-  discard waitFor client.waitForNotificationMessage(
-    fmt"Nimsuggest initialized for {toFilePathAbs(helloWorldUri)}",
-  )
+  sendDidOpen(client, "tests/projects/hw/hw.nim")
+  discard waitForNsInit(client, string(toFilePathAbs(helloWorldUri)))
 
   test "Sending hover.":
     echo "    >> Sending hover."
@@ -314,7 +237,7 @@ suite "LSP features":
     }
     client.notify("textDocument/didChange", %didChangeParams)
     let
-      hoverParams = positionParams(fixtureUri("projects/hw/hw.nim"), 2, 0)
+      hoverParams = positionParams(helloWorldUri, 2, 0)
       hover = client.call("textDocument/hover", %hoverParams).waitFor
     doAssert contains($hover, "hw.a: proc ()")
 
@@ -326,7 +249,7 @@ suite "LSP features":
          "character": 2
       },
       "textDocument": {
-         "uri": fixtureUri("projects/hw/hw.nim")
+         "uri": helloWorldUri
        }
     }
     let actualEchoCompletionItem =
@@ -347,42 +270,21 @@ suite "LSP features":
     doAssert nullResponse == nullValue
     doAssert ls.isShutdown
 
-  stopServer(client)
+  # "Shutdown" test already sent shutdown and stopped the queue drain;
+  # calling stopServer here would send a second shutdown that hangs forever.
+  # Just send exit to flush FDs and ports.
+  client.notify("exit", newJNull())
+  waitFor sleepAsync(200)
 
 suite "Null configuration:":
-  let cmdParams = CommandLineParams(transport: some socket, port: getNextFreePort())
-  let ls = main(cmdParams)
-  let client = newLspSocketClient()
-  client.registerNotification(
-    "window/showMessage",
-    "window/workDoneProgress/create",
-    "workspace/configuration",
-    "extension/statusUpdate",
-    "extension/statusUpdate",
-    "textDocument/publishDiagnostics",
-    "$/progress"
-  )
-  waitFor client.connect("localhost", cmdParams.port)
-
-  let initParams = LspInitializeParams %* {
-      "processId": %getCurrentProcessId(),
-      "rootUri": fixtureUri("projects/hw/"),
-      "capabilities": {
-        "workspace": {"configuration": true},
-        "textDocument": {
-          "rename": {
-            "prepareSupport": true
-          }
-        }
-      }
-  }
-  discard waitFor client.initialize(initParams)
+  let (cmdParams, ls, client) = startServer()
+  doInitialize(client, "tests/projects/hw")
   client.notify("initialized", newJObject())
 
   test "Null configuration":
     echo "    >> Null configuration"
-    client.notify("textDocument/didOpen", %createDidOpenParams("projects/hw/hw.nim"))
-    let hoverParams = positionParams("projects/hw/hw.nim".fixtureUri, 2, 0)
+    sendDidOpen(client, "tests/projects/hw/hw.nim")
+    let hoverParams = positionParams(helloWorldUri, 2, 0)
     let hover = client.call("textDocument/hover", %hoverParams).waitFor
     doAssert hover.kind == JNull
 
