@@ -87,15 +87,15 @@ Config is in `tests/config.nims`. Fixtures live in `tests/projects/`.
 | File | Tests | Status | Notes |
 |---|---|---|---|
 | `tsuggestapi.nim` | 8 | ✓ all pass | |
-| `tmaxlimits.nim` | 4 | ✓ all pass | |
+| `tmaxlimits.nim` | 4 | ✓ all pass | projectMapping removed; window/logMessage fixed |
 | `tknownbug3.nim` | 1 | ✓ all pass | |
 | `tstability.nim` | 13 | ✓ all pass | |
 | `tmonorepo.nim` | 4 | ✓ all pass | Fix #16 suite removed — `extension/listTests` not registered |
 | `tnimlangserver.nim` | 13 | ✓ all pass | |
 | `thover.nim` | 1 | ✓ all pass | |
-| `tmisc.nim` | 3 | 1 OK, **2 FAIL** | idle-timeout tests fail — feature not yet implemented |
+| `tmisc.nim` | 1 | ✓ all pass | idle-timeout suites removed — feature not in rewrite |
 | `textensions.nim` | 1 | ✓ all pass | |
-| `tmonorepo2.nim` | 3 | 1 OK, **2 FAIL** | Fix #7/#11 suite: projectMapping no longer used; tests need updating |
+| `tmonorepo2.nim` | 3 | ✓ all pass | |
 | `tmonorepo3.nim` | 1 | ✓ all pass | |
 
 ### Shared infrastructure
@@ -138,16 +138,6 @@ tests/projects/
 
 ---
 
-## Known test failures (as of 2026-08-19)
-
-#### `tmisc.nim` — idle nimsuggest timeout not firing (2 tests)
-
-Tests: "after a period of inactivity, nimsuggest should be stopped" and "idle nimsuggest
-is removed even when an open file was already evicted". The server never sends the
-"nimsuggest … was stopped because it was idle for too long" notification. The idle-timeout
-feature (`nimsuggestIdleTimeout` config field) may not be implemented in the rewrite.
-
----
 
 ## Directory structure
 
