@@ -1,4 +1,4 @@
-import std/[os, tables, sets]
+import std/[os, tables, sets, algorithm]
 import ./[forest_types]
 import ../resources/resources
 
@@ -62,3 +62,31 @@ proc checkDependency*(
     dependency.rootFile,
     dependency.dependentFile
   )
+
+proc findIntermediatePath*(
+  graph:    Table[FilePathAbs, seq[FilePathAbs]],
+  fromFile: FilePathAbs,
+  toFile:   FilePathAbs
+): seq[FilePathAbs] =
+  ## Returns intermediate files on a path fromFile → ... → toFile,
+  ## following import edges, excluding both endpoints.
+  ## Result is in execution order: closest to toFile first,
+  ## so callers can refresh the cache layer-by-layer toward fromFile.
+  ## Returns empty seq if directly connected or no path exists.
+  var visited: HashSet[FilePathAbs]
+  var stack: seq[seq[FilePathAbs]]
+  stack.add(@[fromFile])
+  while stack.len > 0:
+    let currentPath = stack.pop()
+    let current = currentPath[^1]
+    if current == toFile:
+      if currentPath.len > 2:
+        result = currentPath[1..^2]
+        result.reverse()
+      return
+    if current in visited:
+      continue
+    visited.incl(current)
+    for dep in graph.getOrDefault(current, @[]):
+      if dep notin visited:
+        stack.add(currentPath & dep)

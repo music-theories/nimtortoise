@@ -26,9 +26,6 @@ proc initForest*(
     let nimDumpInfo = getNimDumpInfoForEntryPoints(
       nimbleInfo.entryPoints, rootPath
     )
-    var dependencyGraph = initDependencyGraph(
-      nimbleInfo.entryPoints, rootPath
-    )
     result.nimble = nimbleInfo.dump
 
     var nimInfoSet = false
@@ -39,26 +36,27 @@ proc initForest*(
           nimExe:  nimDump.nimExe
         )
         nimInfoSet = true
-      
-      let source = readFile(string(entryPoint))
-      for importName in extractImports(source):
-        let modulePath = importName.replace('.', DirSep)
-        for path in nimDump.libPaths:
-          if path.isInside(rootPath):
-            if entryPoint notin result.paths:
-              result.paths[entryPoint] = @[]
-            if path notin result.paths[entryPoint]:
-              result.paths[entryPoint].add(path)
+      for path in nimDump.libPaths:
+        if path.isInside(rootPath):
+          if entryPoint notin result.paths:
+            result.paths[entryPoint] = @[]
+          if path notin result.paths[entryPoint]:
+            result.paths[entryPoint].add(path)
 
-            let candidate = FilePathAbs(
-              (string(path) / modulePath & ".nim").normalizedPath
-            )
-            if fileExists(string(candidate)):
-              if entryPoint notin dependencyGraph.graph:
-                dependencyGraph.graph[entryPoint] = @[]
-              if candidate notin dependencyGraph.graph[entryPoint]:
-                dependencyGraph.graph[entryPoint].add(candidate)
+    # Derive search paths from all local nimble packages' src directories.
+    # This lets resolveImport find bare package-name imports (e.g. `import foo`)
+    # without requiring nim dump to include nimble paths.
+    var searchPaths: seq[DirPathAbs]
+    for nimbleFile, dump in nimbleInfo.dump:
+      let srcPath = DirPathAbs(
+        (parentDir(string(nimbleFile)) / string(dump.srcDir)).normalizedPath
+      )
+      if dirExists(string(srcPath)) and srcPath notin searchPaths:
+        searchPaths.add(srcPath)
 
+    var dependencyGraph = initDependencyGraph(
+      nimbleInfo.entryPoints, rootPath, searchPaths
+    )
     result.trees = dependencyGraph.graph
 
 proc initForest*(

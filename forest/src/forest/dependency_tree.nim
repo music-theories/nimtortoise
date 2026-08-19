@@ -165,6 +165,7 @@ proc resolveImport(
   importName:    string,
   importingFile: FilePathAbs,
   root:          DirPathAbs,
+  searchPaths:   seq[DirPathAbs] = @[],
 ): Option[FilePathAbs] {.raises: [OSError, ValueError].} =
   ## Nim modules normally correspond to:
   ##
@@ -174,6 +175,7 @@ proc resolveImport(
   ## Resolution order:
   ##   1. Relative to the importing file's directory
   ##   2. Relative to the project root
+  ##   3. Each entry in searchPaths (for bare package-name imports)
 
   # If the name already contains a path separator it is already a filesystem
   # path (e.g. "std/os", "../utils/utils", "./foo").  Only convert dots to
@@ -190,12 +192,18 @@ proc resolveImport(
   if fileExists(string(relativeToRoot)):
     return some(relativeToRoot)
 
+  for searchPath in searchPaths:
+    let candidate = normalizePath(joinPath(string(searchPath), modulePath & ".nim"))
+    if fileExists(string(candidate)):
+      return some(candidate)
+
   none(FilePathAbs)
 
 proc visit(
   dependencyGraph: var DependencyGraph,
   file: FilePathAbs,
   root: DirPathAbs,
+  searchPaths: seq[DirPathAbs] = @[],
 ) {.raises: [IOError, OSError, ValueError].} =
   let file = normalizePath(string(file))
 
@@ -222,7 +230,7 @@ proc visit(
     let source = readFile(string(file))
 
     for importName in extractImports(source):
-      let dependency = resolveImport(importName, file, root)
+      let dependency = resolveImport(importName, file, root, searchPaths)
 
       if dependency.isNone:
         # Not a project-local .nim file; treat it as a standard library
@@ -246,7 +254,7 @@ proc visit(
       if dep notin dependencyGraph.graph[file]:
         dependencyGraph.graph[file].add(dep)
 
-      dependencyGraph.visit(dep, root)
+      dependencyGraph.visit(dep, root, searchPaths)
 
     discard dependencyGraph.stack.pop()
     dependencyGraph.states[file] = VISITED
@@ -276,12 +284,15 @@ proc commonParentDir(paths: seq[DirPathAbs]): DirPathAbs {.raises: [].} =
   DirPathAbs(parts.join($DirSep))
 
 proc initDependencyGraph*(
-  entryFiles: seq[FilePathAbs],
-  root:       DirPathAbs
+  entryFiles:  seq[FilePathAbs],
+  root:        DirPathAbs,
+  searchPaths: seq[DirPathAbs] = @[],
 ): DependencyGraph {.raises: [IOError, OSError, ValueError].} =
   ## Build a dependency graph from one or more entry .nim files.
   ## If root is empty it is inferred as the common parent directory of all
   ## entry files (suitable for a multi-package repo).
+  ## searchPaths is used to resolve bare package-name imports (e.g. `import foo`
+  ## where foo lives in a sibling package's src/ directory).
   result = DependencyGraph(
     graph:  initTable[FilePathAbs, seq[FilePathAbs]](),
     states: initTable[FilePathAbs, VisitState](),
@@ -302,4 +313,4 @@ proc initDependencyGraph*(
     else: commonParentDir(entries.mapIt(parentDir(it)))
 
   for entry in entries:
-    result.visit(entry, result.root)
+    result.visit(entry, result.root, searchPaths)

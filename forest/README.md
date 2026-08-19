@@ -41,6 +41,13 @@ A Nim project may contain several configuration and dependency files, each servi
 
 **Scope:** One per package, at the package root.
 
+For `forest`, the fields that matter are:
+
+- **`srcDir`** — defines the root from which local imports are resolved. If unset, the project root is used.
+- **`bin` / `namedBin`** — fallback entry points when `entryPoints` is absent.
+- **`entryPoints`** — the natural starting nodes for graph traversal; prefer these over `bin` when present.
+- **`testEntryPoint`** — Entry point for tests.
+
 ---
 
 ### `nimble.paths`
@@ -300,64 +307,3 @@ other.nim
 
 - `main.nim` importing `x` finds `foo/x.nim` first (current directory check)
 - `other.nim` importing `x` finds `$lib/x.nim` (first match in PATH; `$lib/bar/x.nim` is also a match but loses)
-
-Run `nim dump` to inspect the active PATH for a project.
-
-### Implications for nimforest
-
-The current directory check means that a bare `import helpers` in `src/foo.nim` will find `src/helpers.nim` without any path configuration — this is the case nimforest already handles. The PATH is only needed for imports that reach outside the importing file's own directory, which in well-structured projects is handled by `srcDir` and `paths` in the `.nimble` file rather than requiring `nim.cfg` parsing.
-
----
-
-## `.nimble` Field Reference
-
-From https://nim-lang.github.io/nimble/nimble-reference.html
-
-### `[Package]` — Required
-
-| Field | Description |
-|---|---|
-| `name` | Package name (not required in NimScript format) |
-| `version` | Current version; increment before tagging a release |
-| `author` | Author name |
-| `description` | Human-readable description |
-| `license` | License identifier (e.g. `MIT`) |
-
-### `[Package]` — Optional: Installation filtering
-
-"Installation" here means **when someone else installs your package** — via `nimble install your-pkg` or as a dependency of their project. Nimble copies files from your repo into a local cache (typically `~/.nimble/pkgs/`). The `skip*` and `install*` fields control which files are included in that copy.
-
-`skip*` fields are a blacklist: exclude these, copy everything else. `install*` fields are a whitelist: copy only these (plus the `.nimble` file and any declared binary). The two sets cannot be combined — use one approach or the other.
-
-Common use: add `skipDirs = @["tests", "docs", "examples"]` so consumers don't download files they'll never use.
-
-| Field | Description |
-|---|---|
-| `skipDirs` | Directory names to exclude from installation (comma-separated) |
-| `skipFiles` | File names to exclude from installation (comma-separated) |
-| `skipExt` | File extensions to exclude, without leading `.` (comma-separated) |
-| `installDirs` | Directories to exclusively install; nothing else is installed except these, `installFiles`, `installExt`, the `.nimble` file, and any binary |
-| `installFiles` | Files to exclusively install (complements `installDirs` and `installExt`) |
-| `installExt` | Extensions to exclusively install (complements `installDirs` and `installFiles`) |
-
-### `[Package]` — Optional: Build configuration
-
-| Field | Description |
-|---|---|
-| `srcDir` | Directory containing `.nim` source files. **Default:** the directory containing the `.nimble` file (project root) |
-| `binDir` | Directory where `nimble build` writes compiled binaries. **Default:** project root |
-| `bin` | Comma-separated list of files to build as binaries (no extension needed). Makes this a binary package |
-| `namedBin` | Like `bin` but with explicit output names: `name:value`. Overrides duplicates in `bin` |
-| `backend` | Compiler backend for `bin` targets: `c`, `cc`, `cpp`, `objc`, or `js`. **Default:** `c` |
-| `paths` | Relative paths added to `nimble.paths` and the compiler's search path. Covers the same ground as `--path:` in `nim.cfg` but declared in the package manifest |
-| `entryPoints` | Relative paths to `.nim` files used by nimlangserver as project entry points. Useful for test aggregator files such as `tall.nim` |
-| `testEntryPoint` | Relative path to the test file containing imported tests (e.g. `tall.nim`). **Default:** `""` (empty; if unset, Nimble discovers test files automatically) |
-
-### Relevance to dependency tree building
-
-For nimforest, the fields that matter are:
-
-- **`srcDir`** — defines the root from which local imports are resolved. If unset, the project root is used. This subsumes the common `nim.cfg` pattern of `--path:"$projectDir/src"`.
-- **`paths`** — additional search paths declared at the package level. Reading these from `.nimble` avoids the need to parse `nim.cfg` or `config.nims` for path expansions in most real-world projects.
-- **`entryPoints`** — the natural starting nodes for graph traversal; prefer these over `bin` when present.
-- **`bin` / `namedBin`** — fallback entry points when `entryPoints` is absent.
