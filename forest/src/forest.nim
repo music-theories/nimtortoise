@@ -4,11 +4,13 @@ import ./forest/[
   init_forest,
   forest_utils, forest_types, 
   dependency_tree, dependency_tree_utils, 
+  bfs
 ]
 export 
   init_forest,
   forest_utils, forest_types,
-  dependency_tree, dependency_tree_utils
+  dependency_tree, dependency_tree_utils,
+  bfs
 
 import ./resources/resources
 export resources

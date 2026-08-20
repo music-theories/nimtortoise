@@ -1,4 +1,4 @@
-import std/[os, tables, sets, algorithm]
+import std/[os, tables, sets, algorithm, sequtils, deques]
 import ./[forest_types]
 import ../resources/resources
 
@@ -90,3 +90,29 @@ proc findIntermediatePath*(
     for dep in graph.getOrDefault(current, @[]):
       if dep notin visited:
         stack.add(currentPath & dep)
+
+# func orderAndDeduplicateDependencyPaths*[T](
+#   dependencyPaths: seq[seq[T]]
+# ): seq[T] =
+#   var output: seq[T] = @[]
+#   for i in 0..100:
+#     var arraysLeft = 0
+#     for path in dependencyPaths:
+#       if i < path.len:
+#         output.add(path[i])
+#         arraysLeft += 1
+#     if arraysLeft == 0:
+#       break
+#   debugEcho output
+#   return output.deduplicate()
+
+# echo orderAndDeduplicateDependencyPaths[int](
+#   @[
+#     @[0, 1, 2, 3, 4, 5],
+#     @[2, 6],
+#     @[3, 4, 5, 7],
+#     @[0, 1]
+#   ]
+# )
+
+

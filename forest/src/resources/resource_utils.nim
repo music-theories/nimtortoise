@@ -1,4 +1,4 @@
-import std/[json, hashes, os, strutils, uri]
+import std/[json, hashes, sha1, os, strutils, uri]
 import ./resource_types
 
 func `$`*(x: FileUri):     string = string(x)
@@ -181,3 +181,21 @@ func isInside*(sub: DirPathAbs; dir: DirPathAbs): bool =
   let d = string(dir).normalizedPath & DirSep
   string(sub).normalizedPath.startsWith(d)
 
+proc uriToStashFileName*(uri: FileUri): FilePathRel =
+  # Use SHA-1 for a collision-resistant stash filename (40 hex chars).
+  # std/hash is a 64-bit integer hash; two URIs could share it and silently
+  # overwrite each other's edit buffer. SHA-1 collision probability is ~2^-80.
+  return FilePathRel($secureHash(string(uri)) & ".nim")
+
+proc uriToStashFilePath*(
+  storageDir: DirPathAbs, uri: FileUri
+): FilePathAbs =
+  ## Creates stash file path out of storage directory and uri
+  return storageDir / uriToStashFileName(uri)
+
+# Old function:
+# proc uriToStash*(ls: LanguageServer, uri: FileUri): FilePathAbs =
+#   if ls.files.openFiles.hasKey(uri):
+#     return uriStorageLocation(ls, uri)
+#   else:
+#     return FilePathAbs("")
