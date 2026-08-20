@@ -41,7 +41,9 @@ proc createNimsuggestDependencyQueries*(
 
     for f in reversed(sortedListOfDependencies):
       let fasUri = toUri(f)
-      let stashForFile = uriToStashFilePath(storageDir, fasUri)
+      let stashForFile =
+        if openFiles.hasKey(fasUri): uriToStashFilePath(storageDir, fasUri)
+        else: FilePathAbs("")
 
       let checkQuery = NimsuggestQuery[LspFilePosition](
         id: 0,
