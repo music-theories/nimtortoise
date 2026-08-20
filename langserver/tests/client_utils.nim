@@ -37,3 +37,6 @@ proc pkgbProjectFile*(): string =
 
 proc pkgaOrphanFile*(): string =
   absolutePath("tests" / "projects" / "monorepo" / "pkga" / "src" / "aorphan.nim")
+
+proc dependenciesProjectFile*(): string =
+  absolutePath("tests" / "projects" / "dependencies" / "src" / "dependencies.nim")
