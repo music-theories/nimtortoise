@@ -56,16 +56,16 @@ Common use: add `skipDirs = @["tests", "docs", "examples"]` so consumers don't d
 
 ### `[Package]` — Optional: Build configuration
 
-| Field | Description |
-|---|---|
-| `srcDir` | Directory containing `.nim` source files. **Default:** the directory containing the `.nimble` file (project root) |
-| `binDir` | Directory where `nimble build` writes compiled binaries. **Default:** project root |
-| `bin` | Comma-separated list of files to build as binaries (no extension needed). Makes this a binary package |
-| `namedBin` | Like `bin` but with explicit output names: `name:value`. Overrides duplicates in `bin` |
-| `backend` | Compiler backend for `bin` targets: `c`, `cc`, `cpp`, `objc`, or `js`. **Default:** `c` |
-| `paths` | Relative paths added to `nimble.paths` and the compiler's search path. Covers the same ground as `--path:` in `nim.cfg` but declared in the package manifest |
-| `entryPoints` | Relative paths to `.nim` files used by nimlangserver as project entry points. Useful for test aggregator files such as `tall.nim` |
-| `testEntryPoint` | Relative path to the test file containing imported tests (e.g. `tall.nim`). **Default:** `""` (empty; if unset, Nimble discovers test files automatically) |
+| Field | Type | Description |
+|---|---|---|
+| `srcDir` | `string` | Directory containing `.nim` source files. **Default:** the directory containing the `.nimble` file (project root). Must be a bare string literal: `srcDir = "src"`. |
+| `binDir` | `string` | Directory where `nimble build` writes compiled binaries. **Default:** project root |
+| `bin` | `seq[string]` | Executables to build (no extension). Makes this a binary package. **Must use `@[...]` syntax**: `bin = @["myapp"]`. A bare string `bin = "myapp"` is invalid and will not be parsed correctly. |
+| `namedBin` | `seq[string]` | Like `bin` but with explicit output names: `name:value`. Overrides duplicates in `bin` |
+| `backend` | `string` | Compiler backend for `bin` targets: `c`, `cc`, `cpp`, `objc`, or `js`. **Default:** `c` |
+| `paths` | `seq[string]` | Relative paths added to `nimble.paths` and the compiler's search path. Covers the same ground as `--path:` in `nim.cfg` but declared in the package manifest |
+| `entryPoints` | `seq[string]` | Relative paths to `.nim` files used by nimlangserver as project entry points. Useful for test aggregator files such as `tall.nim`. **Must use `@[...]` syntax**: `entryPoints = @["src/main.nim"]`. |
+| `testEntryPoint` | `string` | Relative path to the test file containing imported tests (e.g. `tall.nim`). **Default:** `""` (empty; if unset, Nimble discovers test files automatically) |
 
 ## An average .nimble file
 
