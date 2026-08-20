@@ -521,3 +521,176 @@ The `extension/suggest` code action ("Restart nimsuggest") clears `crashedFiles`
 entire project and forces a fresh spawn. As of the current rewrite this is a stub
 awaiting implementation.
 
+---
+
+## Transitive Dependency Diagnostics
+
+This section documents how nimsuggest propagates diagnostics across multi-file dependency
+chains, and the manual cascade technique required to work around its single-level
+`markClientsDirty` behaviour.
+
+---
+
+### How `executeNoHooksV3` Stores Errors
+
+In v4, every command (including `changed`, `chkFile`, `chk`) routes through
+`executeNoHooksV3` in `nimsuggest/nimsuggest.nim`. This proc **overwrites
+`conf.structuredErrorHook`** at the start of each call to store errors into
+`graph.suggestErrors` — a `Table[FileIndex, seq[Suggest]]`:
+
+```nim
+conf.structuredErrorHook = proc (conf: ConfigRef; info: TLineInfo; msg: string; sev: Severity) =
+  let suggest = Suggest(section: ideChk, filePath: toFullPath(conf, info), ...)
+  graph.suggestErrors.mgetOrPut(info.fileIndex, @[]).add suggest
+```
+
+Errors accumulate in this table during recompilation. They are emitted to the client only
+when an explicit read command runs:
+
+- `ideChk` (`chk`) — emits all entries in `suggestErrors` for all files
+- `ideChkFile` (`chkFile`) — emits only `suggestErrors[fileIndex]` for the queried file
+- `markDirty(fileIdx)` — **clears** `suggestErrors[fileIdx]` as a side effect
+
+This means **no recompilation = no errors**, regardless of what is dirty. A `chkFile`
+on a file that does not need compilation simply returns whatever was already in
+`suggestErrors[fileIdx]` — which may be empty.
+
+---
+
+### `markClientsDirty` is ONE Level Only
+
+When `changed file_a ; stash` is processed, nimsuggest calls:
+
+1. `markDirtyIfNeeded(stash, file_a_idx)` — marks file_a sfDirty, clears its `suggestErrors`
+2. `markClientsDirty(file_a_idx)` — marks direct importers sfDirty
+
+The critical constraint: `markClientsDirty` does **not** compute the transitive closure.
+In `compiler/modulegraphs.nim` line 838, the transitive invalidation is explicitly
+commented out:
+
+```nim
+# invalidTransitiveClosure = true
+```
+
+Only the one-hop set of direct importers is marked. Given the chain:
+
+```
+dependencies.nim → file_c → file_b → file_a
+```
+
+After `changed file_a`:
+- file_a → sfDirty ✓
+- file_b → sfDirty ✓ (direct importer of file_a)
+- file_c → **not dirty** ✗ (two hops away)
+- dependencies.nim → **not dirty** ✗ (three hops away)
+
+---
+
+### Why `recompilePartially` Skips Clean Files
+
+`ideChk` and `ideChkFile` call `recompilePartially` (or `recompilePartially(moduleToCompile)`
+for per-file commands). The entry function in `compiler/pipelines.nim` walks the module
+graph starting from the project root (for `ideChk`) or a specific module (for `ideChkFile`).
+
+A module is only recompiled if `graph.isDirty(module)` — i.e. `sfDirty in module.flags`.
+If file_c is not sfDirty, `compilePipelineModule(file_c)` returns its cached result
+immediately without running the type checker. No new errors are generated; `suggestErrors`
+for file_c remains empty.
+
+Consequence: after `changed file_a`, a bare `chkFile file_c` returns 0 errors — not because
+file_c is correct, but because nimsuggest never recompiled it.
+
+When a module **is** recompiled, `compilePipelineModule` (in `compiler/pipelines.nim`) ends
+by calling:
+
+```nim
+result.excl sfDirty
+graph.markClientsDirty(fileIdx)   # one hop: marks direct importers sfDirty
+```
+
+This is the propagation mechanism that can be chained manually (see below).
+
+---
+
+### The Manual Cascade Technique
+
+Because `markClientsDirty` is one-hop, the langserver must manually thread the dirty signal
+through intermediate non-open files before checking open dependents. The technique is:
+
+**Step 1 — Self-check the changed file with its stash:**
+```
+chkFile file_a ; stash_a
+```
+file_a is sfDirty (from `changed`) → recompiled from stash → `markClientsDirty(file_a_idx)`
+→ file_b becomes sfDirty
+
+**Step 2 — Check each non-open intermediate file (no stash):**
+```
+chkFile file_b ; ""
+```
+file_b is sfDirty → recompiled against the updated file_a types → `markClientsDirty(file_b_idx)`
+→ file_c becomes sfDirty
+
+**Step 3 — Check the open dependent with its stash:**
+```
+chkFile file_c ; stash_c
+```
+file_c is now sfDirty → recompiled from stash (in-memory content) → type error propagates
+through the chain → `suggestErrors[file_c_idx]` populated → response returned to langserver
+
+The intermediate files (file_b in this example) are discovered via `findIntermediatePath`
+from `forest/src/forest/dependency_tree_utils.nim`. Open dependent files are found by
+walking `openFiles` and calling `isDependency`.
+
+**Queue ordering**: The langserver uses `addFirstNoWait` to prepend to the query mailbox,
+so items must be added in **reverse execution order** — open dependents first, then
+intermediates, then the self-check last (so it ends up at the queue front).
+
+| Add order | `addFirstNoWait` call | Queue state after |
+|-----------|----------------------|-------------------|
+| 1st | CHECK_FILE(file_c, stash_c) | [file_c] |
+| 2nd | CHECK_FILE(file_b, "") | [file_b, file_c] |
+| 3rd | CHECK_FILE(file_a, stash_a) | [file_a, file_b, file_c] |
+
+Drain order: file_a → file_b → file_c. Each step makes the next one dirty before it runs.
+
+---
+
+### Stash Paths for Open Dependent Files
+
+A subtle but important detail: open dependent files must be checked against their
+**stash, not their on-disk content**. When a dependent file has unsaved changes (e.g. the
+user edited file_c before saving), the on-disk content is stale. Checking against disk
+content produces diagnostics for the wrong version of the file.
+
+The stash path for any open file is:
+```
+storageDir / sha1(uri) & ".nim"
+```
+
+`storageDir` can be recovered from the changed file's own `q.dirtyFile` — since
+`q.dirtyFile` is always `storageDir / sha1(changedUri) & ".nim"`, taking `parentDir(q.dirtyFile)`
+gives `storageDir` without requiring it to be passed through every function signature.
+
+Non-open intermediate files (file_b) have no stash and must be checked with `dirtyFile=""`
+(on-disk content). This is correct because intermediate files are not open in the editor
+and their on-disk content is always current.
+
+---
+
+### `chkFile` vs `chk` for Diagnostic Propagation
+
+`chk` (CHECK_PROJECT / `ideChk`) calls `recompilePartially()` from the **project root** with
+no specific file, then emits all entries in `suggestErrors`. This sounds like it should
+propagate errors through the whole graph, but it does not, because:
+
+1. It starts at the project root (`deps.nim`), which is not dirty → returns immediately
+   without recompiling anything
+2. Even if it did recompile, it only marks one hop of clients dirty per file recompiled
+
+`chkFile` (CHECK_FILE / `ideChkFile`) calls `recompilePartially(moduleToCompile)` for a
+**specific module**. When that module is sfDirty, recompilation runs and `markClientsDirty`
+is called for that specific module. This makes `chkFile` the correct primitive for the
+cascade — it gives fine-grained control over which module triggers the next hop of dirty
+propagation.
+

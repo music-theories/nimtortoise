@@ -166,20 +166,14 @@ Now, when you change a file, you need to send a `changed` message to `nimsuggest
 changed "/abs/path/to/file.nim";"/abs/path/to/dirtyfile.nim":0:0
 ```
 
-But if you send a `changed` message to `nimsuggest` to indicate a file is change, it will not presume that any other files - even ones that import it - have changed.  No files further along the import chain will be marked as changed, and this leads to stale diagnostics.  e.g let's say that we have another file:
+When you send a `changed` message for `file_a.nim`, nimsuggest does mark `file_b.nim` as dirty — but only because `file_b.nim` directly imports `file_a.nim`. The propagation stops at one hop. So in the two-file case, this works correctly.
 
-```nim
-# file_a.nim
-type
-    SpecialType* = object
-        magical*: int
-```
+The problem arises with an intermediate file in the chain. Say we introduce `file_c.nim`:
 
 ```nim
 # file_c.nim
 import ./file_a.nim
 export file_a
-
 ```
 
 ```nim
@@ -188,16 +182,15 @@ import ./file_c.nim
 let aVariableThatUsesAType = SpecialType(magical: "always")
 ```
 
-Now, if I have all files open and I make an edit in `file_a.nim`, then `file_c.nim`, then `file_b.nim`, everything will be fine as all files will be sending changed messages to nimsuggest, but if `file_c.nim` is closed or is not being edited, and I change `file_a.nim` back:
+Now, if `file_c.nim` is closed (not being edited), and I change `file_a.nim` so that `magical` becomes `int`, nimsuggest receives `changed file_a` and marks `file_c` dirty — but stops there. `file_b.nim` is two hops away and is never marked dirty. Asking nimsuggest to check `file_b.nim` returns no errors, because it sees a clean cached result.
 
-```nim
-# file_a.nim
-type
-    SpecialType* = object
-        magical*: string
-```
+The fix is to walk the import chain and send a sequence of `chkFile` commands — not extra `changed` messages. Sending `changed` only marks a file dirty and clears its stored errors; it does not recompile. What actually triggers error propagation is recompilation, which happens when `chkFile` is called on a dirty file. Each `chkFile` recompiles that file and then marks its own direct importers dirty, setting up the next step:
 
-The diagnostic errors in `file_b.nim` should disappear, but they won't, because we need to send a `changed` message for `file_a.nim`, then `file_c.nim`, then `file_b.nim` in order to get the correct diagnostics.  In other words, we have to walk along the import chain and manually indicate each file has been changed.  We need to send `changed` messages for every file in the import chain between the file using the type and the one defining it.  To prevent doing a slow `recompile` with `nimsuggest`, I am now using `forest` to track where each file is in the dependency tree and send the `changed` messages in order, to ensure the diagnostics being shown stay in sync with reality.
+1. `chkFile file_a ; stash_a` — recompiles `file_a` from the stash; marks `file_c` dirty
+2. `chkFile file_c ; ""` — `file_c` is now dirty; recompiles it; marks `file_b` dirty
+3. `chkFile file_b ; stash_b` — `file_b` is now dirty; recompiles it; error found
+
+This langserver uses `forest` to find the intermediate files between the changed file and each open dependent, then queues this cascade of `chkFile` commands automatically whenever a file is edited.
 
 ### Missing diagnostics bug — fixed
 

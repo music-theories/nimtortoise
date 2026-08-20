@@ -1,4 +1,4 @@
-import std/[options, strformat, sets, tables, times, json, sequtils]
+import std/[options, strformat, sets, tables, times, json, sequtils, sha1]
 import chronos
 import chronicles
 
@@ -312,13 +312,22 @@ proc processNimsuggestQueries*(
             # Add in reverse execution order: dependents first, intermediates next,
             # self-check last (so self-check ends up at queue front).
 
-            # Step 1: Add open dependents (their disk content is current, dirtyFile="")
+            # All open files have a stash written on didOpen and updated on every
+            # didChange. The stash path is storageDir / sha1(uri) & ".nim", where
+            # storageDir = parentDir(q.dirtyFile). We always pass the stash so
+            # nimsuggest sees the current in-memory content, not the on-disk version
+            # (which may be stale when the file has unsaved changes).
+            let storageDir = parentDir(q.dirtyFile)
+
+            # Step 1: Add open dependents with their stash paths so nimsuggest
+            # recompiles them against their in-memory (possibly unsaved) content.
             for f in dependentFiles:
+              let stashForF = storageDir / FilePathRel($secureHash(string(f)) & ".nim")
               let checkQuery = NimsuggestQuery[LspFilePosition](
                 id: 0,
                 kind: NimsuggestQueryKind.CHECK_FILE,
                 uri: f,
-                dirtyFile: FilePathAbs(""),
+                dirtyFile: stashForF,
                 responseFuture: newFuture[seq[Suggest]]("checkFile"),
               )
               slot.queryMailbox.addFirstNoWait(checkQuery)
