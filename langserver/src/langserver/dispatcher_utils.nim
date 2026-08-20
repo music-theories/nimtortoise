@@ -1,4 +1,4 @@
-import std/[options, tables, algorithm, sequtils, strutils, times]
+import std/[options, tables, algorithm, sequtils, strutils, times, sets]
 import chronos
 import chronicles
 import forest
@@ -147,17 +147,60 @@ proc nimsuggestSlotToEvict*(pool: NimsuggestPool): NimsuggestSlot =
   ## Within each tier, the least recently used slot is chosen.
   ## Precondition: pool has at least one slot.
   assert pool.slots.len > 0, "nimsuggestSlotToEvict called on empty pool"
+  var allCandidates: seq[NimsuggestSlot] = @[]
 
-  for state in [SlotState.STOPPED, SlotState.CRASHED, SlotState.STOPPING, SlotState.READY, SlotState.SPAWNING]:
-    var candidates: seq[NimsuggestSlot]
-    for slot in pool.slots.values:
-      if slot.state == state:
-        candidates.add(slot)
-    if candidates.len > 0:
-      return lruAmong(candidates)
+  ## First check STOPPED
+  var stoppedCandidates: seq[NimsuggestSlot] = @[]
+  for slot in pool.slots.values:
+    if slot.state == SlotState.STOPPED or slot.state == SlotState.STOPPING:
+      stoppedCandidates.add(slot)
+      allCandidates.add(slot)
 
+  if stoppedCandidates.len > 0:
+    return lruAmong(stoppedCandidates)
+  
+  # Then check CRASHED
+  var crashedCandidates: seq[NimsuggestSlot] = @[]
+  for slot in pool.slots.values:
+    if slot.state == SlotState.CRASHED:
+      crashedCandidates.add(slot)
+      allCandidates.add(slot)
+
+  if crashedCandidates.len > 0:
+    return lruAmong(crashedCandidates)
+
+  # Then check READY slots 
+  var readyButEmptyCandidates: seq[NimsuggestSlot] = @[]
+  var readyButFullCandidates: seq[NimsuggestSlot] = @[]
+  for slot in pool.slots.values:
+    if slot.state == SlotState.READY:
+      if slot.ownedUris.len == 0:
+        readyButEmptyCandidates.add(slot)
+      else:
+        readyButFullCandidates.add(slot)
+      allCandidates.add(slot)
+  
+  # Prefer READY slots with no owned URIs...
+  if readyButEmptyCandidates.len > 0:
+    return lruAmong(readyButEmptyCandidates)
+
+  # ... then those that do own URIs...
+  if readyButFullCandidates.len > 0:
+    return lruAmong(readyButFullCandidates)
+
+  # Then finally, SPAWNING slots (we gotta give them a chance!!!)
+  var spawningCandidates: seq[NimsuggestSlot] = @[]
+  for slot in pool.slots.values:
+    if slot.state == SlotState.SPAWNING:
+      spawningCandidates.add(slot)
+      allCandidates.add(slot)
+
+  if spawningCandidates.len > 0:
+    return lruAmong(spawningCandidates)
+  
+  return lruAmong(allCandidates)
   # Unreachable if precondition holds, but satisfies the compiler.
-  raiseAssert "nimsuggestSlotToEvict: pool has slots but none matched any state"
+  # raiseAssert "nimsuggestSlotToEvict: pool has slots but none matched any state"
 
 
 proc queryFile*(ls: LanguageServer, uri: FileUri, kind: NimsuggestQueryKind): Future[seq[Suggest]] =
@@ -180,38 +223,3 @@ proc queryFile*(ls: LanguageServer, uri: FileUri, kind: NimsuggestQueryKind): Fu
   )
 
   fileInfo.slot.queryMailbox.addLastNoWait(query)
-
-# var compiledRegexCache {.threadvar.}: Table[string, Regex2]
-
-# proc getCompiledRegex(pattern: string): Regex2 =
-#   ## Returns a cached compiled Regex2 for pattern, compiling it on first use.
-#   ## Chronos is single-threaded cooperative, so no locking is needed.
-#   if pattern notin compiledRegexCache:
-#     compiledRegexCache[pattern] = re2(pattern)
-#   compiledRegexCache[pattern]
-
-# proc clearCompiledRegexCache*() =
-#   ## Invalidate the regex cache. Call after workspace configuration changes so
-#   ## that stale projectMapping patterns are not reused across config updates.
-#   compiledRegexCache.clear()
-
-# proc getIntendedProject*(ls: LanguageServer, uri: FileUri): FilePath =
-#   ## ProjectMapping regex lookup only. No slot creation, no LRU fallback.
-#   ## Returns FilePath("") if no mapping matches.
-#   let path = uri.uriToPath
-#   let rootPath =
-#     case ls.capabilities.serverMode
-#     of lsp: ls.capabilities.lspInitializeParams.getRootPath
-#     of mcp: ls.capabilities.mcpInitializeParams.getRootPath
-#   let pathRelativeToRoot = string(path).tryRelativeTo(rootPath)
-#   let config = ls.configurations.currentConfig
-#   for mapping in config.projectMapping:
-#     var m: RegexMatch2
-#     if find(string(path), getCompiledRegex(mapping.fileRegex), m):
-#       if mapping.projectFile == "":
-#         return path  # regex matched but no projectFile — file is its own project
-#       return FilePath(
-#         if isAbsolute(mapping.projectFile): mapping.projectFile
-#         else: rootPath / mapping.projectFile
-#       )
-#   return FilePath("")

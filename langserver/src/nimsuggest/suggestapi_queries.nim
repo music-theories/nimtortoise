@@ -139,6 +139,7 @@ proc buildNimsuggestArguments*(
   #   else:
   # THIS NEEDS TO ALWAYS BE OFF TO PREVENT THE COMPILER SHITTING THE BED ON LARGE CODEBASES WITH GENERICS, MACROS AND TEMPLATES. 
   result.add("--exceptionInlayHints:off")
+  # result.add("--exceptionInlayHints:off")
 
   debug "Nim Paths ", paths = spawningInfo.paths
   # COMMENTED OUT TO SEE IF THIS MAKES ANY DIFFERENCE

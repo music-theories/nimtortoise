@@ -60,10 +60,10 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
       # Refresh dirtyFile at dispatch time. The query was constructed in the LSP
       # handler before any FILE_ACCESS (DID_CHANGE) in front of it was processed,
       # so dirtyFile may have been captured as "" even though changed=true by now.
-      if q.kind == NimsuggestQueryKind.CHANGED and q.saved:
-        q.dirtyFile = FilePathAbs("")
-      else:
-        q.dirtyFile = ls.uriToStash(q.uri)
+      # if q.kind == NimsuggestQueryKind.CHANGED and q.saved:
+      #   q.dirtyFile = FilePathAbs("")
+      # else:
+      q.dirtyFile = ls.uriToStash(q.uri)
 
       # First, check if the current file is owned by a nimsuggest instance
       let path = toFilePathAbs(q.uri)
@@ -137,16 +137,16 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
             )
             fileInfo.slot.queryMailbox.addLastNoWait(changedQuery)
 
-            if ls.configurations.currentConfig.checkOnSave:
-              debug "Checking project", uri = uri
-              let chkQuery = NimsuggestQuery[LspFilePosition](
-                id: 0,
-                kind: NimsuggestQueryKind.CHECK_PROJECT,
-                uri: toUri(fileInfo.slot.spawnInfo.entryPoint),
-                dirtyFile: FilePathAbs(""),
-                responseFuture: newFuture[seq[Suggest]]("checkProject"),
-              )
-              fileInfo.slot.queryMailbox.addLastNoWait(chkQuery)
+            # if ls.configurations.currentConfig.checkOnSave:
+            #   debug "Checking project", uri = uri
+            #   let chkQuery = NimsuggestQuery[LspFilePosition](
+            #     id: 0,
+            #     kind: NimsuggestQueryKind.CHECK_PROJECT,
+            #     uri: toUri(fileInfo.slot.spawnInfo.entryPoint),
+            #     dirtyFile: ls.uriStorageLocation(uri), # FilePathAbs(""),
+            #     responseFuture: newFuture[seq[Suggest]]("checkProject"),
+            #   )
+            #   fileInfo.slot.queryMailbox.addLastNoWait(chkQuery)
           
           of SlotState.STOPPING, SlotState.STOPPED, SlotState.CRASHED:
             discard

@@ -20,6 +20,22 @@ import ./[suggestapi, suggestapi_types, nimsuggest_types, nimsuggest_slots, diag
 # the module graph.
 # const SlowEmptyThresholdMs = 10_000
 
+# Claude thinks (I'm sceptical):
+# Pass "-" as the file path to chk so the nimsuggest v4 shared preamble does
+# not touch any real file's stash. Specifically:
+# - chk(path, ...) would call msgs.setDirtyFile(conf, path_idx, ""), clearing
+#   the stash that `changed "X";"stash"` just registered.
+# - chk("-", ...) targets the "-" sentinel; setDirtyFile for a non-module is
+#   harmless. The stash for the changed file remains registered.
+# - ideChk then calls graph.needsCompilation() (global, not per-file), which
+#   returns true because changed + stash markDirtyIfNeeded marked the file dirty.
+# - graph.recompilePartially() uses toFullPathConsiderDirty, so the changed file
+#   is compiled from the stash (new content), and transitive dependents cascade.
+# recompile() (ideRecompile) was tried but calls recompileFullProject() which
+# rebuilds from disk, ignoring stash content.
+# return await ns.chk(path, q.dirtyFile)
+# return await ns.recompile()
+
 # === PROCESSING ===
 proc runNimsuggestQuery*(
   ns: Nimsuggest, 
@@ -64,7 +80,10 @@ proc runNimsuggestQuery*(
   of NimsuggestQueryKind.CHECK_FILE:
     return await ns.chkFile(path, q.dirtyFile)
   of NimsuggestQueryKind.CHECK_PROJECT:
+
     return await ns.chk(path, q.dirtyFile)
+    # Claude thinks "passing "-" as the file path to chk so the nimsuggest v4 shared preamble does not touch any real file's stash.  I'm not so sure this is a good idea.
+    # return await ns.chk(FilePathAbs("-"), FilePathAbs(""))
   of NimsuggestQueryKind.RECOMPILE:
     return await ns.recompile()
   of NimsuggestQueryKind.KNOWN:
@@ -92,7 +111,7 @@ proc processNimsuggestQueries*(
       shutdownFut = originalQuery.shutdownFuture
       break
 
-    debug "processNimsuggestQueries: running query", kind = $originalQuery.kind, projectFile = slot.spawnInfo.entryPoint, uri = originalQuery.uri
+    # debug "processNimsuggestQueries: running query", kind = $originalQuery.kind, projectFile = slot.spawnInfo.entryPoint, uri = originalQuery.uri
 
     # $/cancelRequest — skip queries already cancelled by the client.
     if originalQuery.cancelled:
@@ -103,7 +122,7 @@ proc processNimsuggestQueries*(
 
     case originalQuery.kind
     of NimsuggestQueryKind.CHANGED:
-      if mailboxHasChangedQueryForSameUriAnyOtherUri(slot, originalQuery.uri) and (originalQuery.saved == false) and (not originalQuery.isInternal):
+      if mailboxHasChangedQueryForSameUriAnyOtherUri(slot, originalQuery.uri) and (originalQuery.saved == false):
         # If there is a later changed query for the same uri queued, drop this one.  There must be no CHANGED queries to other URIs in between, though.
         debug "processNimsuggestQueries: There is a later CHANGED query for the same uri.", uri = originalQuery.uri
         originalQuery.responseFuture.complete(@[])
@@ -113,7 +132,7 @@ proc processNimsuggestQueries*(
           let fileInfo = openFiles[originalQuery.uri]
           let timeSinceLastChange = now() - fileInfo.lastChanged
 
-          if timeSinceLastChange < config.fileCheckDelay and not originalQuery.isInternal:
+          if timeSinceLastChange < config.fileCheckDelay:
             # Not enough time has elapsed
             let timeoutLength = (config.fileCheckDelay - timeSinceLastChange).inMilliseconds + 5
             debug "processNimsuggestQueries: Running timeout for CHANGED.", timeout = timeoutLength, uri = originalQuery.uri
@@ -123,10 +142,9 @@ proc processNimsuggestQueries*(
             slot.queryMailbox.addFirstNoWait(originalQuery)
             continue
           # else: enough time has passed, continue with processing the query...
-        elif not originalQuery.isInternal:
+        else:
           debug "processNimsuggestQueries: Skipping query, file is no longer open.", uri = originalQuery.uri
           continue
-        # internal cache-refresh queries proceed even for files not in openFiles
 
     
     of NimsuggestQueryKind.CHECK_FILE:
@@ -214,21 +232,25 @@ proc processNimsuggestQueries*(
       
     if slot.state == SlotState.READY:
 
-      debug "processNimsuggestQueries: original Query ", entryPoint = slot.spawnInfo.entryPoint, kind = $originalQuery.kind, uri = $originalQuery.uri
+      # debug "processNimsuggestQueries: original Query ", entryPoint = slot.spawnInfo.entryPoint, kind = $originalQuery.kind, uri = $originalQuery.uri
       let convertedQuery = toNimsuggestQuery(originalQuery, openFiles)
       if convertedQuery.isNone:
-        debug "processNimsuggestQueries: query conversion failed, skipping"
+        # debug "processNimsuggestQueries: query conversion failed, skipping"
         originalQuery.responseFuture.complete(@[])
         continue
 
       else: 
         let q = convertedQuery.get()
-        debug "processNimsuggestQueries: query about to be run ", entryPoint = slot.spawnInfo.entryPoint, kind = $q.kind, uri = $q.uri
+        # debug "processNimsuggestQueries: query about to be run ", entryPoint = slot.spawnInfo.entryPoint, kind = $q.kind, uri = $q.uri
         try:
           # === RUNNING NIMSUGGEST QUERY ===
           let queryStartTime = now()
+          debug "processNimsuggestQueries: running query ", entryPoint = slot.spawnInfo.entryPoint, kind = $q.kind, uri = $q.uri
           let queryResponse: seq[Suggest] = await runNimsuggestQuery(slot.ns.read(), q)
           let elapsedMs = inMilliseconds(now() - queryStartTime)
+          
+          debug "processNimsuggestQueries: response ", response = $(%*queryResponse), elapsedMs  = elapsedMs
+
           q.responseFuture.complete(queryResponse)
           slot.lastCmdTime = now()
 
@@ -252,82 +274,94 @@ proc processNimsuggestQueries*(
 
           case q.kind
           of NimsuggestQueryKind.CHANGED:
-            if q.uri in openFiles and not q.isInternal:
+            if q.uri in openFiles:
               openFiles[q.uri].lastChanged = now()
 
-            # Internal intermediate cache-refresh queries: no cascade, no self-check.
-            if q.isInternal:
-              debug "processNimsuggestQueries: intermediate cache refresh complete", uri = q.uri
-            else:
-              debug "processNimsuggestQueries: check for dependencies to update "
-              let fileJustChanged = toFilePathAbs(q.uri)
-              for openFile, openFileInfo in openFiles:
-                if openFile != q.uri:
-                  let fileToCheck = toFilePathAbs(openFile)
-                  let isDependency = dependencies.trees.checkDependency(
-                    fileJustChanged.isADependencyOf(fileToCheck)
-                  )
+            let fileJustChanged = toFilePathAbs(q.uri)
 
-                  if isDependency:
-                    debug "processNimsuggestQueries: dependency found. Sending CHECK_FILE command.",
-                      dependency = openFile, fileJustChanged = q.uri
+            debug "processNimsuggestQueries: CHANGED complete, scanning open files for dependents",
+              fileJustChanged = fileJustChanged, openFileCount = openFiles.len,
+              responseLen = queryResponse.len,
+              graphNodeCount = dependencies.trees.len
 
-                    # Push CHECK_FILE first; queries pushed after run before it (addFirstNoWait).
-                    let dependencyCheckQuery = NimsuggestQuery[LspFilePosition](
-                      id: 0,
-                      kind: NimsuggestQueryKind.CHECK_FILE,
-                      uri: openFile,
-                      dirtyFile: FilePathAbs(""),
-                      responseFuture: newFuture[seq[Suggest]]("checkFile"),
-                    )
-                    if openFileInfo.slot.isLive():
-                      openFileInfo.slot.queryMailbox.addFirstNoWait(dependencyCheckQuery)
+            var hasDependency = false
+            var dependentFiles: seq[FileUri]
+            for openFile, _ in openFiles:
+              if openFile != q.uri:
+                let fileToCheck = toFilePathAbs(openFile)
+                let isDep = dependencies.trees.checkDependency(fileJustChanged.isADependencyOf(fileToCheck))
+                # debug "processNimsuggestQueries: dependency check",
+                #   changedFileAbs = fileJustChanged, candidateAbs = fileToCheck, isDependency = isDep
 
-                    # Force-recompile the dependent from disk using the updated intermediate
-                    # caches so chkFile sees a fresh compiled state for this file.
-                    # Runs just before CHECK_FILE (pushed after it, runs before it).
-                    let dependentRefreshQuery = NimsuggestQuery[LspFilePosition](
-                      id: 0,
-                      kind: NimsuggestQueryKind.CHANGED,
-                      uri: openFile,
-                      dirtyFile: fileToCheck,
-                      isInternal: true,
-                      responseFuture: newFuture[seq[Suggest]]("dependentRefresh"),
-                    )
-                    if openFileInfo.slot.isLive():
-                      openFileInfo.slot.queryMailbox.addFirstNoWait(dependentRefreshQuery)
+                if isDep:
+                  hasDependency = true
+                  dependentFiles.add(openFile)
 
-                    # Refresh intermediate modules to clear nimsuggest's stale module cache.
-                    # intermediates[0] is closest to changedFile and must execute first.
-                    # countdown + addFirstNoWait ensures execution order matches index order.
-                    # Final execution order: [intermediates..., dependentRefresh, CHECK_FILE]
-                    let intermediates = dependencies.trees.findIntermediatePath(
-                      fileToCheck, fileJustChanged
-                    )
-                    if intermediates.len > 0:
-                      debug "processNimsuggestQueries: refreshing intermediate modules for cache invalidation",
-                        count = intermediates.len, dependency = openFile
-                    for i in countdown(intermediates.len - 1, 0):
-                      let intermed = intermediates[i]
-                      let intermediateQuery = NimsuggestQuery[LspFilePosition](
-                        id: 0,
-                        kind: NimsuggestQueryKind.CHANGED,
-                        uri: toUri(intermed),
-                        dirtyFile: intermed,
-                        isInternal: true,
-                        responseFuture: newFuture[seq[Suggest]]("intermediateChanged"),
-                      )
-                      if openFileInfo.slot.isLive():
-                        openFileInfo.slot.queryMailbox.addFirstNoWait(intermediateQuery)
+            # Queue a cascade of CHECK_FILE commands to propagate diagnostics through
+            # the dependency chain. nimsuggest's markClientsDirty is ONE level only
+            # (transitive closure is disabled in compiler/modulegraphs.nim:838).
+            # We manually walk the chain via intermediate files:
+            #
+            #   1. Self-check changed file → recompile file_a from stash,
+            #                                markClientsDirty(file_a) → file_b dirty
+            #   2. Check intermediates     → recompile file_b (already dirty),
+            #                                markClientsDirty(file_b) → file_c dirty
+            #   3. Check open dependents   → recompile file_c (now dirty) → error
+            #
+            # addFirstNoWait inserts at queue front, so the LAST item added runs FIRST.
+            # Add in reverse execution order: dependents first, intermediates next,
+            # self-check last (so self-check ends up at queue front).
 
+            # Step 1: Add open dependents (their disk content is current, dirtyFile="")
+            for f in dependentFiles:
               let checkQuery = NimsuggestQuery[LspFilePosition](
                 id: 0,
                 kind: NimsuggestQueryKind.CHECK_FILE,
-                uri: q.uri,
+                uri: f,
                 dirtyFile: FilePathAbs(""),
                 responseFuture: newFuture[seq[Suggest]]("checkFile"),
               )
               slot.queryMailbox.addFirstNoWait(checkQuery)
+
+            if hasDependency:
+              debug "processNimsuggestQueries: queuing dependency cascade",
+                fileJustChanged = q.uri, dependents = dependentFiles
+
+              # Step 2: Add intermediate non-open files in countdown order so that
+              # after addFirstNoWait they precede the open dependents in the queue.
+              # findIntermediatePath returns closest-to-changed first (e.g. [file_b]).
+              var addedIntermediates: HashSet[FileUri]
+              for f in dependentFiles:
+                let fileToCheck = toFilePathAbs(f)
+                let intermediates = dependencies.trees.findIntermediatePath(
+                  fileToCheck, fileJustChanged)
+                for i in countdown(intermediates.len - 1, 0):
+                  let intermediateUri = toUri(intermediates[i])
+                  if intermediateUri notin openFiles and
+                     intermediateUri notin addedIntermediates:
+                    addedIntermediates.incl(intermediateUri)
+                    let checkQuery = NimsuggestQuery[LspFilePosition](
+                      id: 0,
+                      kind: NimsuggestQueryKind.CHECK_FILE,
+                      uri: intermediateUri,
+                      dirtyFile: FilePathAbs(""),
+                      responseFuture: newFuture[seq[Suggest]]("checkFile"),
+                    )
+                    slot.queryMailbox.addFirstNoWait(checkQuery)
+
+              # Step 3: Self-check the changed file (added last → runs first).
+              # Pass q.dirtyFile so nimsuggest reads from the stash, not disk,
+              # preserving unsaved in-memory content during recompilation.
+              let checkQuery = NimsuggestQuery[LspFilePosition](
+                id: 0,
+                kind: NimsuggestQueryKind.CHECK_FILE,
+                uri: q.uri,
+                dirtyFile: q.dirtyFile,
+                responseFuture: newFuture[seq[Suggest]]("checkFile"),
+              )
+              slot.queryMailbox.addFirstNoWait(checkQuery)
+            else:
+              discard
 
           of NimsuggestQueryKind.CHECK_FILE:
             if q.uri in openFiles:
@@ -337,40 +371,68 @@ proc processNimsuggestQueries*(
               queryResponse, q.uri, openFiles
             )
             notifyProc("textDocument/publishDiagnostics", diagnosticsJson)
-            debug "processNimsuggestQueries: CHECK_FILE run, sending diagnostics ", uri = $q.uri, json = diagnosticsJson
+            # debug "processNimsuggestQueries: CHECK_FILE done",
+            #   uri = q.uri, errorCount = queryResponse.len, json = diagnosticsJson
             
             # Exact split-identity errors are false positives that RECOMPILE fixes
             # reliably. Suppress misleading diagnostics and trigger RECOMPILE instead.
             # Loose module-qualifier matches (foo.Bar vs Bar) are NOT handled here —
             # they appear as an advisory note in the diagnostic message only.
-            if queryResponse.anyIt(it.forth == "Error" and isExactSplitIdentityTypeMismatch(it.doc)):
-              debug "processNimsuggestQueries: exact split-identity detected, triggering RECOMPILE",
-                uri = $q.uri
-              let recompileQuery = NimsuggestQuery[LspFilePosition](
-                id: 0,
-                kind: NimsuggestQueryKind.RECOMPILE,
-                uri: q.uri,
-                dirtyFile: FilePathAbs(""),
-                responseFuture: newFuture[seq[Suggest]]("splitIdentityRecompile"),
-              )
-              slot.queryMailbox.addLastNoWait(recompileQuery)  
+            # if queryResponse.anyIt(it.forth == "Error" and isExactSplitIdentityTypeMismatch(it.doc)):
+            #   debug "processNimsuggestQueries: exact split-identity detected, triggering RECOMPILE",
+            #     uri = $q.uri
+            #   let recompileQuery = NimsuggestQuery[LspFilePosition](
+            #     id: 0,
+            #     kind: NimsuggestQueryKind.RECOMPILE,
+            #     uri: q.uri,
+            #     dirtyFile: FilePathAbs(""),
+            #     responseFuture: newFuture[seq[Suggest]]("splitIdentityRecompile"),
+            #   )
+            #   slot.queryMailbox.addLastNoWait(recompileQuery)  
             
           of NimsuggestQueryKind.CHECK_PROJECT, NimsuggestQueryKind.RECOMPILE:
             let timeNow = now()
             for uri, file in openFiles:
               openFiles[uri].lastChecked = timeNow
 
+            # let errorFilePaths = queryResponse.mapIt(string(it.filepath)).deduplicate()
+            # debug "processNimsuggestQueries: CHECK_PROJECT complete",
+            #   totalErrors = queryResponse.len,
+            #   filesWithErrors = errorFilePaths.len,
+            #   errorFiles = errorFilePaths,
+            #   triggeredByUri = q.uri
+
+            # for s in queryResponse:
+            #   debug "processNimsuggestQueries: result", suggest = $(%*s)
+
+
+            var filesWithDiagnostics: HashSet[FileUri]
             for (path, groupedSuggests) in groupBy(queryResponse, getFilepath):
+              let uri = toUri(path)
+              filesWithDiagnostics.incl(uri)
+
               let diagnosticsJson = convertNimSuggestResponseToDiagnostics(
-                groupedSuggests, toUri(path), openFiles
+                groupedSuggests, uri, openFiles
               )
-              debug "processQueries: sending diagnostics to file ",uri = toUri(path),  projectFile = slot.spawnInfo.entryPoint, kind = $q.kind
+
               notifyProc("textDocument/publishDiagnostics", diagnosticsJson)
+
+              # debug "processNimsuggestQueries: CHECK_PROJECT sending errors",
+              #   uri = uri, isOpenFile = (uri in openFiles),
+              #   errorCount = groupedSuggests.len, json = diagnosticsJson
+
+            # Clear squigglies for open files that had no errors in this project check.
+            # for uri, _ in openFiles:
+            #   if uri notin filesWithDiagnostics:
+            #     notifyProc(
+            #       "textDocument/publishDiagnostics",
+            #       %*{"uri": $uri, "diagnostics": []},
+            #     )
               
           else:
             discard
 
-          debug "processQueries: query finished running ", projectFile = slot.spawnInfo.entryPoint, kind = $q.kind
+          # debug "processQueries: query finished running ", projectFile = slot.spawnInfo.entryPoint, kind = $q.kind
 
         except CatchableError as ex:
           debug "processQueries: query failed",
@@ -425,4 +487,3 @@ proc restartAllNimsuggestInstances*(
         dependencies,
         config
       )
-

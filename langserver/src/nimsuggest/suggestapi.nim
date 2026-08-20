@@ -141,7 +141,7 @@ proc processQueue(self: Nimsuggest): Future[void] {.async.} =
           debug "Server socket closed"
 
         if not req.future.finished:
-          debug "Sending result(s)", length = res.len
+          # debug "Sending result(s)", length = res.len, command = req.commandString
           req.future.complete(res)
           transport.close()
         else:
