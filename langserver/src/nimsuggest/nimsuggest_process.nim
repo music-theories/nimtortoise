@@ -1,4 +1,4 @@
-import std/[options, strformat, sets, tables, times, json, sequtils, sha1]
+import std/[options, strformat, sets, tables, times, json, sequtils]
 import chronos
 import chronicles
 
@@ -6,11 +6,11 @@ import forest
 
 import ../utils/utils
 import ../utils/process_utils
-import ../utils/type_mismatch_format
+
 import ../configurations/configurations
 import ../protocol/types
 
-import ./[suggestapi, suggestapi_types, nimsuggest_types, nimsuggest_slots, diagnostics, nimsuggest_utils]
+import ./[suggestapi, suggestapi_types, nimsuggest_types, nimsuggest_slots, diagnostics, nimsuggest_utils, nimsuggest_dependencies]
 
 # Interactive queries that take longer than this with an empty result indicate
 # nimsuggest is spinning in unbounded generic instantiation that terminates via
@@ -96,6 +96,7 @@ proc processNimsuggestQueries*(
   pool: NimsuggestPool,
   openFiles: TableRef[FileUri, NlsFileInfo],
   dependencies: Forest,
+  storageDir: DirPathAbs,
   config: NlsConfig,
   notifyProc: proc(name: string, params: JsonNode) {.gcsafe, raises: [].}, #Send a notification to the client
 ) {.async.} =
@@ -148,13 +149,12 @@ proc processNimsuggestQueries*(
 
     
     of NimsuggestQueryKind.CHECK_FILE:
-      discard
-      # if mailboxHasQueryOfKind(
-      #   slot, NimsuggestQueryKind.CHECK_FILE, originalQuery.uri
-      # ):
-      #   debug "processNimsuggestQueries: skipping stale query (CHECK_FILE pending)", kind = $originalQuery.kind, uri = originalQuery.uri
-      #   originalQuery.responseFuture.complete(@[])
-      #   continue
+      if mailboxHasQueryOfKind(
+        slot, NimsuggestQueryKind.CHECK_FILE, originalQuery.uri
+      ) and (originalQuery.isDependency == false):
+        debug "processNimsuggestQueries: skipping stale query (CHECK_FILE pending)", kind = $originalQuery.kind, uri = originalQuery.uri
+        originalQuery.responseFuture.complete(@[])
+        continue
 
     of NimsuggestQueryKind.CHECK_PROJECT:
       discard
@@ -254,123 +254,20 @@ proc processNimsuggestQueries*(
           q.responseFuture.complete(queryResponse)
           slot.lastCmdTime = now()
 
-          # Detect slow-empty: an interactive query that took >SlowEmptyThresholdMs
-          # and returned nothing means nimsuggest is stuck in unbounded generic
-          # instantiation terminated by stack overflow (not our TCP timeout).
-          # Call markFailed so crash-recovery restarts the slot.
-          # case q.kind
-          # of NimsuggestQueryKind.HOVER, NimsuggestQueryKind.SUGGEST,
-          #    NimsuggestQueryKind.DEFINITION, NimsuggestQueryKind.DECLARATION,
-          #    NimsuggestQueryKind.TYPE_DEFINITION, NimsuggestQueryKind.SIGNATURE_HELP,
-          #    NimsuggestQueryKind.DOCUMENT_HIGHLIGHT:
-          #   if queryResponse.len == 0 and elapsedMs > SlowEmptyThresholdMs:
-          #     debug "processNimsuggestQueries: slow empty — triggering markFailed",
-          #       kind = $q.kind, elapsedMs = elapsedMs,
-          #       entryPoint = slot.spawnInfo.entryPoint
-          #     slot.ns.read().markFailed(
-          #       fmt"slow empty response ({elapsedMs}ms) on {q.kind}: nimsuggest unresponsive")
-          # else:
-          #   discard
-
           case q.kind
           of NimsuggestQueryKind.CHANGED:
-            if q.uri in openFiles:
-              openFiles[q.uri].lastChanged = now()
+            debug "processNimsuggestQueries: CHANGED complete, scanning open files for dependents"
+            
+            let dependencyQueriesToSend = createNimsuggestDependencyQueries(
+              q, 
+              storageDir, 
+              openFiles, dependencies
+            )
 
-            let fileJustChanged = toFilePathAbs(q.uri)
+            for msg in dependencyQueriesToSend:
+              slot.queryMailbox.addFirstNoWait(msg)
 
-            debug "processNimsuggestQueries: CHANGED complete, scanning open files for dependents",
-              fileJustChanged = fileJustChanged, openFileCount = openFiles.len,
-              responseLen = queryResponse.len,
-              graphNodeCount = dependencies.trees.len
-
-            var hasDependency = false
-            var dependentFiles: seq[FileUri]
-            for openFile, _ in openFiles:
-              if openFile != q.uri:
-                let fileToCheck = toFilePathAbs(openFile)
-                let isDep = dependencies.trees.checkDependency(fileJustChanged.isADependencyOf(fileToCheck))
-                # debug "processNimsuggestQueries: dependency check",
-                #   changedFileAbs = fileJustChanged, candidateAbs = fileToCheck, isDependency = isDep
-
-                if isDep:
-                  hasDependency = true
-                  dependentFiles.add(openFile)
-
-            # Queue a cascade of CHECK_FILE commands to propagate diagnostics through
-            # the dependency chain. nimsuggest's markClientsDirty is ONE level only
-            # (transitive closure is disabled in compiler/modulegraphs.nim:838).
-            # We manually walk the chain via intermediate files:
-            #
-            #   1. Self-check changed file → recompile file_a from stash,
-            #                                markClientsDirty(file_a) → file_b dirty
-            #   2. Check intermediates     → recompile file_b (already dirty),
-            #                                markClientsDirty(file_b) → file_c dirty
-            #   3. Check open dependents   → recompile file_c (now dirty) → error
-            #
-            # addFirstNoWait inserts at queue front, so the LAST item added runs FIRST.
-            # Add in reverse execution order: dependents first, intermediates next,
-            # self-check last (so self-check ends up at queue front).
-
-            # All open files have a stash written on didOpen and updated on every
-            # didChange. The stash path is storageDir / sha1(uri) & ".nim", where
-            # storageDir = parentDir(q.dirtyFile). We always pass the stash so
-            # nimsuggest sees the current in-memory content, not the on-disk version
-            # (which may be stale when the file has unsaved changes).
-            let storageDir = parentDir(q.dirtyFile)
-
-            # Step 1: Add open dependents with their stash paths so nimsuggest
-            # recompiles them against their in-memory (possibly unsaved) content.
-            for f in dependentFiles:
-              let stashForF = storageDir / FilePathRel($secureHash(string(f)) & ".nim")
-              let checkQuery = NimsuggestQuery[LspFilePosition](
-                id: 0,
-                kind: NimsuggestQueryKind.CHECK_FILE,
-                uri: f,
-                dirtyFile: stashForF,
-                responseFuture: newFuture[seq[Suggest]]("checkFile"),
-              )
-              slot.queryMailbox.addFirstNoWait(checkQuery)
-
-            if hasDependency:
-              debug "processNimsuggestQueries: queuing dependency cascade",
-                fileJustChanged = q.uri, dependents = dependentFiles
-
-              # Step 2: Add intermediate non-open files in countdown order so that
-              # after addFirstNoWait they precede the open dependents in the queue.
-              # findIntermediatePath returns closest-to-changed first (e.g. [file_b]).
-              var addedIntermediates: HashSet[FileUri]
-              for f in dependentFiles:
-                let fileToCheck = toFilePathAbs(f)
-                let intermediates = dependencies.trees.findIntermediatePath(
-                  fileToCheck, fileJustChanged)
-                for i in countdown(intermediates.len - 1, 0):
-                  let intermediateUri = toUri(intermediates[i])
-                  if intermediateUri notin openFiles and
-                     intermediateUri notin addedIntermediates:
-                    addedIntermediates.incl(intermediateUri)
-                    let checkQuery = NimsuggestQuery[LspFilePosition](
-                      id: 0,
-                      kind: NimsuggestQueryKind.CHECK_FILE,
-                      uri: intermediateUri,
-                      dirtyFile: FilePathAbs(""),
-                      responseFuture: newFuture[seq[Suggest]]("checkFile"),
-                    )
-                    slot.queryMailbox.addFirstNoWait(checkQuery)
-
-              # Step 3: Self-check the changed file (added last → runs first).
-              # Pass q.dirtyFile so nimsuggest reads from the stash, not disk,
-              # preserving unsaved in-memory content during recompilation.
-              let checkQuery = NimsuggestQuery[LspFilePosition](
-                id: 0,
-                kind: NimsuggestQueryKind.CHECK_FILE,
-                uri: q.uri,
-                dirtyFile: q.dirtyFile,
-                responseFuture: newFuture[seq[Suggest]]("checkFile"),
-              )
-              slot.queryMailbox.addFirstNoWait(checkQuery)
-            else:
-              discard
+            # let storageDir = parentDir(q.dirtyFile)
 
           of NimsuggestQueryKind.CHECK_FILE:
             if q.uri in openFiles:
@@ -380,24 +277,7 @@ proc processNimsuggestQueries*(
               queryResponse, q.uri, openFiles
             )
             notifyProc("textDocument/publishDiagnostics", diagnosticsJson)
-            # debug "processNimsuggestQueries: CHECK_FILE done",
-            #   uri = q.uri, errorCount = queryResponse.len, json = diagnosticsJson
-            
-            # Exact split-identity errors are false positives that RECOMPILE fixes
-            # reliably. Suppress misleading diagnostics and trigger RECOMPILE instead.
-            # Loose module-qualifier matches (foo.Bar vs Bar) are NOT handled here —
-            # they appear as an advisory note in the diagnostic message only.
-            # if queryResponse.anyIt(it.forth == "Error" and isExactSplitIdentityTypeMismatch(it.doc)):
-            #   debug "processNimsuggestQueries: exact split-identity detected, triggering RECOMPILE",
-            #     uri = $q.uri
-            #   let recompileQuery = NimsuggestQuery[LspFilePosition](
-            #     id: 0,
-            #     kind: NimsuggestQueryKind.RECOMPILE,
-            #     uri: q.uri,
-            #     dirtyFile: FilePathAbs(""),
-            #     responseFuture: newFuture[seq[Suggest]]("splitIdentityRecompile"),
-            #   )
-            #   slot.queryMailbox.addLastNoWait(recompileQuery)  
+
             
           of NimsuggestQueryKind.CHECK_PROJECT, NimsuggestQueryKind.RECOMPILE:
             let timeNow = now()
@@ -470,6 +350,7 @@ proc restartSlot*(
   pool: NimsuggestPool, 
   openFiles: TableRef[FileUri, NlsFileInfo],
   dependencies: Forest,
+  storageDir: DirPathAbs,
   config: NlsConfig,
 ): Future[void] {.async.} =
   let spawningInfo: NimsuggestSpawnInfo = slot.spawnInfo
@@ -480,19 +361,82 @@ proc restartSlot*(
   )
   if successfulSpawn.isSome:
     asyncSpawn slot.processNimsuggestQueries(
-      pool, openFiles, dependencies, config, pool.notifyProc
+      pool, openFiles, dependencies, storageDir, config, pool.notifyProc
     )
 
 proc restartAllNimsuggestInstances*(
   pool: NimsuggestPool, 
   openFiles: TableRef[FileUri, NlsFileInfo],
   dependencies: Forest,
+  storageDir: DirPathAbs,
   config: NlsConfig,
 ) =
   for projectFile in pool.slots.keys.toSeq():
     if pool.slots.hasKey(projectFile):
       asyncSpawn restartSlot(
         pool.slots[projectFile], pool, openFiles, 
-        dependencies,
+        dependencies, storageDir,
         config
       )
+
+
+# Notes on Cascade
+# Queue a cascade of CHECK_FILE commands to propagate diagnostics through
+# the dependency chain. nimsuggest's markClientsDirty is ONE level only
+# (transitive closure is disabled in compiler/modulegraphs.nim:838).
+# We manually walk the chain via intermediate files:
+#
+#   1. Self-check changed file → recompile file_a from stash,
+#                                markClientsDirty(file_a) → file_b dirty
+#   2. Check intermediates     → recompile file_b (already dirty),
+#                                markClientsDirty(file_b) → file_c dirty
+#   3. Check open dependents   → recompile file_c (now dirty) → error
+#
+# addFirstNoWait inserts at queue front, so the LAST item added runs FIRST.
+# Add in reverse execution order: dependents first, intermediates next,
+# self-check last (so self-check ends up at queue front).
+
+# All open files have a stash written on didOpen and updated on every
+# didChange. The stash path is storageDir / sha1(uri) & ".nim", where
+# storageDir = parentDir(q.dirtyFile). We always pass the stash so
+# nimsuggest sees the current in-memory content, not the on-disk version
+# (which may be stale when the file has unsaved changes).
+
+
+# debug "processNimsuggestQueries: CHECK_FILE done",
+#   uri = q.uri, errorCount = queryResponse.len, json = diagnosticsJson
+
+# Exact split-identity errors are false positives that RECOMPILE fixes
+# reliably. Suppress misleading diagnostics and trigger RECOMPILE instead.
+# Loose module-qualifier matches (foo.Bar vs Bar) are NOT handled here —
+# they appear as an advisory note in the diagnostic message only.
+# if queryResponse.anyIt(it.forth == "Error" and isExactSplitIdentityTypeMismatch(it.doc)):
+#   debug "processNimsuggestQueries: exact split-identity detected, triggering RECOMPILE",
+#     uri = $q.uri
+#   let recompileQuery = NimsuggestQuery[LspFilePosition](
+#     id: 0,
+#     kind: NimsuggestQueryKind.RECOMPILE,
+#     uri: q.uri,
+#     dirtyFile: FilePathAbs(""),
+#     responseFuture: newFuture[seq[Suggest]]("splitIdentityRecompile"),
+#   )
+#   slot.queryMailbox.addLastNoWait(recompileQuery)  
+
+
+# Detect slow-empty: an interactive query that took >SlowEmptyThresholdMs
+# and returned nothing means nimsuggest is stuck in unbounded generic
+# instantiation terminated by stack overflow (not our TCP timeout).
+# Call markFailed so crash-recovery restarts the slot.
+# case q.kind
+# of NimsuggestQueryKind.HOVER, NimsuggestQueryKind.SUGGEST,
+#    NimsuggestQueryKind.DEFINITION, NimsuggestQueryKind.DECLARATION,
+#    NimsuggestQueryKind.TYPE_DEFINITION, NimsuggestQueryKind.SIGNATURE_HELP,
+#    NimsuggestQueryKind.DOCUMENT_HIGHLIGHT:
+#   if queryResponse.len == 0 and elapsedMs > SlowEmptyThresholdMs:
+#     debug "processNimsuggestQueries: slow empty — triggering markFailed",
+#       kind = $q.kind, elapsedMs = elapsedMs,
+#       entryPoint = slot.spawnInfo.entryPoint
+#     slot.ns.read().markFailed(
+#       fmt"slow empty response ({elapsedMs}ms) on {q.kind}: nimsuggest unresponsive")
+# else:
+#   discard

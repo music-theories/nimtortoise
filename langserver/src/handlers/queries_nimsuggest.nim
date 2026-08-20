@@ -1,4 +1,5 @@
 import chronos
+import forest
 import ../nimsuggest/[nimsuggest_types, suggestapi_types]
 import ../langserver/langserver
 
@@ -18,7 +19,7 @@ proc initNimsuggestPositionQuery*(
     id: id.uint,
     kind: kind,
     uri: uri,
-    dirtyFile: ls.uriToStash(uri),
+    dirtyFile: uriToStashFilePath(ls.files.storageDir, uri),
     responseFuture: newFuture[seq[Suggest]]("nimsuggestQuery"),
   )
   q.position = LspFilePosition(
@@ -43,7 +44,7 @@ proc initNimsuggestInlayHintQuery*(
     id: id.uint,
     kind: NimsuggestQueryKind.INLAY_HINTS,
     uri: uri,
-    dirtyFile: ls.uriToStash(uri),
+    dirtyFile: uriToStashFilePath(ls.files.storageDir, uri),
     responseFuture: newFuture[seq[Suggest]]("nimsuggestQuery"),
     inlayHints: (
       start: LspFilePosition(
@@ -69,7 +70,7 @@ proc initNimsuggestFileQuery*(
     id: id.uint,
     kind: kind,
     uri: uri,
-    dirtyFile: ls.uriToStash(uri),
+    dirtyFile: uriToStashFilePath(ls.files.storageDir, uri),
     responseFuture: newFuture[seq[Suggest]]("nimsuggestQuery"),
   )
 

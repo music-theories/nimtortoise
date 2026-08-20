@@ -176,7 +176,7 @@ proc processHoverQuery(
         id: 0.uint,
         kind: NimsuggestQueryKind.HOVER,
         uri: query.uri,
-        dirtyFile: ls.uriToStash(query.uri),
+        dirtyFile: uriToStashFilePath(ls.files.storageDir,  query.uri),
         responseFuture: newFuture[seq[Suggest]]("nimsuggestQuery"),
         position: LspFilePosition(
           line: Line0Based(macroLine0),

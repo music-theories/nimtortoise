@@ -70,11 +70,12 @@ type
       expand*: tuple[position: P, tag: string]
     of NimsuggestQueryKind.DOCUMENT_SYMBOLS,
       NimsuggestQueryKind.WORKSPACE_SYMBOLS,
-      NimsuggestQueryKind.CHECK_FILE,
       NimsuggestQueryKind.CHECK_PROJECT,
       NimsuggestQueryKind.RECOMPILE,
       NimsuggestQueryKind.KNOWN:
       discard
+    of NimsuggestQueryKind.CHECK_FILE:
+      isDependency*: bool
     of NimsuggestQueryKind.SHUTDOWN:
       shutdownFuture*: Future[void]
         ## Completed by processNimsuggestQueries after shutdownChildProcess returns.
@@ -160,16 +161,6 @@ type
     statusChangedProc*: StatusChangedProc
       ## Called when a slot transitions to READY or is removed.
       ## Triggers extension/statusUpdate. Set by initLanguageServer. May be nil.
-      ## 
-    
-    
-    # nimVersion*: string      ## Nim version string for logging.
-    # timeout*: int            ## Per-request timeout in ms.
-    # projectMapping*: seq[ProjectMapping]
-    # nimsuggestPath*: FilePathAbs  ## Path to nimsuggest binary. Set in initNimsuggestInstances.
-    # nimsuggestProtocol*: int
-    # nimsuggestCapabilities*: set[NimSuggestCapability]
-
 
 type
   NlsFileInfo* = ref object of RootObj

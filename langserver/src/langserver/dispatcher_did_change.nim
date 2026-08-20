@@ -5,7 +5,6 @@ import ../nimsuggest/nimsuggest
 import ../protocol/types
 import ../utils/utils
 import ./[langserver_types, query_types]
-import ./[langserver_utils]
 
 proc saveFileChangesToStash(
   ls: LanguageServer,
@@ -14,7 +13,7 @@ proc saveFileChangesToStash(
 ): seq[seq[tuple[u16pos, offset: int]]] = 
   ## Returns fingerTable
   result = @[]
-  let stashLocation = ls.uriStorageLocation(uri)
+  let stashLocation = uriToStashFilePath(ls.files.storageDir, uri)
   let file = open(string(stashLocation), fmWrite)
 
   if contentChanges.len <= 0:
@@ -60,7 +59,7 @@ proc processDidChangeQuery*(
         id: 0,
         kind: NimsuggestQueryKind.CHANGED,
         uri: uri,
-        dirtyFile: ls.uriStorageLocation(uri),
+        dirtyFile: uriToStashFilePath(ls.files.storageDir, uri),
         responseFuture: newFuture[seq[Suggest]]("nimsuggestQuery"),
         saved: false
       )  
@@ -72,7 +71,7 @@ proc processDidChangeQuery*(
         id: 0,
         kind: NimsuggestQueryKind.CHANGED,
         uri: uri,
-        dirtyFile: ls.uriStorageLocation(uri),
+        dirtyFile: uriToStashFilePath(ls.files.storageDir, uri),
         responseFuture: newFuture[seq[Suggest]]("nimsuggestQuery"),
         saved: false
       )  
@@ -107,7 +106,7 @@ proc processDidChangeQuery*(
       id: 0,
       kind: NimsuggestQueryKind.CHANGED,
       uri: uri,
-      dirtyFile: ls.uriStorageLocation(uri),
+      dirtyFile: uriToStashFilePath(ls.files.storageDir, uri),
       responseFuture: newFuture[seq[Suggest]]("nimsuggestQuery"),
       saved: false
     )  

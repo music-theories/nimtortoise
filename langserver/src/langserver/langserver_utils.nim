@@ -1,20 +1,9 @@
-import std/[os, sha1, tables, options]
+import std/[os, tables, options]
 import chronicles
+import forest
 import ./langserver_types
 import ../utils/utils
 import ../protocol/types
-
-proc uriStorageLocation*(ls: LanguageServer, uri: FileUri): FilePathAbs =
-  # Use SHA-1 for a collision-resistant stash filename (40 hex chars).
-  # std/hash is a 64-bit integer hash; two URIs could share it and silently
-  # overwrite each other's edit buffer. SHA-1 collision probability is ~2^-80.
-  return ls.files.storageDir / FilePathRel($secureHash(string(uri)) & ".nim")
-
-proc uriToStash*(ls: LanguageServer, uri: FileUri): FilePathAbs =
-  if ls.files.openFiles.hasKey(uri):
-    return uriStorageLocation(ls, uri)
-  else:
-    return FilePathAbs("")
 
 proc toUtf16Pos*(
   ls: LanguageServer, uri: FileUri, line: int, utf8Pos: int

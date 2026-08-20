@@ -122,7 +122,6 @@ proc toNimsuggestQuery*(
     ))
   of NimsuggestQueryKind.DOCUMENT_SYMBOLS,
     NimsuggestQueryKind.WORKSPACE_SYMBOLS,
-    NimsuggestQueryKind.CHECK_FILE,
     NimsuggestQueryKind.CHECK_PROJECT,
     NimsuggestQueryKind.RECOMPILE,
     NimsuggestQueryKind.KNOWN:
@@ -130,6 +129,16 @@ proc toNimsuggestQuery*(
       id: q.id, uri: q.uri, dirtyFile: q.dirtyFile,
       responseFuture: q.responseFuture, cancelled: q.cancelled,
       kind: q.kind,
+    ))
+  of NimsuggestQueryKind.CHECK_FILE:
+    return some(NimsuggestQuery[NimsuggestFilePosition](
+      id: q.id, 
+      uri: q.uri, 
+      dirtyFile: q.dirtyFile,
+      kind: NimsuggestQueryKind.CHECK_FILE,
+      isDependency: q.isDependency,
+      responseFuture: q.responseFuture, 
+      cancelled: q.cancelled,
     ))
   of NimsuggestQueryKind.CHANGED:
     return some(NimsuggestQuery[NimsuggestFilePosition](

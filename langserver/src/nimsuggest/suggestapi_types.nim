@@ -102,3 +102,9 @@ type
     nimbleFile*: Option[FilePathAbs]
     paths*:      seq[DirPathAbs]
     extraArgs*:  seq[string]
+
+type 
+  SpecialKind* = enum
+    HELLO, 
+    GOODBYE
+    

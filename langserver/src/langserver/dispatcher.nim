@@ -9,7 +9,7 @@ import ../nimble/nimble_utils
 import ../protocol/types
 
 import ../utils/utils
-import ./[langserver_types, query_types, langserver_utils, capability_configs]
+import ./[langserver_types, query_types, capability_configs]
 import ./[dispatcher_did_open, dispatcher_did_change]
 
 
@@ -63,7 +63,7 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
       # if q.kind == NimsuggestQueryKind.CHANGED and q.saved:
       #   q.dirtyFile = FilePathAbs("")
       # else:
-      q.dirtyFile = ls.uriToStash(q.uri)
+      q.dirtyFile = uriToStashFilePath(ls.files.storageDir, q.uri)
 
       # First, check if the current file is owned by a nimsuggest instance
       let path = toFilePathAbs(q.uri)
@@ -115,7 +115,7 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
             fileInfo.slot.crashedUris.excl(uri)
 
           if q.didSave.text.isSome:
-            let stashLocation = ls.uriStorageLocation(uri)
+            let stashLocation = uriToStashFilePath(ls.files.storageDir, uri)
             let file = open(string(stashLocation), fmWrite)
             fileInfo.fingerTable = @[]
             for line in q.didSave.text.get.splitLines:
@@ -131,7 +131,7 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
               id: 0,
               kind: NimsuggestQueryKind.CHANGED,
               uri: uri,
-              dirtyFile: ls.uriStorageLocation(uri),
+              dirtyFile: uriToStashFilePath(ls.files.storageDir, uri),
               saved: true,
               responseFuture: newFuture[seq[Suggest]]("nimsuggestQuery"),
             )
@@ -143,7 +143,7 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
             #     id: 0,
             #     kind: NimsuggestQueryKind.CHECK_PROJECT,
             #     uri: toUri(fileInfo.slot.spawnInfo.entryPoint),
-            #     dirtyFile: ls.uriStorageLocation(uri), # FilePathAbs(""),
+            #     dirtyFile: uriToStashFilePath(ls.files.storageDir, uri), # FilePathAbs(""),
             #     responseFuture: newFuture[seq[Suggest]]("checkProject"),
             #   )
             #   fileInfo.slot.queryMailbox.addLastNoWait(chkQuery)
@@ -204,8 +204,8 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
           let oldUri = r.oldUri
           let newUri = r.newUri
           debug "File renamed", oldUri = oldUri, newUri = newUri
-          let oldStash = ls.uriStorageLocation(oldUri)
-          let newStash = ls.uriStorageLocation(newUri)
+          let oldStash = uriToStashFilePath(ls.files.storageDir, oldUri)
+          let newStash = uriToStashFilePath(ls.files.storageDir, newUri)
           let oldPath = toFilePathAbs(oldUri)
           let newPath = toFilePathAbs(newUri)
 

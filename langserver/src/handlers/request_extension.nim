@@ -78,6 +78,7 @@ proc executeCommand*(
         ls.pool,
         ls.files.openFiles,
         ls.dependencies,
+        ls.files.storageDir,
         ls.configurations.currentConfig,
       )
 
@@ -142,6 +143,7 @@ proc extensionSuggest*(ls: LanguageServer, params: SuggestParams): Future[Sugges
         ls.pool,
         ls.files.openFiles,
         ls.dependencies,
+        ls.files.storageDir,
         ls.configurations.currentConfig,
       )
     else:
@@ -151,6 +153,7 @@ proc extensionSuggest*(ls: LanguageServer, params: SuggestParams): Future[Sugges
       ls.pool, 
       ls.files.openFiles, 
       ls.dependencies, 
+      ls.files.storageDir,
       ls.configurations.currentConfig, 
     )
   of saNone:

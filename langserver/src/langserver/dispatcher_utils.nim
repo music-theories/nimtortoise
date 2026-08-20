@@ -5,7 +5,7 @@ import forest
 
 import ../nimsuggest/[suggestapi_types, nimsuggest_types, nimsuggest_slots]
 import ../protocol/types
-import ./[langserver_types, langserver_utils]
+import ./[langserver_types]
 import ../utils/utils
 
 
@@ -85,7 +85,7 @@ proc addFileToOpenFiles*(
   params: TextDocumentItem
 ) = 
   # Write the initial stash file
-  let storagePath = ls.uriStorageLocation(params.uri)
+  let storagePath = uriToStashFilePath(ls.files.storageDir,params.uri)
   try:
     writeFile(string(storagePath), params.text)
   except IOError as ex:
@@ -214,7 +214,7 @@ proc queryFile*(ls: LanguageServer, uri: FileUri, kind: NimsuggestQueryKind): Fu
   if fileInfo.slot.state in {SlotState.STOPPED, SlotState.CRASHED}:
     result.complete(@[])
     return
-  let dirtyFile = ls.uriToStash(uri)
+  let dirtyFile = uriToStashFilePath(ls.files.storageDir, uri)
   let query = NimsuggestQuery[LspFilePosition](
     kind: kind,
     uri: uri,

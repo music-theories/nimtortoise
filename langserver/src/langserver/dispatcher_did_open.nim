@@ -6,7 +6,7 @@ import ../nimble/nimble_utils
 import ../protocol/types
 import ../utils/utils
 import ./[langserver_types, query_types]
-import ./[dispatcher_utils, langserver_utils]
+import ./[dispatcher_utils]
 
 proc consolidateNimsuggestInstances(
   ls: LanguageServer,
@@ -65,6 +65,7 @@ proc startSlotConsumer(
     ls.pool,
     ls.files.openFiles,
     ls.dependencies,
+    ls.files.storageDir,
     ls.configurations.currentConfig,
     ls.notify,
   )
@@ -163,7 +164,8 @@ proc processDidOpenQuery*(
     slotThatKnows.queryMailbox.addLastNoWait(NimsuggestQuery[LspFilePosition](
       kind: NimsuggestQueryKind.CHECK_FILE,
       uri: uri,
-      dirtyFile: ls.uriToStash(uri),  # or should this be empty?
+      dirtyFile: uriToStashFilePath(ls.files.storageDir, uri),
+      isDependency: false,
       responseFuture: newFuture[seq[Suggest]]("checkFile"),
     ))
     # Finished
@@ -209,7 +211,20 @@ proc processDidOpenQuery*(
           let spawnResult = await createSlotWithFallback(ls, spawnInfo, filePath, q.didOpen.textDocument)
           if spawnResult.isSome():
             debug "didOpen: Successfully spawned a new nimsuggest slot", entryPoint = spawnInfo.entryPoint, uri = uri
-            discard ls.queryFile(uri, NimsuggestQueryKind.CHECK_FILE)
+
+            let dirtyFile = uriToStashFilePath(ls.files.storageDir, uri)
+
+            let query = NimsuggestQuery[LspFilePosition](
+              kind: NimsuggestQueryKind.CHECK_FILE,
+              isDependency: false,
+              uri: uri,
+              dirtyFile: dirtyFile,
+              responseFuture: newFuture[seq[Suggest]]("queryFile"),
+            )
+            let spawnedSlot = spawnResult.get()
+            spawnedSlot.queryMailbox.addLastNoWait(query)
+
+
           else:
             debug "didOpen: Spawning was NOT successful.", entryPoint = spawnInfo.entryPoint
 
