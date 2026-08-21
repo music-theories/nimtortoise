@@ -13,8 +13,8 @@ proc initDefaultNlsConfig*(): NlsConfig =
     # projectMapping: @[],
     # workingDirectoryMapping: @[],
     # --- Save Settings ---
-    checkOnSave: true,
-    checkDependentsOnChange: false,
+    # checkOnSave: true,
+    checkDependentsOnChange: true,
     formatOnSave: false,
     # --- Langserver settings --- 
     # langserverTimeout: 1_800_000, # in MS - This is 30 mins
@@ -54,8 +54,6 @@ proc nlsConfigFromJson*(json: JsonNode): NlsConfig =
   if json.kind != JObject:
     return
 
-  if json.hasKey("checkOnSave"):
-    result.checkOnSave = json["checkOnSave"].getBool()
   if json.hasKey("checkDependentsOnChange"):
     result.checkDependentsOnChange = json["checkDependentsOnChange"].getBool()
   if json.hasKey("formatOnSave"):

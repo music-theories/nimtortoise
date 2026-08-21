@@ -268,16 +268,16 @@
             "type": "object",
             "title": "Nim Tortoise configuration",
             "properties": {
-                "nimTortoise.checkOnSave": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Run project-wide diagnostics on save.",
-                    "scope": "resource"
-                },
                 "nimTortoise.formatOnSave": {
                     "type": "boolean",
                     "default": false,
                     "description": "Format the file on save using nph.",
+                    "scope": "resource"
+                },
+                "nimTortoise.checkDependentsOnChange": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Run CHECK_FILE on all dependent files after each change. Disable to reduce CPU usage on lower-powered machines (dependents will only be checked on save).",
                     "scope": "resource"
                 },
                 "nimTortoise.fileCheckDelay": {

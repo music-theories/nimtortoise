@@ -126,6 +126,7 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
           # Directly query nimsuggest
           case fileInfo.slot.state
           of SlotState.READY, SlotState.SPAWNING:
+
             let changedQuery = NimsuggestQuery[LspFilePosition](
               id: 0,
               kind: NimsuggestQueryKind.CHANGED,
@@ -137,20 +138,6 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
             )
             fileInfo.slot.queryMailbox.addLastNoWait(changedQuery)
 
-            # # if ls.configurations.currentConfig.checkOnSave:
-            # # if true:
-            # let chkQuery = NimsuggestQuery[LspFilePosition](
-            #   id: 0,
-            #   # kind: NimsuggestQueryKind.CHECK_PROJECT,
-            #   kind: NimsuggestQueryKind.CHECK_FILE,
-            #   saved: true,
-            #   isDependency: false,
-            #   uri: toUri(fileInfo.slot.spawnInfo.entryPoint),
-            #   dirtyFile: uriToStashFilePath(ls.files.storageDir, uri), # FilePathAbs(""),
-            #   responseFuture: newFuture[seq[Suggest]]("checkProject"),
-            # )
-            # fileInfo.slot.queryMailbox.addLastNoWait(chkQuery)
-          
           of SlotState.STOPPING, SlotState.STOPPED, SlotState.CRASHED:
             discard
 
