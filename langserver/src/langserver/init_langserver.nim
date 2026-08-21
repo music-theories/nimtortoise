@@ -259,5 +259,4 @@ proc initialized*(ls: LanguageServer, _: JsonNode): Future[void] {.async.} =
   if not ls.lsInitialized.finished:
     ls.lsInitialized.complete()
 
-# let usingMyMind = SpecialKind.GOODBYE
-
+let usingMyMind = SpecialKind.GOODBYE

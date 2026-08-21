@@ -32,7 +32,7 @@ proc createNimsuggestDependencyQueries*(
     .toHashSet().toSeq()   # deduplicate
   debug "dependencyNodes", nodes = dependencyNodes
 
-  let checkDependents = config.performance.updateOnChange
+  let updateOnChange = config.performance.updateOnChange
 
   if dependencyNodes.len > 0:
     let sortedListOfDependencies = topoSort(
@@ -41,7 +41,7 @@ proc createNimsuggestDependencyQueries*(
     )
     debug "sortedNodes", sorted = sortedListOfDependencies
 
-    if checkDependents or query.saved:
+    if updateOnChange or query.saved:
       let startCheck = NimsuggestQuery[LspFilePosition](
         id: 0,
         kind: NimsuggestQueryKind.CHECK_FILE,

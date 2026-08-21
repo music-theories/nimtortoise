@@ -101,7 +101,9 @@ proc processDidChangeQuery*(
 
       of SlotState.CRASHED, SlotState.STOPPING:
         debug "processDidChangeQuery: DID_CHANGE dispatcher cannot add message to slot in CRASHED or STOPPING mailbox", uri = uri, state = slotThatOwnsUri.state, entryPoint = slotThatOwnsUri.spawnInfo.entryPoint
-      
+
+    else:
+      debug "processDidChangeQuery: file is open but no slot owns it, stash updated but no CHANGED enqueued", uri = uri
 
   else:
     debug "processDidChangeQuery: DID_CHANGE file is NOT in openFiles.  Sending synthetic DID_OPEN message. ", uri = uri, openFiles = openFiles

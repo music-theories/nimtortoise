@@ -265,7 +265,9 @@ proc processNimsuggestQueries*(
           case q.kind
           of NimsuggestQueryKind.CHANGED:
             debug "processNimsuggestQueries: CHANGED complete, scanning open files for dependents"
-            
+            if q.uri in openFiles:
+              openFiles[q.uri].lastChanged = now()
+
             if not q.isDependency:
               let dependencyQueriesToSend = createNimsuggestDependencyQueries(
                 q, storageDir, openFiles, dependencies,
@@ -273,8 +275,6 @@ proc processNimsuggestQueries*(
               )
 
               for msg in reversed(dependencyQueriesToSend):
-                if msg.uri in openFiles:
-                  openFiles[msg.uri].lastChecked = now()
                 debug "processNimsuggestQueries: dependency to queue", kind = $msg.kind,uri = msg.uri
                 slot.queryMailbox.addFirstNoWait(msg)
 

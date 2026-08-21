@@ -153,27 +153,30 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
 
       of FileAccessQueryKind.DID_CHANGE_CONFIGURATION:
         debug "Changed configuration: "
-        var receivedConfigJson: JsonNode
+        let oldConfiguration = ls.configurations.currentConfig
+        var newConfiguration: NlsConfig
         if ls.usePullConfigurationModel():
           if ls.supportsConfigurationRequest():
             debug "Requesting configuration from the client"
             let configurationParams = %*{"items": [{"section": "nimTortoise"}]}
             let configFuture = ls.call("workspace/configuration", configurationParams)
-            receivedConfigJson = await configFuture 
+            let receivedConfigJson = await configFuture
+            debug "workspace/configuration response", response = receivedConfigJson
+            let parsedConfig = parseWorkspaceConfigurationResponse(receivedConfigJson)
+            newConfiguration = parsedConfig.get(oldConfiguration)
           else:
             debug "Client does not support workspace/configuration"
             ls.configurations.configReady.fire()
             continue
         else:
-          receivedConfigJson = q.didChangeConfiguration
-        
-        let oldConfiguration = ls.configurations.currentConfig
-        let newConfiguration = parseDidChangeConfiguration(receivedConfigJson)
+          newConfiguration = parseDidChangeConfiguration(q.didChangeConfiguration)
 
         let newConfigurationIsDifferent = isDifferentFrom(newConfiguration, oldConfiguration)
 
         if newConfigurationIsDifferent:
           ls.configurations.currentConfig = newConfiguration
+
+        debug "Current performance ", kind = $ls.configurations.currentConfig.performance.kind, throttling = $ls.configurations.currentConfig.performance.fileCheckThrottling, updateOnChange = $ls.configurations.currentConfig.performance.updateOnChange
 
         ls.configurations.configReady.fire()
 

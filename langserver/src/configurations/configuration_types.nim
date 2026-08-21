@@ -35,6 +35,7 @@ type
 
 type
   PerformanceSetting* = object
+    kind*: PerformanceSettingKind
     fileCheckThrottling*: times.Duration # File 
     updateOnChange*: bool
     description*: string

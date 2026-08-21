@@ -11,21 +11,25 @@ proc initPerformanceSettings*(): Table[PerformanceSettingKind, PerformanceSettin
   result = initTable[PerformanceSettingKind, PerformanceSetting]()
 
   result[PerformanceSettingKind.HIGHEST] =  PerformanceSetting(
+    kind: PerformanceSettingKind.HIGHEST,
     fileCheckThrottling: initDuration(milliseconds = 200),
     updateOnChange: true,
     description: "Update open dependencies on change. Low request throttling. Highest CPU usage."
   )
   result[PerformanceSettingKind.HIGH] = PerformanceSetting(
+    kind: PerformanceSettingKind.HIGH,
     fileCheckThrottling: initDuration(seconds = 1),
     updateOnChange: true,
     description: "Update open dependencies on change. Medium request throttling. High CPU usage."
   )
   result[PerformanceSettingKind.LOW] = PerformanceSetting(
+    kind: PerformanceSettingKind.LOW,
     fileCheckThrottling: initDuration(seconds = 1),
     updateOnChange: false,
     description: "Only update dependencies on save.  Medium request throttling. Low CPU usage."
   )
   result[PerformanceSettingKind.LOWEST] = PerformanceSetting(
+    kind: PerformanceSettingKind.LOWEST,
     fileCheckThrottling: initDuration(seconds = 5),
     updateOnChange: false,
     description: "Only update dependencies on save.  High request throttling. owest CPU usage."

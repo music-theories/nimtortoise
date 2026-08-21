@@ -51,16 +51,36 @@ proc getNimbleTasks*(
       await process.shutdownChildProcess()
       continue
     let output = string.fromBytes(await process.stdoutStream.read())
+    
+    var foundBuild = false
+    var foundTest = false
     var name, desc: string
     for line in output.splitLines:
       if scanf(line, "$+  $*", name, desc):
         #first run of nimble tasks can compile nim and output the result of the compilation
         if name.isWord:
+          let nameStripped = name.strip()
           result.add(NimbleTask(
-            name: name.strip(), 
+            name: nameStripped, 
             description: desc.strip(), 
             projectDir: nimbleDirectory
           ))
+          if nameStripped == "build": 
+            foundBuild = true
+          if nameStripped == "test": 
+            foundTest = true
+    if foundBuild == false:
+      result.add(NimbleTask(
+        name: "build", 
+        description: "-", 
+        projectDir: nimbleDirectory
+      ))
+    if foundTEst == false:
+      result.add(NimbleTask(
+        name: "test", 
+        description: "-", 
+        projectDir: nimbleDirectory
+      ))
     await process.shutdownChildProcess()
 
 proc runNimbleTask*(

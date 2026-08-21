@@ -40,8 +40,21 @@ proc consolidateNimsuggestInstances(
         
         oldSlot.ownedUris.excl(oldSlotUri)
         newSlot.ownedUris.incl(oldSlotUri)
+        # If this URI is open, tell the new slot's nimsuggest about the current
+        # stash so it has the right file version.
+        if oldSlotUri in ls.files.openFiles:
+          newSlot.queryMailbox.addLastNoWait(NimsuggestQuery[LspFilePosition](
+            id: 0,
+            kind: NimsuggestQueryKind.CHANGED,
+            uri: oldSlotUri,
+            dirtyFile: uriToStashFilePath(ls.files.storageDir, oldSlotUri),
+            saved: false,
+            isDependency: false,
+            responseFuture: newFuture[seq[Suggest]]("consolidateChanged"),
+          ))
 
       discard await ls.pool.stopNimsuggestSlot(oldSlot)
+
       slotsToRemove.add(oldSlot.spawnInfo.entryPoint)
     else:
       debug "consolidateNimsuggestInstances: new slot does not know old slot", newSlotProjectFile = newSlot.spawnInfo.entryPoint, oldSlotProjectFile = oldSlot.spawnInfo.entryPoint

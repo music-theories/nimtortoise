@@ -16,7 +16,10 @@ const
 
 suite "Transitive dependency diagnostics":
   let (cmdParams, ls, client) = startServer(depsRoot)
-  client.setWorkspaceConfig(%*[{"maxNimsuggestProcesses": 1}])
+  client.setWorkspaceConfig(%*[{
+    "maxNimsuggestProcesses": 1,
+    "performance": "HIGHEST"
+  }])
   doInitialize(client, depsRoot)
   client.notify("initialized", newJObject())
 
