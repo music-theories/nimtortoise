@@ -12,7 +12,6 @@ import ../utils/utils
 import ./[langserver_types, query_types, capability_configs]
 import ./[dispatcher_did_open, dispatcher_did_change]
 
-
 proc waitForLsInitialized*(ls: LanguageServer): Future[void] {.async.} =
   ## Waits until initNimsuggestInstances has completed (config received, nimble dump
   ## done, entry-point slots spawned), with a 60-second timeout.
@@ -133,20 +132,24 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
               uri: uri,
               dirtyFile: uriToStashFilePath(ls.files.storageDir, uri),
               saved: true,
+              isDependency: false,
               responseFuture: newFuture[seq[Suggest]]("nimsuggestQuery"),
             )
             fileInfo.slot.queryMailbox.addLastNoWait(changedQuery)
 
-            # if ls.configurations.currentConfig.checkOnSave:
-            #   debug "Checking project", uri = uri
-            #   let chkQuery = NimsuggestQuery[LspFilePosition](
-            #     id: 0,
-            #     kind: NimsuggestQueryKind.CHECK_PROJECT,
-            #     uri: toUri(fileInfo.slot.spawnInfo.entryPoint),
-            #     dirtyFile: uriToStashFilePath(ls.files.storageDir, uri), # FilePathAbs(""),
-            #     responseFuture: newFuture[seq[Suggest]]("checkProject"),
-            #   )
-            #   fileInfo.slot.queryMailbox.addLastNoWait(chkQuery)
+            # # if ls.configurations.currentConfig.checkOnSave:
+            # # if true:
+            # let chkQuery = NimsuggestQuery[LspFilePosition](
+            #   id: 0,
+            #   # kind: NimsuggestQueryKind.CHECK_PROJECT,
+            #   kind: NimsuggestQueryKind.CHECK_FILE,
+            #   saved: true,
+            #   isDependency: false,
+            #   uri: toUri(fileInfo.slot.spawnInfo.entryPoint),
+            #   dirtyFile: uriToStashFilePath(ls.files.storageDir, uri), # FilePathAbs(""),
+            #   responseFuture: newFuture[seq[Suggest]]("checkProject"),
+            # )
+            # fileInfo.slot.queryMailbox.addLastNoWait(chkQuery)
           
           of SlotState.STOPPING, SlotState.STOPPED, SlotState.CRASHED:
             discard

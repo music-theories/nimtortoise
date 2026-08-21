@@ -74,13 +74,12 @@ type
       NimsuggestQueryKind.RECOMPILE,
       NimsuggestQueryKind.KNOWN:
       discard
-    of NimsuggestQueryKind.CHECK_FILE:
-      isDependency*: bool
     of NimsuggestQueryKind.SHUTDOWN:
       shutdownFuture*: Future[void]
         ## Completed by processNimsuggestQueries after shutdownChildProcess returns.
         ## execStop awaits this to know the OS process is confirmed dead.
-    of NimsuggestQueryKind.CHANGED:
+    of NimsuggestQueryKind.CHECK_FILE, NimsuggestQueryKind.CHANGED:
+      isDependency*: bool
       saved*: bool
 
 # === NIMSUGGEST SLOT TYPES ====

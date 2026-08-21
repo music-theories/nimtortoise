@@ -1,4 +1,4 @@
-import std/[strutils, tables, options]
+import std/[strutils, tables, options, times]
 import chronos
 import chronicles
 
@@ -137,6 +137,7 @@ proc toNimsuggestQuery*(
       dirtyFile: q.dirtyFile,
       kind: NimsuggestQueryKind.CHECK_FILE,
       isDependency: q.isDependency,
+      saved: q.saved,
       responseFuture: q.responseFuture, 
       cancelled: q.cancelled,
     ))
@@ -146,7 +147,46 @@ proc toNimsuggestQuery*(
       responseFuture: q.responseFuture,
       cancelled: q.cancelled,
       kind: NimsuggestQueryKind.CHANGED,
+      isDependency: q.isDependency,
       saved: q.saved,
     ))
   of NimsuggestQueryKind.SHUTDOWN:
     return none(NimsuggestQuery[NimsuggestFilePosition])
+
+proc writeStashFile*(
+  storageDir: DirPathAbs,
+  uri: FileUri,
+  text: string
+): FilePathAbs = 
+  result = FilePathAbs("")
+  # Write the initial stash file
+  let storagePath = uriToStashFilePath(storageDir, uri)
+  try:
+    writeFile(string(storagePath), text)
+  except IOError as ex:
+    warn "Failed to write stash file; hover/completion may show stale content",
+      path = string(storagePath), msg = ex.msg
+  except OSError as ex:
+    warn "Failed to write stash file; hover/completion may show stale content",
+      path = string(storagePath), msg = ex.msg
+  
+  return storagePath
+
+proc initNlsFileInfo*(
+  slot: NimsuggestSlot,
+  params: TextDocumentItem
+): NlsFileInfo = 
+  # Build finger table for UTF-16 mapping
+  var fingerTable: seq[seq[tuple[u16pos, offset: int]]] = @[]
+  for line in params.text.splitLines:
+    fingerTable.add(line.createUTFMapping())
+
+  # Register in the file table (sync, atomic)
+  return NlsFileInfo(
+    slot: slot,
+    fingerTable: fingerTable,
+    textDocument: params,
+    lastChanged: times.now(),
+    lastChecked: times.now(),
+  )
+

@@ -13,7 +13,8 @@ proc initDefaultNlsConfig*(): NlsConfig =
     # projectMapping: @[],
     # workingDirectoryMapping: @[],
     # --- Save Settings ---
-    checkOnSave: false,
+    checkOnSave: true,
+    checkDependentsOnChange: false,
     formatOnSave: false,
     # --- Langserver settings --- 
     # langserverTimeout: 1_800_000, # in MS - This is 30 mins
@@ -31,7 +32,7 @@ proc initDefaultNlsConfig*(): NlsConfig =
         enable: false
       ),
       exceptionHints: NlsInlayExceptionHintsConfig(
-        enable: true,
+        enable: false, # THIS SHOULD NEVER BE ON!
         hintStringLeft: "🔔",
         hintStringRight: ""
       ),
@@ -53,16 +54,13 @@ proc nlsConfigFromJson*(json: JsonNode): NlsConfig =
   if json.kind != JObject:
     return
 
-  # if json.hasKey("projectMapping"):
-  #   result.projectMapping = json["projectMapping"].to(seq[NlsNimsuggestConfig])
-  # if json.hasKey("workingDirectoryMapping"):
-  #   result.workingDirectoryMapping = json["workingDirectoryMapping"].to(seq[NlsWorkingDirectoryMaping])
   if json.hasKey("checkOnSave"):
     result.checkOnSave = json["checkOnSave"].getBool()
+  if json.hasKey("checkDependentsOnChange"):
+    result.checkDependentsOnChange = json["checkDependentsOnChange"].getBool()
   if json.hasKey("formatOnSave"):
     result.formatOnSave = json["formatOnSave"].getBool()
-  # if json.hasKey("langserverTimeout"):
-  #   result.langserverTimeout = json["langserverTimeout"].getInt()
+
   if json.hasKey("fileCheckDelay"):
     result.fileCheckDelay = initDuration(milliseconds = json["fileCheckDelay"].getInt())
   if json.hasKey("maxNimsuggestProcesses"):

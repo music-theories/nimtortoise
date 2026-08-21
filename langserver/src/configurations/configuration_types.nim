@@ -40,6 +40,7 @@ type
     # workingDirectoryMapping*: seq[NlsWorkingDirectoryMaping]
     # --- Save Settings ---
     checkOnSave*: bool
+    checkDependentsOnChange*: bool
     formatOnSave*: bool
     # --- Langserver settings --- 
     # langserverTimeout*: int

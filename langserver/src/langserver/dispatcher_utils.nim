@@ -3,7 +3,7 @@ import chronos
 import chronicles
 import forest
 
-import ../nimsuggest/[suggestapi_types, nimsuggest_types, nimsuggest_slots]
+import ../nimsuggest/[suggestapi_types, nimsuggest_types, nimsuggest_slots, nimsuggest_utils]
 import ../protocol/types
 import ./[langserver_types]
 import ../utils/utils
@@ -58,7 +58,6 @@ proc checkNimsuggestSlotKnowsURI(slot: NimsuggestSlot, uri: FileUri): Future[Opt
   of SlotState.STOPPED, SlotState.STOPPING, SlotState.CRASHED:
     return none(NimsuggestSlot)
 
-
 proc isKnownByANimsuggestSlot*(pool: NimsuggestPool, uri: FileUri): Future[Option[NimsuggestSlot]] {.async.} =
   var futures: seq[Future[Option[NimsuggestSlot]]]
 
@@ -84,37 +83,12 @@ proc addFileToOpenFiles*(
   nimsuggestSlot: NimsuggestSlot,
   params: TextDocumentItem
 ) = 
-  # Write the initial stash file
-  let storagePath = uriToStashFilePath(ls.files.storageDir,params.uri)
-  try:
-    writeFile(string(storagePath), params.text)
-  except IOError as ex:
-    warn "Failed to write stash file; hover/completion may show stale content",
-      path = string(storagePath), msg = ex.msg
-  except OSError as ex:
-    warn "Failed to write stash file; hover/completion may show stale content",
-      path = string(storagePath), msg = ex.msg
-
-  # Build finger table for UTF-16 mapping
-  var fingerTable: seq[seq[tuple[u16pos, offset: int]]] = @[]
-  for line in params.text.splitLines:
-    fingerTable.add(line.createUTFMapping())
-
-  # Register in the file table (sync, atomic)
-  let fileInfo = NlsFileInfo(
-    slot: nimsuggestSlot,
-    fingerTable: fingerTable,
-    textDocument: params,
-    lastChanged: times.now(),
-    lastChecked: times.now(),
+  let writtenStashFile = writeStashFile(
+    ls.files.storageDir, params.uri, params.text
   )
-  ls.files.openFiles[params.uri] = fileInfo
-
-  # if params.uri in ls.files.idleOpenFiles:
-  #   ls.files.idleOpenFiles.del(params.uri)
-
-  # Register ownership in the slot (sync, atomic with above)
+  let fileInfo = initNlsFileInfo(nimsuggestSlot, params)
   nimsuggestSlot.assignUri(params.uri)
+  ls.files.openFiles[params.uri] = fileInfo
 
 proc sortNimsuggestByDate(a, b: NimsuggestSlot): int = 
   if a.lastCmdTime == b.lastCmdTime:

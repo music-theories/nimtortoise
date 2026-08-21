@@ -502,7 +502,7 @@ proc inlayHint*(
   if not configuration.inlayHints.typeHints.enable:
     inlayHintsOptions &= " -typeHints"
   if configuration.inlayHints.exceptionHints.enable:
-    inlayHintsOptions &= " +exceptionHints"
+    inlayHintsOptions &= " -exceptionHints" # THIS SHOULD NEVER BE ON
 
   let query = ls.initNimsuggestInlayHintQuery(
     id,

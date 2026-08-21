@@ -1,4 +1,4 @@
-import std/[options, strformat, sets, tables, times, json, sequtils]
+import std/[options, strformat, sets, tables, times, json, sequtils, algorithm]
 import chronos
 import chronicles
 
@@ -112,8 +112,6 @@ proc processNimsuggestQueries*(
       shutdownFut = originalQuery.shutdownFuture
       break
 
-    # debug "processNimsuggestQueries: running query", kind = $originalQuery.kind, projectFile = slot.spawnInfo.entryPoint, uri = originalQuery.uri
-
     # $/cancelRequest — skip queries already cancelled by the client.
     if originalQuery.cancelled:
       debug "processNimsuggestQueries: query cancelled, skipping", kind = $originalQuery.kind, uri = originalQuery.uri
@@ -123,11 +121,13 @@ proc processNimsuggestQueries*(
 
     case originalQuery.kind
     of NimsuggestQueryKind.CHANGED:
-      if mailboxHasChangedQueryForSameUriAnyOtherUri(slot, originalQuery.uri) and (originalQuery.saved == false):
+      if mailboxHasChangedQueryForSameUriAnyOtherUri(slot, originalQuery.uri) and (originalQuery.saved == false) and (originalQuery.isDependency == false):
         # If there is a later changed query for the same uri queued, drop this one.  There must be no CHANGED queries to other URIs in between, though.
         debug "processNimsuggestQueries: There is a later CHANGED query for the same uri.", uri = originalQuery.uri
+
         originalQuery.responseFuture.complete(@[])
         continue
+
       else:
         if originalQuery.uri in openFiles:
           let fileInfo = openFiles[originalQuery.uri]
@@ -144,15 +144,15 @@ proc processNimsuggestQueries*(
             continue
           # else: enough time has passed, continue with processing the query...
         else:
-          debug "processNimsuggestQueries: Skipping query, file is no longer open.", uri = originalQuery.uri
-          continue
+          debug "processNimsuggestQueries: File is not open.", uri = originalQuery.uri
+          # continue
 
-    
     of NimsuggestQueryKind.CHECK_FILE:
       if mailboxHasQueryOfKind(
         slot, NimsuggestQueryKind.CHECK_FILE, originalQuery.uri
-      ) and (originalQuery.isDependency == false):
+      ):
         debug "processNimsuggestQueries: skipping stale query (CHECK_FILE pending)", kind = $originalQuery.kind, uri = originalQuery.uri
+        
         originalQuery.responseFuture.complete(@[])
         continue
 
@@ -231,10 +231,9 @@ proc processNimsuggestQueries*(
           continue
       
     if slot.state == SlotState.READY:
-
       # debug "processNimsuggestQueries: original Query ", entryPoint = slot.spawnInfo.entryPoint, kind = $originalQuery.kind, uri = $originalQuery.uri
       let convertedQuery = toNimsuggestQuery(originalQuery, openFiles)
-      if convertedQuery.isNone:
+      if convertedQuery.isNone():
         # debug "processNimsuggestQueries: query conversion failed, skipping"
         originalQuery.responseFuture.complete(@[])
         continue
@@ -258,27 +257,31 @@ proc processNimsuggestQueries*(
           of NimsuggestQueryKind.CHANGED:
             debug "processNimsuggestQueries: CHANGED complete, scanning open files for dependents"
             
-            let dependencyQueriesToSend = createNimsuggestDependencyQueries(
-              q, 
-              storageDir, 
-              openFiles, dependencies
-            )
+            if not q.isDependency:
+              let dependencyQueriesToSend = createNimsuggestDependencyQueries(
+                q, storageDir, openFiles, dependencies,
+                config
+              )
 
-            for msg in dependencyQueriesToSend:
-              slot.queryMailbox.addFirstNoWait(msg)
-
-            # let storageDir = parentDir(q.dirtyFile)
+              for msg in reversed(dependencyQueriesToSend):
+                if msg.uri in openFiles:
+                  openFiles[msg.uri].lastChecked = now()
+                debug "processNimsuggestQueries: dependency to queue", kind = $msg.kind,uri = msg.uri
+                slot.queryMailbox.addFirstNoWait(msg)
 
           of NimsuggestQueryKind.CHECK_FILE:
             if q.uri in openFiles:
               openFiles[q.uri].lastChecked = now()
+
+            debug "processNimsuggestQueries: CHECK_FILE response"
+            for s in queryResponse:
+              debug "processNimsuggestQueries: CHECK_FILE response", respone = $s.section, path = s.filePath
 
             let diagnosticsJson = convertNimSuggestResponseToDiagnostics(
               queryResponse, q.uri, openFiles
             )
             notifyProc("textDocument/publishDiagnostics", diagnosticsJson)
 
-            
           of NimsuggestQueryKind.CHECK_PROJECT, NimsuggestQueryKind.RECOMPILE:
             let timeNow = now()
             for uri, file in openFiles:
@@ -293,7 +296,6 @@ proc processNimsuggestQueries*(
 
             # for s in queryResponse:
             #   debug "processNimsuggestQueries: result", suggest = $(%*s)
-
 
             var filesWithDiagnostics: HashSet[FileUri]
             for (path, groupedSuggests) in groupBy(queryResponse, getFilepath):
@@ -330,7 +332,8 @@ proc processNimsuggestQueries*(
           slot.crashedUris.incl(q.uri)
           
           if not q.responseFuture.finished:
-            q.responseFuture.complete(@[]) # empty, not fail — see fix #17
+            q.responseFuture.complete(@[]) 
+            # empty, not fail — see fix #17
 
   # --- Shutdown: kill the OS process now that the queue is drained ---
   try:
@@ -378,7 +381,6 @@ proc restartAllNimsuggestInstances*(
         dependencies, storageDir,
         config
       )
-
 
 # Notes on Cascade
 # Queue a cascade of CHECK_FILE commands to propagate diagnostics through

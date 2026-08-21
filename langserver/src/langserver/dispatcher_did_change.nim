@@ -61,7 +61,8 @@ proc processDidChangeQuery*(
         uri: uri,
         dirtyFile: uriToStashFilePath(ls.files.storageDir, uri),
         responseFuture: newFuture[seq[Suggest]]("nimsuggestQuery"),
-        saved: false
+        saved: false,
+        isDependency: false
       )  
       slot.queryMailbox.addLastNoWait(changedQuery)
 
@@ -73,7 +74,8 @@ proc processDidChangeQuery*(
         uri: uri,
         dirtyFile: uriToStashFilePath(ls.files.storageDir, uri),
         responseFuture: newFuture[seq[Suggest]]("nimsuggestQuery"),
-        saved: false
+        saved: false,
+        isDependency: false
       )  
 
       ls.langserverQueue.addFirstNoWait(LangserverQuery(
