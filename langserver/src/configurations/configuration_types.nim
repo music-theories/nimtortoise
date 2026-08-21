@@ -34,21 +34,31 @@ type
     nvInfo = "info"
 
 type
+  PerformanceSetting* = object
+    fileCheckThrottling*: times.Duration # File 
+    updateOnChange*: bool
+    description*: string
+
+  PerformanceSettingKind* {.pure.} = enum
+    HIGHEST = "HIGHEST",
+    HIGH = "HIGH",
+    LOW = "LOW",
+    LOWEST = "LOWEST"
+
+type
   NlsConfig* = ref object of RootObj
-    # --- Files/Folders ---
-    # projectMapping*: seq[NlsNimsuggestConfig]
-    # workingDirectoryMapping*: seq[NlsWorkingDirectoryMaping]
     # --- Save Settings ---
     # checkOnSave*: bool
-    checkDependentsOnChange*: bool
+    # checkDependentsOnChange*: bool
+    performance*: PerformanceSetting
     formatOnSave*: bool
     # --- Langserver settings --- 
     # langserverTimeout*: int
-    fileCheckDelay*: times.Duration # In milliseconds 
+    # fileCheckDelay*: times.Duration # In milliseconds 
     # -- Nimsuggest Settings ---
+    nimsuggestPath*: FilePathAbs
     maxNimsuggestProcesses*: int
     maxNimsuggestCrashRetries*: int
-    nimsuggestPath*: FilePathAbs
     nimsuggestSpawnTimeout*: times.Duration # in seconds
     nimsuggestIdleTimeout*: times.Duration # In seconds
     nimsuggestRequestTimeout*: times.Duration # In seconds
@@ -64,3 +74,5 @@ type
       ## Parsed config. none until first workspace/configuration response arrives.
     configReady*: AsyncEvent
       ## Fired when currentConfig is first populated, and re-fired after each change.
+
+

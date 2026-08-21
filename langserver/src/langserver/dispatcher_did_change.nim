@@ -1,4 +1,4 @@
-import std/[tables, sequtils, times, strutils]
+import std/[tables, sequtils, times, strutils, options]
 import chronos
 import chronicles
 import ../nimsuggest/nimsuggest
@@ -49,57 +49,58 @@ proc processDidChangeQuery*(
       uri, contentChanges
     )
     ls.files.openFiles[uri].lastChanged = times.now()
+    let slotCheck = getSlotThatOwnsUri(ls.pool, uri)
+    if slotCheck.isSome():
+      let slotThatOwnsUri = slotCheck.get()
 
-    let slot = ls.files.openFiles[uri].slot
+      case slotThatOwnsUri.state
+      of SlotState.SPAWNING, SlotState.READY:
+        debug "processDidChangeQuery: DID_CHANGE dispatcher adding CHANGED message to slot mailbox", uri = uri
+        let changedQuery = NimsuggestQuery[LspFilePosition](
+          id: 0,
+          kind: NimsuggestQueryKind.CHANGED,
+          uri: uri,
+          dirtyFile: uriToStashFilePath(ls.files.storageDir, uri),
+          responseFuture: newFuture[seq[Suggest]]("nimsuggestQuery"),
+          saved: false,
+          isDependency: false
+        )  
+        slotThatOwnsUri.queryMailbox.addLastNoWait(changedQuery)
 
-    case slot.state
-    of SlotState.SPAWNING, SlotState.READY:
-      debug "processDidChangeQuery: DID_CHANGE dispatcher adding CHANGED message to slot mailbox", uri = uri
-      let changedQuery = NimsuggestQuery[LspFilePosition](
-        id: 0,
-        kind: NimsuggestQueryKind.CHANGED,
-        uri: uri,
-        dirtyFile: uriToStashFilePath(ls.files.storageDir, uri),
-        responseFuture: newFuture[seq[Suggest]]("nimsuggestQuery"),
-        saved: false,
-        isDependency: false
-      )  
-      slot.queryMailbox.addLastNoWait(changedQuery)
+      of SlotState.STOPPED:
+        debug "processDidChangeQuery: DID_CHANGE dispatcher could not add CHANGED message to dead slot mailbox.  Send synthetic DID_OPEN message to try and open slot", uri = uri
+        let changedQuery = NimsuggestQuery[LspFilePosition](
+          id: 0,
+          kind: NimsuggestQueryKind.CHANGED,
+          uri: uri,
+          dirtyFile: uriToStashFilePath(ls.files.storageDir, uri),
+          responseFuture: newFuture[seq[Suggest]]("nimsuggestQuery"),
+          saved: false,
+          isDependency: false
+        )  
 
-    of SlotState.STOPPED:
-      debug "processDidChangeQuery: DID_CHANGE dispatcher could not add CHANGED message to dead slot mailbox.  Send synthetic DID_OPEN message to try and open slot", uri = uri
-      let changedQuery = NimsuggestQuery[LspFilePosition](
-        id: 0,
-        kind: NimsuggestQueryKind.CHANGED,
-        uri: uri,
-        dirtyFile: uriToStashFilePath(ls.files.storageDir, uri),
-        responseFuture: newFuture[seq[Suggest]]("nimsuggestQuery"),
-        saved: false,
-        isDependency: false
-      )  
+        ls.langserverQueue.addFirstNoWait(LangserverQuery(
+          kind: LangserverQueryKind.NIMSUGGEST,
+          nimsuggest: changedQuery
+        ))
 
-      ls.langserverQueue.addFirstNoWait(LangserverQuery(
-        kind: LangserverQueryKind.NIMSUGGEST,
-        nimsuggest: changedQuery
-      ))
-
-      ls.langserverQueue.addFirstNoWait(LangserverQuery(
-        kind: LangserverQueryKind.FILE_ACCESS,
-        fileAccess: FileAccessQuery(
-          kind: FileAccessQueryKind.DID_OPEN,
-          didOpen: DidOpenTextDocumentParams(
-            textDocument: TextDocumentItem(
-              uri: uri,
-              languageId: languageID,
-              version: version,
-              text: savedContent
-            ) 
+        ls.langserverQueue.addFirstNoWait(LangserverQuery(
+          kind: LangserverQueryKind.FILE_ACCESS,
+          fileAccess: FileAccessQuery(
+            kind: FileAccessQueryKind.DID_OPEN,
+            didOpen: DidOpenTextDocumentParams(
+              textDocument: TextDocumentItem(
+                uri: uri,
+                languageId: languageID,
+                version: version,
+                text: savedContent
+              ) 
+            )
           )
-        )
-      ))
+        ))
 
-    of SlotState.CRASHED, SlotState.STOPPING:
-      debug "processDidChangeQuery: DID_CHANGE dispatcher cannot add message to slot in CRASHED or STOPPING mailbox", uri = uri, state = slot.state, entryPoint = slot.spawnInfo.entryPoint
+      of SlotState.CRASHED, SlotState.STOPPING:
+        debug "processDidChangeQuery: DID_CHANGE dispatcher cannot add message to slot in CRASHED or STOPPING mailbox", uri = uri, state = slotThatOwnsUri.state, entryPoint = slotThatOwnsUri.spawnInfo.entryPoint
       
 
   else:

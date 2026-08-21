@@ -334,6 +334,17 @@ proc newRestartItem(title: string, pathToFile: string, action: static string): L
   )
   cast[LspItem](restartItem)
 
+proc newPerformanceItem(): LspItem =
+  let current = vscode.workspace.getConfiguration("nimTortoise").getStr("performance")
+  let item = vscode.newTreeItem("Performance", TreeItemCollapsibleState_None)
+  item.description = current
+  item.tooltip = "Click to change the performance setting".cstring
+  item.iconPath = vscode.themeIcon("settings-gear", vscode.themeColor("notificationsInfoIcon.foreground"))
+  item.command = newJsObject()
+  item.command.command = "nimTortoise.setPerformance".cstring
+  item.command.title = "Set Performance".cstring
+  cast[LspItem](item)
+
 proc newCheckProjectItem(): LspItem =
   let item = vscode.newTreeItem("Check Project", TreeItemCollapsibleState_None)
   item.tooltip = "Restart nimsuggest and run a full compile check for the active file's project"
@@ -352,6 +363,7 @@ proc getChildrenImpl(
       if self.status.isSome: self.status.get.pendingRequests.len else: 0
     let pendingDesc = if pendingCount > 0: cstring($pendingCount) else: "".cstring
     var rootItems = @[
+      newPerformanceItem(),
       newLspItem("LSP Status", "", "", TreeItemCollapsibleState_Collapsed),
       newLspItem("Pending Requests", pendingDesc, "", TreeItemCollapsibleState_Collapsed),
       newLspItem("Nimsuggest Pool", "", "", TreeItemCollapsibleState_Expanded),

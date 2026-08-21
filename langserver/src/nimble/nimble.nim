@@ -10,56 +10,6 @@ import ../protocol/types
 import ../utils/process_utils
 import ../utils/utils
 
-
-
-# proc getNimbleDumpInfo*(
-#   nimbleDumpCache: Table[FilePathAbs, NimbleDumpInfo],
-#   nimbleFile: FilePathAbs
-# ): Future[NimbleDumpInfo] {.async.} =
-#   ## Runs nimble dump, which gets all the entryPoints/projectFiles. 
-#   if nimbleFile in nimbleDumpCache:
-#     return nimbleDumpCache[nimbleFile]
-#   var process: AsyncProcessRef
-#   try:
-#     let workDir = parentDir(string(nimbleFile))
-#     let nimbleDirEnv = getEnv("NIMBLE_DIR", "<not set>")
-#     let homeEnv = getEnv("HOME", "<not set>")
-#     let pathEnv = getEnv("PATH", "<not set>")
-
-#     debug "getNimbleDumpInfo: environment",
-#       nimbleFile = $nimbleFile, workDir = workDir,
-#       NIMBLE_DIR = nimbleDirEnv, HOME = homeEnv, PATH = pathEnv
-
-#     process = await startProcess(
-#       "nimble",
-#       workingDir = workDir,
-#       arguments = @["dump"],
-#       options = {UsePath},
-#       stderrHandle = AsyncProcess.Pipe,
-#       stdoutHandle = AsyncProcess.Pipe,
-#     )
-#     let info = string.fromBytes(process.stdoutStream.read().await)
-#     debug "getNimbleDumpInfo: result ", info
-
-#     for line in info.splitLines:
-#       if line.startsWith("srcDir"):
-#         result.srcDir = line[(1 + line.find '"') ..^ 2]
-#       if line.startsWith("name"):
-#         result.name = line[(1 + line.find '"') ..^ 2]
-#       if line.startsWith("nimDir"):
-#         result.nimDir = some(line[(1 + line.find '"') ..^ 2])
-#       if line.startsWith("nimblePath"):
-#         result.nimblePath = FilePathAbs(line[(1 + line.find '"') ..^ 2])
-#       if line.startsWith("entryPoints"):
-#         result.entryPoints =
-#           line[(1 + line.find '"') ..^ 2].split(',').mapIt(it.strip(chars = {' ', '"'}))
-
-#   except CatchableError:
-#     debug "Failed to get nimble dump info", nimbleFile = $nimbleFile
-#   finally:
-#     if process != nil:
-#       await shutdownChildProcess(process)
-
 proc startNimbleProcess*(
   args: seq[string], workingDir: string
 ): Future[AsyncProcessRef] {.async.} =
@@ -132,40 +82,3 @@ proc runNimbleTask*(
 
   debug "Ran nimble cmd/task", command = $params.command, output = $result.output
   await process.shutdownChildProcess()
-
-
-# proc initNimsuggestInstances*(ls: LanguageServer) {.async.} =
-#   ## Starts nimsuggest instances.
-#   let rootPath = getRootPath(ls.capabilities.lspInitializeParams)
-
-#   debug "initNimsuggestInstances: spawning from rootPath", rootPath = rootPath
-#   if rootPath == "":
-#     debug "initNimsuggestInstances: rootPath is empty.  Quitting.  This should not happen, as this is the folder the language server is being run from."
-#     return
-
-#   let config = ls.configurations.currentConfig
-
-#   # Update pool settings from config (pool was created with defaults in initLanguageServer)
-#   ls.pool.maxSlots = config.maxNimsuggestProcesses
-#   ls.pool.fileCheckDelay = initDuration(milliseconds = config.fileCheckDelay)
-
-#   # Get all nimble information
-#   let foundNimbleFiles = searchForNimbleFiles(string(rootPath))
-#   var nimsuggestSet = false
-#   # let nimblePath = FilePath("") # Should be rootPath?
-#   for i, n in foundNimbleFiles:
-#     let nimblePath = FilePath(n)
-#     let nimbleDumpInfo: NimbleDumpInfo = await getNimbleDumpInfo(ls.nimbleDumpCache, nimblePath)
-
-#     if nimbleDumpInfo.nimblePath.isSome:
-#       let nimblePathToUse = FilePath(nimbleDumpInfo.nimblePath.get())
-#       ls.nimbleDumpCache[nimblePathToUse] = nimbleDumpInfo
-#     else:
-#       ls.nimbleDumpCache[nimblePath] = nimbleDumpInfo
-
-#     if nimsuggestSet == false:
-#       # Resolve the nimsuggest binary path and Nim version now that config is available.
-#       let (nimsuggestPath, nimVersion) = await getNimSuggestPathAndVersion(nimbleDumpInfo, config)
-#       ls.pool.nimsuggestPath = nimsuggestPath
-#       ls.pool.nimVersion = nimVersion
-#       nimsuggestSet = true

@@ -16,6 +16,7 @@ proc consolidateNimsuggestInstances(
   var slotsToRemove: seq[FilePathAbs] = @[]
   for projectPath, oldSlot in ls.pool.slots:
     if oldSlot.spawnInfo.entryPoint == newSlot.spawnInfo.entryPoint: continue
+    
     let knownQuery = NimsuggestQuery[LspFilePosition](
       id: 0.uint,
       kind: NimsuggestQueryKind.KNOWN,
@@ -31,18 +32,14 @@ proc consolidateNimsuggestInstances(
       debug "consolidateNimsuggestInstances: new slot knows old slot", newSlotEntryPoint = newSlot.spawnInfo.entryPoint, oldSlotEntryPoint = oldSlot.spawnInfo.entryPoint
       # New slot knows old slot's entry point → it imported old slot entirely.
       # Transfer all owned URIs and shut the old slot down.
-      newSlot.ownedUris.incl(toUri(oldSlot.spawnInfo.entryPoint))
+      let entryPointUri = toUri(oldSlot.spawnInfo.entryPoint)
+      newSlot.ownedUris.incl(entryPointUri)
 
-      if toUri(oldSlot.spawnInfo.entryPoint) in ls.files.openFiles:
-        ls.files.openFiles[toUri(oldSlot.spawnInfo.entryPoint)].slot = newSlot
-
-      for oldSlotUri in oldSlot.ownedUris.toSeq:
+      for oldSlotUri in oldSlot.ownedUris.toSeq():
         debug "consolidateNimsuggestInstances: reassign owned uri ", oldSlotUri = oldSlotUri
         
         oldSlot.ownedUris.excl(oldSlotUri)
         newSlot.ownedUris.incl(oldSlotUri)
-        if oldSlotUri in ls.files.openFiles:
-          ls.files.openFiles[oldSlotUri].slot = newSlot
 
       discard await ls.pool.stopNimsuggestSlot(oldSlot)
       slotsToRemove.add(oldSlot.spawnInfo.entryPoint)
@@ -129,7 +126,6 @@ proc createOrphanSlot(
     await ls.startSlotConsumer(slot.get(), params)
   return slot
     
-
 proc processDidOpenQuery*(
   ls: LanguageServer, q: FileAccessQuery
 ) {.async.} = 
@@ -137,20 +133,22 @@ proc processDidOpenQuery*(
   # Check if file is already open
   if uri in ls.files.openFiles:
     debug "didOpenFile: URI is already in openFiles", uri = uri
-    let slot = ls.files.openFiles[uri].slot
-    case slot.state 
-    of SlotState.READY, SlotState.SPAWNING:
-      if uri in slot.ownedUris:
-        # The file is already marked as open and has a valid nimsuggest slot.  Our work here is done!
-        return
-      else:
-        # Otherwise, the slot doesn't own it, so it should get checked below.
+    let slotCheck = getSlotThatOwnsUri(ls.pool, uri)
+    if slotCheck.isSome():
+      let slotThatOwnsUri = slotCheck.get()
+      case slotThatOwnsUri.state 
+      of SlotState.READY, SlotState.SPAWNING:
+        if uri in slotThatOwnsUri.ownedUris:
+          # The file is already marked as open and has a valid nimsuggest slot.  Our work here is done!
+          return
+        else:
+          # Otherwise, the slot doesn't own it, so it should get checked below.
+          discard
+      of SlotState.STOPPING, SlotState.CRASHED:
         discard
-    of SlotState.STOPPING, SlotState.CRASHED:
-      discard
-    of SlotState.STOPPED:
-      # Should restart?  This should happen below ...
-      discard
+      of SlotState.STOPPED:
+        # Should restart?  This should happen below ...
+        discard
 
   # Check if file is known to any nimsuggest instance
   debug "didOpen: calling isKnownByANimsuggestSlot", uri = uri

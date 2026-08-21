@@ -2,7 +2,7 @@
     "name": "vscode-nim-tortoise",
     "displayName": "Nim Tortoise",
     "description": "Fork and rewrite of nimlangserver.",
-    "version": "0.1.4",
+    "version": "0.2.0",
     "publisher": "YOUR_PUBLISHER_ID",
     "author": {
         "name": "David Pocknee"
@@ -151,6 +151,11 @@
           },
         "commands": [
             {
+                "command": "nimTortoise.setPerformance",
+                "title": "Set Performance Level",
+                "category": "Nim Tortoise"
+            },
+            {
                 "command": "nimTortoise.run.file",
                 "title": "Run selected Nim file",
                 "category": "Nim Tortoise",
@@ -271,19 +276,20 @@
                 "nimTortoise.formatOnSave": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Format the file on save using nph.",
+                    "description": "Format the file on save using nph (if installed).",
                     "scope": "resource"
                 },
-                "nimTortoise.checkDependentsOnChange": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Run CHECK_FILE on all dependent files after each change. Disable to reduce CPU usage on lower-powered machines (dependents will only be checked on save).",
-                    "scope": "resource"
-                },
-                "nimTortoise.fileCheckDelay": {
-                    "type": "integer",
-                    "default": 1000,
-                    "description": "Quiet period in ms after the last edit before per-file diagnostics are run. Lower values give faster feedback; higher values reduce CPU usage during rapid edits."
+                "nimTortoise.performance": {
+                    "type": "string",
+                    "default": "LOW",
+                    "enum": ["HIGHEST", "HIGH", "LOW", "LOWEST"],
+                    "enumDescriptions": [
+                        "Update open dependencies on change. Low request throttling. Highest CPU usage.",
+                        "Update open dependencies on change. Medium request throttling. High CPU usage.",
+                        "Only update dependencies on save. Medium request throttling. Low CPU usage.",
+                        "Only update dependencies on save. High request throttling. Lowest CPU usage."
+                    ],
+                    "description": "Controls how aggressively the language server checks dependent files and throttles requests."
                 },
                 "nimTortoise.notificationVerbosity": {
                     "type": "string",
@@ -300,16 +306,6 @@
                     "type": "boolean",
                     "default": false,
                     "description": "Enable verbose logging of nimsuggest."
-                },
-                "nimTortoise.nimExpandArc": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Expand ARC on proc definition hover."
-                },
-                "nimTortoise.nimExpandMacro": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Expand macro calls on hover."
                 },
                 "nimTortoise.maxNimsuggestProcesses": {
                     "type": "integer",
@@ -330,7 +326,7 @@
                 "nimTortoise.nimsuggestIdleTimeout": {
                     "type": "integer",
                     "default": 1800,
-                    "description": "Timeout in seconds after which an idle nimsuggest process is stopped."
+                    "description": "Timeout in milliseconds after which an idle nimsuggest process is stopped."
                 },
                 "nimTortoise.nimsuggestRequestTimeout": {
                     "type": "integer",
@@ -351,21 +347,6 @@
                     "type": "boolean",
                     "default": false,
                     "description": "Enable inlay parameter hints."
-                },
-                "nimTortoise.inlayHints.exceptionHints.enable": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Enable inlay hints for exceptions."
-                },
-                "nimTortoise.inlayHints.exceptionHints.hintStringLeft": {
-                    "type": "string",
-                    "default": "🔔",
-                    "description": "String displayed to the left of a symbol name in exception inlay hints."
-                },
-                "nimTortoise.inlayHints.exceptionHints.hintStringRight": {
-                    "type": "string",
-                    "default": "",
-                    "description": "String displayed to the right of a symbol name in exception inlay hints."
                 },
                 "nimTortoise.lsp.trace.server": {
                     "scope": "window",
@@ -403,44 +384,16 @@
                     "default": 15,
                     "description": "Timeout in seconds before language server notifications are automatically dismissed. Use 0 to disable."
                 },
-                "nimTortoise.debug.type": {
-                    "type": "string",
-                    "default": "lldb",
-                    "description": "Debugger type used by 'Debug selected file'. Matches the 'type' attribute in launch.json (e.g. 'lldb', 'cppdbg')."
-                },
                 "nimTortoise.nimbleAutoSetup": {
                     "type": "boolean",
                     "default": true,
                     "description": "Automatically run 'nimble setup' when a .nimble file is detected, to generate nimble.paths."
-                },
-                "nimTortoise.project": {
-                    "type": "array",
-                    "default": [],
-                    "description": "Nim project files to track. If empty, the active file is used.",
-                    "scope": "resource"
                 },
                 "nimTortoise.buildCommand": {
                     "type": "string",
                     "default": "c",
                     "description": "Nim compiler backend used when building (c, cpp, js, etc.).",
                     "scope": "resource"
-                },
-                "nimTortoise.runOutputDirectory": {
-                    "type": "string",
-                    "default": "",
-                    "description": "Output directory for compiled binaries when using 'Run selected file'. Relative to workspace root.",
-                    "scope": "resource"
-                },
-                "nimTortoise.test.entryPoint": {
-                    "type": "string",
-                    "default": "",
-                    "description": "Single test entry point. Prefer nimTortoise.test.entryPoints for monorepo support. If both are empty, tests are disabled."
-                },
-                "nimTortoise.test.entryPoints": {
-                    "type": "array",
-                    "items": { "type": "string" },
-                    "default": [],
-                    "description": "List of test entry points, one per sub-project. Paths relative to workspace root (e.g. [\"langserver/tests/all.nim\"]). Takes precedence over nimTortoise.test.entryPoint."
                 }
             }
         },

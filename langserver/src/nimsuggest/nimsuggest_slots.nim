@@ -26,11 +26,11 @@ proc slotForUri*(pool: NimsuggestPool, uri: FileUri): Option[NimsuggestSlot] =
       return some(slot)
   return none(NimsuggestSlot)
 
-proc assignUri*(slot: NimsuggestSlot, uri: FileUri) =
-  slot.ownedUris.incl(uri)
+# proc assignUri*(slot: NimsuggestSlot, uri: FileUri) =
+#   slot.ownedUris.incl(uri)
 
-proc unassignUri*(slot: NimsuggestSlot, uri: FileUri) =
-  slot.ownedUris.excl(uri)
+# proc unassignUri*(slot: NimsuggestSlot, uri: FileUri) =
+#   slot.ownedUris.excl(uri)
 
 # === UTILS ===
 proc isLive*(slot: NimsuggestSlot): bool =

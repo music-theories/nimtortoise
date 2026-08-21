@@ -1,9 +1,9 @@
-import std/[options, tables, algorithm, sequtils, strutils, times, sets]
+import std/[options, tables, algorithm, sequtils, times, sets]
 import chronos
 import chronicles
 import forest
 
-import ../nimsuggest/[suggestapi_types, nimsuggest_types, nimsuggest_slots, nimsuggest_utils]
+import ../nimsuggest/[suggestapi_types, nimsuggest_types, nimsuggest_utils]
 import ../protocol/types
 import ./[langserver_types]
 import ../utils/utils
@@ -86,8 +86,8 @@ proc addFileToOpenFiles*(
   let writtenStashFile = writeStashFile(
     ls.files.storageDir, params.uri, params.text
   )
-  let fileInfo = initNlsFileInfo(nimsuggestSlot, params)
-  nimsuggestSlot.assignUri(params.uri)
+  let fileInfo = initNlsFileInfo(params)
+  nimsuggestSlot.ownedUris.incl(params.uri)
   ls.files.openFiles[params.uri] = fileInfo
 
 proc sortNimsuggestByDate(a, b: NimsuggestSlot): int = 
@@ -175,25 +175,3 @@ proc nimsuggestSlotToEvict*(pool: NimsuggestPool): NimsuggestSlot =
   return lruAmong(allCandidates)
   # Unreachable if precondition holds, but satisfies the compiler.
   # raiseAssert "nimsuggestSlotToEvict: pool has slots but none matched any state"
-
-
-proc queryFile*(ls: LanguageServer, uri: FileUri, kind: NimsuggestQueryKind): Future[seq[Suggest]] =
-  ## Creates a NimsuggestQuery and enqueues it on the owning slot's query mailbox.
-  ## Returns a Future completed by processQueries when nimsuggest responds.
-  result = newFuture[seq[Suggest]]("queryFile")
-  let fileInfo = ls.files.openFiles.getOrDefault(uri)
-  if fileInfo == nil:
-    result.complete(@[])
-    return
-  if fileInfo.slot.state in {SlotState.STOPPED, SlotState.CRASHED}:
-    result.complete(@[])
-    return
-  let dirtyFile = uriToStashFilePath(ls.files.storageDir, uri)
-  let query = NimsuggestQuery[LspFilePosition](
-    kind: kind,
-    uri: uri,
-    dirtyFile: dirtyFile,
-    responseFuture: result,
-  )
-
-  fileInfo.slot.queryMailbox.addLastNoWait(query)

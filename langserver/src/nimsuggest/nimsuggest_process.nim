@@ -109,7 +109,16 @@ proc processNimsuggestQueries*(
 
     if originalQuery.kind == NimsuggestQueryKind.SHUTDOWN:
       debug "processNimsuggestQueries: received SHUTDOWN, exiting loop", projectFile = slot.spawnInfo.entryPoint
+
       shutdownFut = originalQuery.shutdownFuture
+
+      # Drain any queries that arrived after the SHUTDOWN sentinel so their
+      # futures are resolved and callers are not left waiting forever.
+      while slot.queryMailbox.len > 0:
+        let drainedQuery = slot.queryMailbox.popFirstNoWait()
+        if not drainedQuery.responseFuture.finished:
+          drainedQuery.responseFuture.complete(@[])
+
       break
 
     # $/cancelRequest — skip queries already cancelled by the client.
@@ -133,9 +142,9 @@ proc processNimsuggestQueries*(
           let fileInfo = openFiles[originalQuery.uri]
           let timeSinceLastChange = now() - fileInfo.lastChanged
 
-          if timeSinceLastChange < config.fileCheckDelay:
+          if timeSinceLastChange < config.performance.fileCheckThrottling:
             # Not enough time has elapsed
-            let timeoutLength = (config.fileCheckDelay - timeSinceLastChange).inMilliseconds + 5
+            let timeoutLength = (config.performance.fileCheckThrottling - timeSinceLastChange).inMilliseconds + 5
             debug "processNimsuggestQueries: Running timeout for CHANGED.", timeout = timeoutLength, uri = originalQuery.uri
             # Start a blocking timer until the remaining time has elapsed
             await sleepAsync(timeoutLength)

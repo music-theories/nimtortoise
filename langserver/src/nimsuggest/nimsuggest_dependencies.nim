@@ -1,4 +1,4 @@
-import std/[os, sets, tables, sequtils, algorithm]
+import std/[sets, tables, sequtils]
 import chronos
 import chronicles
 
@@ -9,7 +9,7 @@ import ../configurations/configurations
 import ../utils/utils
 import ../protocol/types
 
-import ./[suggestapi_types, nimsuggest_utils, nimsuggest_types]
+import ./[suggestapi_types, nimsuggest_types]
 
 proc createNimsuggestDependencyQueries*(
   query: NimsuggestQuery[NimsuggestFilePosition],
@@ -32,14 +32,14 @@ proc createNimsuggestDependencyQueries*(
     .toHashSet().toSeq()   # deduplicate
   debug "dependencyNodes", nodes = dependencyNodes
 
+  let checkDependents = config.performance.updateOnChange
+
   if dependencyNodes.len > 0:
     let sortedListOfDependencies = topoSort(
       dependencyNodes,
       dependencies.trees,
     )
     debug "sortedNodes", sorted = sortedListOfDependencies
-
-    let checkDependents = config.checkDependentsOnChange
 
     if checkDependents or query.saved:
       let startCheck = NimsuggestQuery[LspFilePosition](
@@ -81,3 +81,16 @@ proc createNimsuggestDependencyQueries*(
           responseFuture: newFuture[seq[Suggest]]("checkFile"),
         )
         result.add(changedQuery)
+
+  elif query.saved:
+    # No open dependents, but still check the saved file itself so stale
+    # diagnostics from a previous state are replaced.
+    result.add(NimsuggestQuery[LspFilePosition](
+      id: 0,
+      kind: NimsuggestQueryKind.CHECK_FILE,
+      isDependency: true,
+      saved: false,
+      uri: query.uri,
+      dirtyFile: query.dirtyFile,
+      responseFuture: newFuture[seq[Suggest]]("checkFile"),
+    ))

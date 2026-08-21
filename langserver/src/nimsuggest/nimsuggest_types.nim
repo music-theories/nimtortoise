@@ -163,10 +163,6 @@ type
 
 type
   NlsFileInfo* = ref object of RootObj
-    slot*: NimsuggestSlot
-      ## The pool slot responsible for this file. Assigned in addFileToOpenFiles.
-      ## Always non-nil for any file present in ls.files.openFiles.
-    # changed*: bool
     fingerTable*: seq[seq[tuple[u16pos, offset: int]]]
     lastChanged*: DateTime
       ## Updated on every DID_CHANGE.

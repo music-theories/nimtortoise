@@ -1,4 +1,4 @@
-import std/[sugar, sequtils, tables, strformat, strscans, json, strutils, parsejson, sets]
+import std/[sugar, sequtils, tables, strformat, strscans, json, strutils, parsejson, sets, options]
 import chronos
 import chronos/asyncproc
 import chronicles
@@ -528,12 +528,11 @@ proc codeAction*(
   ls: LanguageServer, params: CodeActionParams
 ): Future[seq[CodeAction]] {.async.} =
   let uri = params.textDocument.uri
-  let fileInfo = ls.files.openFiles.getOrDefault(uri)
-  let projectUri =
-    if fileInfo != nil:
-      toUri(fileInfo.slot.spawnInfo.entryPoint)
-    else:
-      uri
+  var projectUri = uri
+  let slotCheck = getSlotThatOwnsUri(ls.pool, uri)
+  if slotCheck.isSome():
+    projectUri = toUri(slotCheck.get().spawnInfo.entryPoint)
+
   return
     seq[CodeAction] %* [
       {

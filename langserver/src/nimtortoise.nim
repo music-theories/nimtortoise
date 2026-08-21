@@ -267,3 +267,12 @@ when isMainModule:
     error "Error in main"
     writeStackTrace e
     quit(1)
+
+
+# let kinder = SpecialKind.GOODBYE
+
+# proc hereIsAnotherThingThatIam(): bool = 
+#   return true
+
+# let somethingElse: bool = hereIsAnotherThingThatIam()
+

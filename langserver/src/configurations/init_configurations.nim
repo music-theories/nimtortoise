@@ -1,4 +1,4 @@
-import std/[json, options, times]
+import std/[json, options, times, tables]
 import chronos
 import chronicles
 import forest
@@ -7,6 +7,32 @@ import ./[configuration_types]
 func inlayHintsEnabled*(cnf: NlsConfig): bool =
   return cnf.inlayHints.typeHints.enable or cnf.inlayHints.exceptionHints.enable or cnf.inlayHints.parameterHints.enable
 
+proc initPerformanceSettings*(): Table[PerformanceSettingKind, PerformanceSetting] = 
+  result = initTable[PerformanceSettingKind, PerformanceSetting]()
+
+  result[PerformanceSettingKind.HIGHEST] =  PerformanceSetting(
+    fileCheckThrottling: initDuration(milliseconds = 200),
+    updateOnChange: true,
+    description: "Update open dependencies on change. Low request throttling. Highest CPU usage."
+  )
+  result[PerformanceSettingKind.HIGH] = PerformanceSetting(
+    fileCheckThrottling: initDuration(seconds = 1),
+    updateOnChange: true,
+    description: "Update open dependencies on change. Medium request throttling. High CPU usage."
+  )
+  result[PerformanceSettingKind.LOW] = PerformanceSetting(
+    fileCheckThrottling: initDuration(seconds = 1),
+    updateOnChange: false,
+    description: "Only update dependencies on save.  Medium request throttling. Low CPU usage."
+  )
+  result[PerformanceSettingKind.LOWEST] = PerformanceSetting(
+    fileCheckThrottling: initDuration(seconds = 5),
+    updateOnChange: false,
+    description: "Only update dependencies on save.  High request throttling. owest CPU usage."
+  )
+
+const performanceSettings = initPerformanceSettings()
+
 proc initDefaultNlsConfig*(): NlsConfig = 
   return NlsConfig(
     # --- Files/Folders ---
@@ -14,11 +40,12 @@ proc initDefaultNlsConfig*(): NlsConfig =
     # workingDirectoryMapping: @[],
     # --- Save Settings ---
     # checkOnSave: true,
-    checkDependentsOnChange: true,
-    formatOnSave: false,
+    # checkDependentsOnChange: true,
+    # formatOnSave: false,
     # --- Langserver settings --- 
     # langserverTimeout: 1_800_000, # in MS - This is 30 mins
-    fileCheckDelay: initDuration(milliseconds = 1000), # in MS
+    # fileCheckDelay: initDuration(milliseconds = 1000), # in MS
+    performance: performanceSettings[PerformanceSettingKind.LOW],
     # -- Nimsuggest Settings ---
     maxNimsuggestProcesses: 2, # max number of nimsuggest processes to keep alive. 0 means unlimited.
     maxNimsuggestCrashRetries: 3, # auto-restart attempts before giving up on a crashed slot
@@ -54,13 +81,16 @@ proc nlsConfigFromJson*(json: JsonNode): NlsConfig =
   if json.kind != JObject:
     return
 
-  if json.hasKey("checkDependentsOnChange"):
-    result.checkDependentsOnChange = json["checkDependentsOnChange"].getBool()
+  if json.hasKey("performance"):
+    let performanceKind = json["performance"].to(PerformanceSettingKind)
+    result.performance = performanceSettings[performanceKind]
+    
   if json.hasKey("formatOnSave"):
     result.formatOnSave = json["formatOnSave"].getBool()
 
-  if json.hasKey("fileCheckDelay"):
-    result.fileCheckDelay = initDuration(milliseconds = json["fileCheckDelay"].getInt())
+  # if json.hasKey("fileCheckDelay"):
+  #   result.fileCheckDelay = initDuration(milliseconds = json["fileCheckDelay"].getInt())
+
   if json.hasKey("maxNimsuggestProcesses"):
     result.maxNimsuggestProcesses = json["maxNimsuggestProcesses"].getInt()
   if json.hasKey("maxNimsuggestCrashRetries"):
@@ -129,4 +159,3 @@ proc parseWorkspaceConfigurationResponse*(conf: JsonNode): Option[NlsConfig] =
   except CatchableError:
     debug "Failed to parse workspace/configuration response.", error = getCurrentExceptionMsg()
     return none(NlsConfig)
-  

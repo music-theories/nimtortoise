@@ -192,6 +192,10 @@ The fix is to walk the import chain and send a sequence of `chkFile` commands â€
 
 This langserver uses `forest` to find the intermediate files between the changed file and each open dependent, then queues this cascade of `chkFile` commands automatically whenever a file is edited.
 
+### Performance Settinga
+
+Because the language server is having to send more requests to `nimsuggest` this has created an increase in CPU usage.  In order to combat this, there is a new `performance` selector, found in the `Nim Tortoise` settings in VS Code.  Choose between `HIGHEST`, `HIGH`, `LOW` and `LOWEST` - each of which uses a different mix of request throttling and choosing when to save so you can better regulate where and when to allocate resources.  The `HIGHEST` setting checks and gives diagnostics back for any open dependencies on any change, meaning that this setting can be quite intensive.  `HIGH` is similar, but increases the amount of request throttling from a window of 250ms out to 1 second.  `LOW` also uses the same 1 second window, but will only update open files which are the dependencies of each other upon the user saving.  And `LOWEST` also uses the "only update dependencies upon saving" approach, but with a much larger request throttling window of 5 seconds.
+
 ### Missing diagnostics bug â€” fixed
 
 In the previous release, diagnostics (errors, warnings, hints) were silently dropped for large numbers of files because each file was being routed to the wrong nimsuggest slot. The entry point selection logic used simple string heuristics that failed for projects with multiple entry points or non-standard directory layouts.

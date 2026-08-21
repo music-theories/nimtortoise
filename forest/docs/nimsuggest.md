@@ -694,3 +694,42 @@ is called for that specific module. This makes `chkFile` the correct primitive f
 cascade — it gives fine-grained control over which module triggers the next hop of dirty
 propagation.
 
+---
+
+### `chkFile` Cascade vs `chk` — Empirical Performance (2026-08-21)
+
+Measured from `traces/2026-08-21i.txt`. Five files open; one saved with real errors.
+
+**CHECK_FILE cascade (5 files on open, warm nimsuggest):**
+
+| File | Time |
+|------|------|
+| configuration_types.nim | 253 ms |
+| dispatcher.nim | 210 ms |
+| nimsuggest_types.nim | 251 ms |
+| suggestapi_types.nim | 189 ms |
+| init_langserver.nim | 250 ms |
+| **Total** | **1,153 ms** |
+
+**CHECK_PROJECT (single `chk` on save + triggered cascade):**
+
+| Step | Time |
+|------|------|
+| `chk` nimtortoise.nim | 1,847 ms |
+| cascade: suggestapi_types.nim | 650 ms |
+| cascade: nimsuggest.nim | 1,954 ms |
+| cascade: dispatcher.nim | 1,788 ms |
+| cascade: init_langserver.nim | 775 ms |
+| **Total** | **7,014 ms** |
+
+**CHECK_PROJECT was ~6× slower** and still missed the actual compilation errors in the
+saved file (`undeclared field: 'GOODBYE'`), returning only a stale hint. The `chkFile`
+cascade found all real errors correctly.
+
+The speed gap arises because `chk` recompiles the full dependency graph from the project
+root on every call, while `chkFile` operates on nimsuggest's already-warmed per-file AST
+cache. The cascade also explains the inflated post-`chk` `chkFile` times (650–1,954 ms
+vs the normal ~230 ms): running `chk` leaves nimsuggest in a state where subsequent
+per-file checks are more expensive.
+
+**Conclusion**: use the `chkFile` cascade exclusively. `chk` should not be issued on save.

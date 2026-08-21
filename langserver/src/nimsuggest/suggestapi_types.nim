@@ -103,9 +103,9 @@ type
     paths*:      seq[DirPathAbs]
     extraArgs*:  seq[string]
 
-# type 
-#   SpecialKind* = enum
-#     HELLO, 
-#     GOODBYE,
-#     SOMETHING_ELSE
+type 
+  SpecialKind* = enum
+    HELLO, 
+    GOODBYE,
+    SOMETHING_ELSE
     

@@ -25,5 +25,6 @@
         "settings": { "foreground": "#FF8C00" }
       }
     ]
-  }
+  },
+  "nimTortoise.performance": "LOW"
 }

@@ -1,4 +1,4 @@
-import std/[options, json, tables]
+import std/[json, tables]
 import chronos
 import chronicles
 import forest
@@ -13,16 +13,16 @@ import ../utils/utils
 
 
 # === workspace/executeCommand ===
-proc resolveSlot(ls: LanguageServer, projectFile: FilePathAbs): Option[NimsuggestSlot] =
-  ## Find the slot responsible for `projectFile`.
-  ## The extension sends the active editor file, which may not be a pool entry
-  ## point; fall back to the open-files table to find the owning slot.
-  if projectFile in ls.pool.slots:
-    return some(ls.pool.slots[projectFile])
-  let uri = toUri(projectFile)
-  if uri in ls.files.openFiles:
-    return some(ls.files.openFiles[uri].slot)
-  return none(NimsuggestSlot)
+# proc resolveSlot(ls: LanguageServer, projectFile: FilePathAbs): Option[NimsuggestSlot] =
+#   ## Find the slot responsible for `projectFile`.
+#   ## The extension sends the active editor file, which may not be a pool entry
+#   ## point; fall back to the open-files table to find the owning slot.
+#   if projectFile in ls.pool.slots:
+#     return some(ls.pool.slots[projectFile])
+#   let uri = toUri(projectFile)
+#   if uri in ls.files.openFiles:
+#     return some(ls.files.openFiles[uri].slot)
+#   return none(NimsuggestSlot)
 
 
 ##[
@@ -84,15 +84,15 @@ proc executeCommand*(
 
   of "nimtortoise.checkProject":
     debug "Checking project", projectFile = projectFile
-    let slot = ls.resolveSlot(projectFile)
-    if slot.isSome:
-      let resolvedSlot = slot.get()
+    
+    if projectFile in ls.pool.slots:
+      let slot = ls.pool.slots[projectFile]
       ls.langserverQueue.addLastNoWait(LangserverQuery(
         kind: LangserverQueryKind.NIMSUGGEST,
         nimsuggest: NimsuggestQuery[LspFilePosition](
           id: 0,
           kind: NimsuggestQueryKind.CHECK_PROJECT,
-          uri: toUri(resolvedSlot.spawnInfo.entryPoint),
+          uri: toUri(slot.spawnInfo.entryPoint),
           dirtyFile: FilePathAbs(""),
           responseFuture: newFuture[seq[Suggest]]("checkProject"),
         )
@@ -100,11 +100,10 @@ proc executeCommand*(
 
   of "nimtortoise.recompile":
     debug "Recompile Nimsuggest instance ", projectFile = projectFile
-    let slot = ls.resolveSlot(projectFile)
-    if slot.isSome:
-      let resolvedSlot = slot.get()
-      if resolvedSlot.isLive():
-        let entryPoint = resolvedSlot.spawnInfo.entryPoint
+    if projectFile in ls.pool.slots:
+      let slot = ls.pool.slots[projectFile]
+      if slot.isLive():
+        let entryPoint = slot.spawnInfo.entryPoint
         ls.langserverQueue.addLastNoWait(LangserverQuery(
           kind: LangserverQueryKind.NIMSUGGEST,
           nimsuggest: NimsuggestQuery[LspFilePosition](

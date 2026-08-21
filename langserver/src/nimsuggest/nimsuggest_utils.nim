@@ -1,4 +1,4 @@
-import std/[strutils, tables, options, times]
+import std/[strutils, tables, options, times, sets]
 import chronos
 import chronicles
 
@@ -173,7 +173,6 @@ proc writeStashFile*(
   return storagePath
 
 proc initNlsFileInfo*(
-  slot: NimsuggestSlot,
   params: TextDocumentItem
 ): NlsFileInfo = 
   # Build finger table for UTF-16 mapping
@@ -183,10 +182,16 @@ proc initNlsFileInfo*(
 
   # Register in the file table (sync, atomic)
   return NlsFileInfo(
-    slot: slot,
     fingerTable: fingerTable,
     textDocument: params,
     lastChanged: times.now(),
     lastChecked: times.now(),
   )
 
+proc getSlotThatOwnsUri*(
+  pool: NimsuggestPool, uriToCheck: FileUri
+): Option[NimsuggestSlot] = 
+  for entryPoint, s in pool.slots:
+    if uriToCheck in s.ownedUris:
+      return some(s)
+  return none(NimsuggestSlot)
