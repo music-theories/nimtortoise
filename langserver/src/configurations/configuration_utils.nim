@@ -1,14 +1,6 @@
+import std/[times]
+import forest
 import ./configuration_types
-
-func `==`(a, b: NlsNimsuggestConfig): bool =
-  if a.isNil and b.isNil: return true
-  if a.isNil or b.isNil: return false
-  a.projectFile == b.projectFile and a.fileRegex == b.fileRegex
-
-func `==`(a, b: NlsWorkingDirectoryMaping): bool =
-  if a.isNil and b.isNil: return true
-  if a.isNil or b.isNil: return false
-  a.projectFile == b.projectFile and a.directory == b.directory
 
 func `==`(a, b: NlsInlayTypeHintsConfig): bool =
   if a.isNil and b.isNil: return true
@@ -37,16 +29,17 @@ func `==`(a, b: NlsInlayHintsConfig): bool =
 proc isDifferentFrom*(newConfig: NlsConfig, currentConfig: NlsConfig): bool =
   ## Returns true if newConfig and currentConfig differ in any field value.
   let n = newConfig
-  n.projectMapping != currentConfig.projectMapping or
-  n.workingDirectoryMapping != currentConfig.workingDirectoryMapping or
-  n.checkOnSave != currentConfig.checkOnSave or
-  n.formatOnSave != currentConfig.formatOnSave or
+  # n.projectMapping != currentConfig.projectMapping or
+  # n.workingDirectoryMapping != currentConfig.workingDirectoryMapping or
   # n.langserverTimeout != currentConfig.langserverTimeout or
-  n.fileCheckDelay != currentConfig.fileCheckDelay or
+  n.performance != currentConfig.performance or
+  n.formatOnSave != currentConfig.formatOnSave or
+  # n.fileCheckDelay != currentConfig.fileCheckDelay or
   n.maxNimsuggestProcesses != currentConfig.maxNimsuggestProcesses or
   n.nimsuggestPath != currentConfig.nimsuggestPath or
   n.nimsuggestIdleTimeout != currentConfig.nimsuggestIdleTimeout or
   n.nimsuggestRequestTimeout != currentConfig.nimsuggestRequestTimeout or
+  n.nimsuggestSpawnTimeout != currentConfig.nimsuggestSpawnTimeout or
   n.logNimsuggest != currentConfig.logNimsuggest or
   n.inlayHints != currentConfig.inlayHints or
   n.notificationVerbosity != currentConfig.notificationVerbosity or

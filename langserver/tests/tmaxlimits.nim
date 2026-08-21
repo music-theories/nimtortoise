@@ -30,10 +30,7 @@ import ./fixhelpers
 suite "Fix — checkFile sends changed() before chkFile":
   generateSimpleNimblePaths()
   let (cmdParams, ls, client) = startServer("tests/projects/simple")
-  client.setWorkspaceConfig(%*[{
-    "maxNimsuggestProcesses": 1,
-    "projectMapping": [{"fileRegex": "tests/projects/simple/src/.*\\.nim", "projectFile": simpleProjectFile()}]
-  }])
+  client.setWorkspaceConfig(%*[{"maxNimsuggestProcesses": 1}])
   doInitialize(client, "tests/projects/simple")
   client.notify("initialized", newJObject())
 
@@ -68,6 +65,8 @@ suite "Fix — checkFile sends changed() before chkFile":
       0
     )
 
+  stopServer(client)
+
 # ---------------------------------------------------------------------------
 # Suite 2: Fix #8 — config-first init
 # ---------------------------------------------------------------------------
@@ -78,32 +77,32 @@ suite "Fix — checkFile sends changed() before chkFile":
 # Observable regression: the first textDocument/didOpen must route to the
 # MAPPED project file, not treat the opened file as its own project.
 
-suite "Fix #8 — config-first init: projectMapping applied on first open":
+suite "Fix #8 — config-first init: non-entry file routes to project nimsuggest":
   generateSimpleNimblePaths()
   let (cmdParams, ls, client) = startServer("tests/projects/simple")
-  # Set config via workspace/configuration BEFORE initialized so the server's
-  # initNimsuggestInstances receives the correct projectMapping immediately.
-  client.setWorkspaceConfig(%*[{
-    "maxNimsuggestProcesses": 1,
-    "projectMapping": [{"fileRegex": "tests/projects/simple/src/.*\\.nim", "projectFile": simpleProjectFile()}]
-  }])
+  client.setWorkspaceConfig(%*[{"maxNimsuggestProcesses": 1}])
   doInitialize(client, "tests/projects/simple")
   client.notify("initialized", newJObject())
 
-  test "opening widget.nim (non-entry) routes to simple.nim via projectMapping":
-    echo "    >> opening widget.nim (non-entry) routes to simple.nim via projectMapping"
-    sendDidOpen(client, "tests/projects/simple/src/widget.nim")
+  test "opening widget.nim (non-entry) routes to simple.nim via isKnownByANimsuggestSlot":
+    echo "    >> opening widget.nim (non-entry) routes to simple.nim via isKnownByANimsuggestSlot"
+    # Open the entry point first so its nimsuggest is running and can answer KNOWN queries.
+    sendDidOpen(client, "tests/projects/simple/src/simple.nim")
     check waitForNsInit(client, simpleProjectFile())
+    sendDidOpen(client, "tests/projects/simple/src/widget.nim")
+    waitFor sleepAsync(500)
 
   test "no Nimsuggest initialized message mentions widget.nim as a project root":
     echo "    >> no Nimsuggest initialized message mentions widget.nim as a project root"
     check not waitFor client.waitForNotification(
-      "window/showMessage",
+      "window/logMessage",
       proc(j: JsonNode): bool =
         let msg = j["message"].getStr("")
         "Nimsuggest initialized for" in msg and "widget.nim" in msg,
       1000
     )
+
+  stopServer(client)
 
 # ---------------------------------------------------------------------------
 # Suite 3: concurrent spawn limit
@@ -115,25 +114,19 @@ suite "Fix #8 — config-first init: projectMapping applied on first open":
 suite "Fix — concurrent didOpen respects maxNimsuggestProcesses=1":
   generateMonorepoNimblePaths()
   let (cmdParams, ls, client) = startServer("tests/projects/monorepo")
-  client.setWorkspaceConfig(%*[{
-    "maxNimsuggestProcesses": 1,
-    "projectMapping": [
-      {"fileRegex": "tests/projects/monorepo/pkga/src/.*\\.nim", "projectFile": pkgaProjectFile()},
-      {"fileRegex": "tests/projects/monorepo/pkgb/src/.*\\.nim", "projectFile": pkgbProjectFile()}
-    ]
-  }])
+  client.setWorkspaceConfig(%*[{"maxNimsuggestProcesses": 1}])
   doInitialize(client, "tests/projects/monorepo")
   client.notify("initialized", newJObject())
 
-  test "at most one nimsuggest runs when two mapped files are opened before any init":
-    echo "    >> at most one nimsuggest runs when two mapped files are opened before any init"
+  test "at most one nimsuggest runs when two entry-point files are opened concurrently":
+    echo "    >> at most one nimsuggest runs when two entry-point files are opened concurrently"
     sendDidOpen(client, "tests/projects/monorepo/pkga/src/pkga.nim")
     sendDidOpen(client, "tests/projects/monorepo/pkgb/src/pkgb.nim")
 
     let gotPkga = pkgaProjectFile()
     let gotPkgb = pkgbProjectFile()
     check waitFor client.waitForNotification(
-      "window/showMessage",
+      "window/logMessage",
       proc(j: JsonNode): bool =
         let msg = j["message"].getStr("")
         ("Nimsuggest initialized for " & gotPkga) in msg or
@@ -143,3 +136,5 @@ suite "Fix — concurrent didOpen respects maxNimsuggestProcesses=1":
 
     waitFor sleepAsync(1000)
     check waitForInstanceCount(client, 1, 5000)
+
+  stopServer(client)

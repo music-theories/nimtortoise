@@ -10,3 +10,4 @@
 
 # Put all test executables in the repo's bin/ directory
 switch("outdir", thisDir() & "/../bin")
+switch("path", thisDir() & "/../src")

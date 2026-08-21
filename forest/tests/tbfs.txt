@@ -1,0 +1,1875 @@
+WRN 2026-08-20 17:37:25.654+02:00 entry point not found, skipping            tid=68442 path=/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interface_sizes.nim
+DBG 2026-08-20 17:37:25.655+02:00 running nim dump                           tid=68442 nimFile=/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/user_interfaces.nim
+DBG 2026-08-20 17:37:25.656+02:00 running nim dump                           tid=68442 nimFile=/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim
+DBG 2026-08-20 17:37:25.657+02:00 running nim dump                           tid=68442 nimFile=/Users/dp/Desktop/funis/funis/controller/mods/mods.nim
+DBG 2026-08-20 17:37:25.658+02:00 running nim dump                           tid=68442 nimFile=/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim
+DBG 2026-08-20 17:37:25.659+02:00 running nim dump                           tid=68442 nimFile=/Users/dp/Desktop/funis/funis/controller/liszt/src/liszt.nim
+DBG 2026-08-20 17:37:25.661+02:00 running nim dump                           tid=68442 nimFile=/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim
+DBG 2026-08-20 17:37:25.662+02:00 running nim dump                           tid=68442 nimFile=/Users/dp/Desktop/funis/funis/controller/mods_quickjs/mods_quickjs.nim
+{
+  "root": "/Users/dp/Desktop/funis/funis/controller",
+  "nimble": {
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/user_interfaces.nimble": {
+      "name": "user_interfaces",
+      "srcDir": "src",
+      "bin": [
+        "user_interfaces"
+      ],
+      "entryPoints": [
+        "src/user_interfaces.nim"
+      ],
+      "testEntryPoint": ""
+    },
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/sorabji.nimble": {
+      "name": "sorabji",
+      "srcDir": "src",
+      "bin": [],
+      "entryPoints": [
+        "src/sorabji.nim"
+      ],
+      "testEntryPoint": ""
+    },
+    "/Users/dp/Desktop/funis/funis/controller/mods/mods.nimble": {
+      "name": "mods",
+      "srcDir": "",
+      "bin": [
+        "mods"
+      ],
+      "entryPoints": [
+        "mods.nim"
+      ],
+      "testEntryPoint": ""
+    },
+    "/Users/dp/Desktop/funis/funis/controller/ravel/ravel.nimble": {
+      "name": "ravel",
+      "srcDir": "src",
+      "bin": [],
+      "entryPoints": [
+        "src/ravel.nim"
+      ],
+      "testEntryPoint": ""
+    },
+    "/Users/dp/Desktop/funis/funis/controller/liszt/liszt.nimble": {
+      "name": "liszt",
+      "srcDir": "src",
+      "bin": [
+        "liszt"
+      ],
+      "entryPoints": [
+        "src/liszt.nim"
+      ],
+      "testEntryPoint": ""
+    },
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/user_interfaces_shared.nimble": {
+      "name": "user_interfaces_shared",
+      "srcDir": "src",
+      "bin": [],
+      "entryPoints": [
+        "src/user_interfaces_shared.nim"
+      ],
+      "testEntryPoint": ""
+    },
+    "/Users/dp/Desktop/funis/funis/controller/mods_quickjs/mods_quickjs.nimble": {
+      "name": "mods_quickjs",
+      "srcDir": ".",
+      "bin": [
+        "mods_quickjs"
+      ],
+      "entryPoints": [
+        "mods_quickjs.nim"
+      ],
+      "testEntryPoint": ""
+    },
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/user_interfaces_sizes.nimble": {
+      "name": "user_interfaces_sizes",
+      "srcDir": "src",
+      "bin": [],
+      "entryPoints": [
+        "src/user_interface_sizes.nim"
+      ],
+      "testEntryPoint": ""
+    }
+  },
+  "paths": {
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/../user_interfaces_sizes/src",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/../ravel/src"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/liszt/src/liszt.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/liszt/../user_interfaces_sizes/src",
+      "/Users/dp/Desktop/funis/funis/controller/liszt/../user_interfaces_shared/src",
+      "/Users/dp/Desktop/funis/funis/controller/liszt/../user_interfaces/src",
+      "/Users/dp/Desktop/funis/funis/controller/liszt/../sorabji/src",
+      "/Users/dp/Desktop/funis/funis/controller/liszt/../ui_sizes/src",
+      "/Users/dp/Desktop/funis/funis/controller/liszt/../ravel/src"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/../sorabji/src",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/../user_interfaces_sizes/src",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/../ravel/src"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/user_interfaces.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/../user_interfaces_sizes/src",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/../user_interfaces_shared/src",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/../sorabji/src",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/../ui_sizes/src",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/../ravel/src"
+    ]
+  },
+  "trees": {
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/sorabji_display.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/doms/sorabji_doms.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/controllers/controllers.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/sorabji_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/model/routing/src/parse_routing.nim": [
+      "/Users/dp/Desktop/funis/funis/model/routing/src/print.nim",
+      "/Users/dp/Desktop/funis/funis/model/routing/src/routing_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_tree_doms.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_layouts.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_tree_layouts.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_doms.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_layout_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/string_oscillations/string_oscillation_doms.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/interaction_modes/interaction_modes.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/interaction_modes/field_mode.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/interaction_modes/hexagon_mode.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/interaction_modes/selected_box_mode.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/interaction_modes/interaction_mode_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animations.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_2D/animation_2D_colors.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_2D/animation_2D_coordinates.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_3D/animation_3D_colors.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_3D/animation_3D_coordinates.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_colors.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_coordinates.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_floats.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_string_oscillations.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_apply.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/color_schemes.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/hex_colors.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/rgba_int.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/rgba_normalized.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/color_converters.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/color_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/ableton_ui/ableton_clip_ui.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/ableton_ui/ableton_clip_menu.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/input_ui.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/mouse_ui.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/keyboard_ui.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/input_ui_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/input_ui_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/gamepad_ui.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/gamepad_outlines.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/gamepad_interactive.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/input_doms.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/input_ui_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/external/flatty/src/flatty.nim": [
+      "/Users/dp/Desktop/funis/funis/external/flatty/src/flatty/objvar.nim",
+      "/Users/dp/Desktop/funis/funis/external/flatty/src/flatty/jsbinny.nim",
+      "/Users/dp/Desktop/funis/funis/external/flatty/src/flatty/binny.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/rolls/rolls.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melodies.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/inputs.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/gamepads.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/keyboards/keyboards.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/mice/mice.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/screens/screens.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/states/states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/meta/meta.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/parsers/parsers.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_grids_doms.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_layout_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_layout_notes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/mods_quickjs/quickjs/quickjs.nim": [],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects_3d/draw_objects_3d.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects_3d/draw_object_3d_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects_3d/transforms.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects_3d/draw_shapes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects_3d/draw_object_3d_utils.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/cameras/camera_animations.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animations.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/cameras/camera_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_proportions.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_defaults.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/tracks/tracks.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/rolls/rolls.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melodies.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared_utils.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_notes_doms.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_layout_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_layout_notes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/parsers/json_to_inputs.nim": [
+      "/Users/dp/Desktop/funis/funis/external/jsony/src/jsony.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/mice/mice.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/gamepads.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/keyboards/keyboards.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/screens/screens.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/input_ui_utils.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/input_ui_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/time_duration_ui/time_duration_left.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/rgba_int.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/color_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/menu/menu_utils.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/menu/menu_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_floats.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/connector_operations.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/interaction_modes/interaction_modes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/operation_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/frequency_length_ui/frequency_length_left.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/instruments/instruments.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/instruments/instrument_ui_layouts.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/track_ui/track_midi_keyboard_ui.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/doms/controller_dom_states.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/doms/dom_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/mice/mouse_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_combiners.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_fractions.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_melodies.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_defaults.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/field_operations.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/sorabji_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/operation_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/boxes/box_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/types/types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/operation_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/scenes/scene_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/states/sorabji_state_utils.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/screens/screen_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/states/sorabji_state_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/types/types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/states/sorabji_state_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/cameras/camera_diffs.nim": [
+      "/Users/dp/Desktop/funis/funis/external/jsony/src/jsony.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/cameras/camera_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/external/flatty/src/flatty/objvar.nim": [],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_utils.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/proportion_temperament_ui/proportion_temperament_ui_left.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/diffs/diffs.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/diffs/diffs/diffs.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/model/routing/src/events.nim": [
+      "/Users/dp/Desktop/funis/funis/model/routing/src/routing_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/sorabji_display.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/boxes/boxes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/caches/controller_caches.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/cameras/cameras.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/connectors/connectors.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/fields/fields.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/geometry/geometry_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/interaction_modes/interaction_modes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/operations.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/scenes/scenes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/settings/settings.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/screens/screens.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/screens/screen_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/gamepads.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/init_gamepads.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/update_gamepads.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/gamepad_functions.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/gamepad_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/gamepad_virtual.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/gamepad_filter.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/gamepad_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/scenes/scenes.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/scenes/scene_template_2d.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/scenes/scene_template_3d.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/scenes/meta_scene_template.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/scenes/scene_template_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/scenes/scene_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/trees/tree_layout_calculations.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/utils/utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/trees/tree_layout_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/liszt/src/liszt.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/liszt/src/liszt/metascene.nim",
+      "/Users/dp/Desktop/funis/funis/controller/liszt/src/liszt/init_liszt.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/degrees_radians.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared_constants.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/menu/menu.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/menu/menu_doms.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/menu/menu_layouts.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/menu/menu_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/menu/menu_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/combiners/combiners.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/combiners/melody_fraction_combiner_layouts.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/structures/structures.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/structures/structure_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/structures/fraction_structure_layouts.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/structures/fraction_structure_doms.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/interaction_operations.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/interaction_modes/interaction_modes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/operation_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/box_operations.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/sorabji_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/operation_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/proportions/proportion_types.nim": [],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_colors.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/proportion_generator_ui/proportion_generator_ui.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/proportion_generator_ui/proportion_generator_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/ableton_ui/ableton_clip_filled_ui.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/ableton_ui/ableton_clip_menu.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/parsers/parsers.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/parsers/json_to_inputs.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/meta/meta_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/color_getters.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/color_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/color_converters.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/rgba_int.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/rgba_normalized.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/doms/sorabji_doms.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/doms/selection_animations.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/doms/update_sorabji_doms.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/doms/box_doms.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/doms/field_doms.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/settings/setting_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/fields/field_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/sorabji_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/boxes/boxes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_layout_grids.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_layout_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/gamepad_filter.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/gamepad_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_templates.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/states/sorabji_state_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_cow_helpers.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_extract.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_load.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/gamepad_ui.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/gamepad_outlines.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/gamepad_interactive.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/input_ui_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/caches/controller_cache_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/screens/screen_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/cameras/camera_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/types/types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/boxes/box_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/fields/field_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/connectors/connector_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/operation_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/timbre_ui/timbre_ui_partial_utils.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_tree_layouts.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/trees/trees.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/frames/frames.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_layout_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_layouts.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/faust_ui/faust_left_ui.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/inputs.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/cameras/cameras.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animations.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/diffs/diffs.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_paint.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_paint_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_shape_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_object_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/waveforms/waveforms.nim": [],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/degrees_radians.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/button_functions.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared_constants.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_init.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/states/sorabji_state_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/api/api_sorabji_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/interaction_modes/field_mode.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/interaction_modes/interaction_mode_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared_constants.nim": [],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_instruments.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_defaults.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/scenes/scene_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/types/types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/diffs/diffs/diff_messages.nim": [
+      "/Users/dp/Desktop/funis/funis/external/jsony/src/jsony.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_objects.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects_3d/draw_objects_3d.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/colors.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/diffs/diffs/diff_float_hooks.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/diffs/diffs/diff_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/states/sorabji_states.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/states/field_selection.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/states/sorabji_state_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/states/sorabji_state_utils.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_objects.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_paint.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_shapes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_object_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_paint_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_shape_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_object_utils.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/instruments/instrument_ui_layouts.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/structures/fraction_structure_layouts.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/timbre_ui/timbre_ui_acoustic_string.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/timbre_ui/timbre_ui_partial_utils.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/ableton_ui/ableton_clip_menu.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/external/nim_zmq/zmq/connections.nim": [
+      "/Users/dp/Desktop/funis/funis/external/nim_zmq/zmq/bindings.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_object_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_shape_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_paint_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/midi_input_ui/midi_input_menu.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/menu/menu.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/model/routing/src/routing.nim": [
+      "/Users/dp/Desktop/funis/funis/model/routing/src/path_utils.nim",
+      "/Users/dp/Desktop/funis/funis/model/routing/src/parse_routing.nim",
+      "/Users/dp/Desktop/funis/funis/model/routing/src/routing_types.nim",
+      "/Users/dp/Desktop/funis/funis/model/routing/src/events.nim",
+      "/Users/dp/Desktop/funis/funis/model/routing/src/print.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_doms.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_layout_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_layout_notes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_grids_doms.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_notes_doms.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/liszt/src/liszt/metascene_input_fields.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/liszt/src/liszt/metascene_input_utils.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/diffs/diffs/diff_draw_3d.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects_3d/draw_objects_3d.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/diffs/diffs/diff_draw.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_rolls.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_defaults.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/mods_quickjs/js_mod_runner.nim": [
+      "/Users/dp/Desktop/funis/funis/external/nim_zmq/zmq.nim",
+      "/Users/dp/Desktop/funis/funis/controller/mods_quickjs/quickjs/quickjs.nim",
+      "/Users/dp/Desktop/funis/funis/controller/mods_quickjs/js_host_api.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/boxes/boxes.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/boxes/box_caches.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/boxes/box_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_outputs.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_defaults.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/menu_ui/box_menu.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/menu/menu.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/gamepad_functions.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/gamepad_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/keyboards/keyboard_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_shape_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/trees/trees.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/trees/tree_layout_calculations.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/trees/tree_layout_doms.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/trees/tree_layout_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/proportions/proportion_temperament_ui_doms.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/proportions/proportion_temperament_ui_layouts.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/proportions/proportion_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/proportions/period_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/utils/utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/text_frames/text_frames.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/track_ui/track_proportion_harp_ui.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_saves.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_apply.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_cow_helpers.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_equality.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_extract.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_init.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_load.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_templates.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_utils.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/mods/host_imports.nim": [
+      "/Users/dp/Desktop/funis/funis/external/nim_zmq/zmq.nim",
+      "/Users/dp/Desktop/funis/funis/model/routing/src/routing.nim",
+      "/Users/dp/Desktop/funis/funis/controller/mods/wasm3/wasm3.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/color_types.nim": [],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/fields/field_caches.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/sorabji_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/geometry/geometry_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/boxes/boxes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/settings/settings.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/operations.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/scenes/scenes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/fields/field_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_shapes.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_shape_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/geometry/geometry_utils.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/sorabji_states.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/menu/menu_layouts.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/menu/menu_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/faust_playback/faust_playback.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/proportions/proportion_tree_utils.nim": [],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/proportion_tree_ui/proportion_tree_center.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/containers/fraction_containers.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/trees/trees.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fractions.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/containers/container_layouts.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/diffs/diffs/diffs.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/diffs/diffs/diff_dom.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/diffs/diffs/diff_draw.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/diffs/diffs/diff_draw_3d.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/diffs/diffs/diff_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/diffs/diffs/diff_messages.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/diffs/diffs/apply_diffs.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_coordinates.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_apply.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_3D/animation_3D_coordinates.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_3D/animation_3D_colors.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_2D/animation_2D_coordinates.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_2D/animation_2D_colors.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_coordinates.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_colors.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_string_oscillations.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/string_oscillations/string_oscillation_doms.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/caches/controller_cache_field_utils.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/sorabji_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/fields/fields.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/interaction_modes/interaction_mode_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/operations.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/settings/settings.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/scenes/scene_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/caches/controller_cache_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/melody_ui/melody_ui_left.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/acoustic_string_ui/acoustic_string_right.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/external/nim_zmq/zmq/bindings.nim": [],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_melodies.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_defaults.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/message_operations.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/sorabji_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/operation_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/scales/scales.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/liszt/src/liszt/metascene_input_utils.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/frames/frames.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/frames/frame_layouts.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/frames/frame_doms.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/prints/prints.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/doms/doms.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_objects.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/colors.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects_3d/draw_objects_3d.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/proportions/period_utils.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/utils/utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/proportions/proportion_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/menu_ui/menu_ui.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/menu_ui/box_menu.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_doms.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/frames/frames.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_layouts.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_layout_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/clips/clips.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/clips/faust_layout.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/input_doms.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/input_ui_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/timbre_ui/timbre_ui_partial_tree.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/timbre_ui/timbre_ui_partial_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/scenes/scene_template_3d.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/types/types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/scenes/scene_template_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/scenes/scene_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/connectors/connector_doms.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/sorabji_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/settings/settings.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/connectors/connector_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/string_oscillations/string_oscillation_utils.nim": [],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/settings/settings.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/settings/meta_color_schemes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/settings/setting_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/controllers/controller_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/screens/screen_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/cameras/camera_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/types/types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/caches/controller_cache_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/shaders/shader_converters.nim": [
+      "/Users/dp/Desktop/funis/funis/external/jsony/src/jsony.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/shaders/shader_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/mice/mice.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/screens/screens.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/mice/mouse_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/text_frames/text_frame_colors.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melodies.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_layout_grids.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_layout_notes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_layout_navigation.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_layout_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_layout_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_doms.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_notes_doms.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_grids_doms.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/structures/fraction_structure_doms.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/structures/fraction_structure_layouts.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/liszt/src/liszt/metascene_load.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/doms/dom_utils.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/doms/dom_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/diffs/diffs/diff_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/doms/doms.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/doms/dom_types.nim": [],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/animation_operations.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/operation_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/placeholder_box/placeholder_box_3D_empty.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_equality.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/states/sorabji_state_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/midi_input_ui/midi_input_ui.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/midi_input_ui/midi_input_menu.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/mods/wasm3/wasm3.nim": [],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/keyboard_ui.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/input_ui_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/color_converters.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/rgba_normalized.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/color_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/load_save_operations.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/sorabji_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/operation_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/liszt/src/liszt/metascene_input_hexagons.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/liszt/src/liszt/metascene_input_utils.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/proportion_generator_ui/proportion_generator_utils.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_utils.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/colors.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_objects.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/doms/doms.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects_3d/draw_objects_3d.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/shaders/shaders.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/prints/prints.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/shaders/shaders.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/shaders/init_shaders.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/shaders/shader_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/shaders/shader_converters.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/doms/selection_animations.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/sorabji_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/sorabji_display.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_layout_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/proportion_temperament_ui/proportion_temperament_ui_center.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/ui_settings/ui_settings.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/ui_settings/color_schemes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/ui_settings/init_settings.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/doms/box_doms.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/sorabji_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/sorabji_display.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/external/jsony/src/jsony.nim": [
+      "/Users/dp/Desktop/funis/funis/external/jsony/src/jsony/objvar.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/shaders/shader_types.nim": [],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/diffs/diffs/apply_diffs.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/doms/doms.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/diffs/diffs/diff_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/mouse_ui.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/input_ui_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_3D/animation_3D_colors.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_2D/animation_2D_colors.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/scenes/scene_template_utils.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/types/types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/scenes/scene_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/gamepad_virtual.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/gamepad_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/gamepad_utils.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/api/api_sorabji_states.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/screens/screen_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/states/sorabji_states.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/interaction_modes/hexagon_mode.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/connectors/connectors.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/interaction_modes/interaction_mode_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/caches/controller_caches.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/caches/controller_cache_box_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/caches/controller_cache_connector_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/caches/controller_cache_field_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/caches/controller_cache_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/caches/controller_cache_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/caches/init_controller_caches.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/text_frames/text_frame_doms.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/text_frames/text_frame_layouts.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/text_frames/text_frame_colors.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_cow_helpers.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/states/sorabji_state_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_utils.nim": [
+      "/Users/dp/Desktop/funis/funis/external/flatty/src/flatty.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/states/sorabji_state_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_equality.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/fraction_tree_ui/fraction_tree_right.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/fraction_tree_ui/fraction_menus.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/external/nim_zmq/zmq/poller.nim": [
+      "/Users/dp/Desktop/funis/funis/external/nim_zmq/zmq/bindings.nim",
+      "/Users/dp/Desktop/funis/funis/external/nim_zmq/zmq/connections.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/components.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/clips/clips.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/combiners/combiners.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/containers/containers.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/faust_playback/faust_playback.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fractions.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/text_frames/text_frames.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/frames/frames.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/instruments/instruments.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melodies.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/menu/menu.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/proportions/proportions.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/rolls/rolls.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/scales/scales.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/structures/structures.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/tracks/tracks.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/trees/trees.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/utils/utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/variations/variations.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/waveforms/waveforms.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/menu/menu_doms.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/menu/menu_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/menu/menu_utils.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/proportions/proportion_temperament_ui_layouts.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/proportions/period_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/proportions/proportion_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/utils/utils.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/connectors/connector_caches.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/sorabji_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/connectors/connector_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/scenes/scene_template_2d.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/types/types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/scenes/scene_template_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/scenes/scene_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/cameras/camera_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animations.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_object_utils.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_shape_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_object_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_paint_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/colors.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects_3d/draw_shapes.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/shaders/shaders.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects_3d/draw_object_3d_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_objects.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/update_gamepads.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/gamepad_virtual.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/gamepad_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/button_functions.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/operation_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/types/types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/interaction_modes/interaction_mode_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/settings/meta_color_schemes.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/settings/setting_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/external/flatty/src/flatty/jsbinny.nim": [],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/containers/melody_containers.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/trees/trees.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melodies.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/variations/variations.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/containers/container_layouts.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/type_utils.nim": [],
+    "/Users/dp/Desktop/funis/funis/controller/mods_quickjs/mods_quickjs.nim": [
+      "/Users/dp/Desktop/funis/funis/model/routing/src/routing.nim",
+      "/Users/dp/Desktop/funis/funis/controller/mods_quickjs/js_mod_runner.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_inputs.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_defaults.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/gamepad_outlines.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/gamepad_thumbsticks.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/input_ui_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/doms/init_doms.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/doms/dom_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_extract.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/states/sorabji_state_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_equality.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_utils.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/variation_melody_ui/variation_melody_tree_right.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/colors.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/rgba_int.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/rgba_normalized.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/hex_colors.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/color_converters.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/color_schemes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/color_getters.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/color_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/melody_container_ui/melody_container_left.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_3D/animation_3D_coordinates.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/interaction_modes/interaction_mode_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/sorabji_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/connectors/connectors.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/cameras/cameras.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_layout_utils.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_layout_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_layout_grids.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/containers/container_layouts.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/trees/trees.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/mods/mod_runner.nim": [
+      "/Users/dp/Desktop/funis/funis/external/nim_zmq/zmq.nim",
+      "/Users/dp/Desktop/funis/funis/model/routing/src/routing.nim",
+      "/Users/dp/Desktop/funis/funis/controller/mods/host_imports.nim",
+      "/Users/dp/Desktop/funis/funis/controller/mods/wasm3/wasm3.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_shape_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/states/state_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/gamepads.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/mice/mice.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/keyboards/keyboards.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/screens/screens.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/cameras/cameras.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/cameras/camera_animations.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/cameras/camera_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/cameras/camera_diffs.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/product_ui/product_ui_center.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/text_frames/text_frame_layouts.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/doms/update_sorabji_doms.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/sorabji_display.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/sorabji_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/doms/field_doms.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/doms/selection_animations.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/frames/frame_doms.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/frames/frame_layouts.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/operations.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/animation_operations.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/box_operations.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/field_operations.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/interaction_operations.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/movement_operations.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/operation_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/message_operations.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/connector_operations.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/load_save_operations.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/caches/controller_cache_connector_utils.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/sorabji_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/boxes/box_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/fields/field_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/connectors/connectors.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/interaction_modes/interaction_mode_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/settings/settings.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/caches/controller_cache_field_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/caches/controller_cache_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/variations/variation_melody_messages.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/model/routing/src/print.nim": [],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects_3d/transforms.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects_3d/draw_object_3d_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_shape_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/keyboards/keyboards.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/keyboards/keyboard_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_fractions.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_defaults.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/caches/controller_cache_utils.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/sorabji_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/interaction_modes/interaction_mode_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/boxes/boxes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/fields/fields.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/geometry/geometry_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/operations.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/scenes/scene_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/settings/settings.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/caches/controller_cache_box_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/caches/controller_cache_field_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/caches/controller_cache_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/fraction_tree_ui/fraction_tree_left.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/fraction_tree_ui/fraction_menus.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/gamepad_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/diffs/diffs/diff_draw.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_objects.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/colors.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/roll_ui/roll_proportion_harp_ui.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/ui_settings/init_settings.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/menu/menu_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_combiners.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_defaults.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_fractions.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_inputs.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_instruments.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_melodies.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_outputs.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_proportions.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_rolls.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_utils.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/fields/fields.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/fields/field_caches.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/fields/field_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/doms/field_doms.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/sorabji_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/sorabji_display.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/doms/box_doms.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/gamepad_thumbsticks.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/input_ui_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/variation_melody_ui/variation_melody_tree_left.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/mods/mods.nim": [
+      "/Users/dp/Desktop/funis/funis/model/routing/src/routing.nim",
+      "/Users/dp/Desktop/funis/funis/controller/mods/mod_runner.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/doms/controller_dom_nodes.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/doms/dom_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_objects.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects_3d/draw_objects_3d.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/ui_settings/color_schemes.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/colors.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_layout_utils.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_paint_types.nim": [],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_defaults.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes/size_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/string_oscillations/string_oscillation_paths.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/hex_colors.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/color_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/color_converters.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/utils/math_log_utils.nim": [],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/proportion_tree_ui/proportion_tree_left.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/screens/screen_types.nim": [],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/text_frames/text_frames.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/text_frames/text_frame_layouts.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/text_frames/text_frame_colors.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/text_frames/text_frame_doms.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/sorabji_states.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/api/api_sorabji_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_saves.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/states/sorabji_states.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/controllers/controllers.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/controllers/controller_create_boxes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/controllers/init_controllers.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/controllers/controller_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/save_load_ui/save_load_ui.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/save_load_ui/save_load_menu.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/rgba_normalized.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/color_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects_3d/draw_object_3d_utils.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects_3d/draw_object_3d_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_objects.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_layout_notes.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_layout_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_layout_grids.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/acoustic_string_ui/acoustic_string_center.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/liszt/src/liszt/init_liszt.nim": [
+      "/Users/dp/Desktop/funis/funis/external/nim_zmq/zmq.nim",
+      "/Users/dp/Desktop/funis/funis/external/jsony/src/jsony.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/external/nim_zmq/zmq/asynczmq.nim": [
+      "/Users/dp/Desktop/funis/funis/external/nim_zmq/zmq/connections.nim",
+      "/Users/dp/Desktop/funis/funis/external/nim_zmq/zmq/bindings.nim",
+      "/Users/dp/Desktop/funis/funis/external/nim_zmq/zmq/poller.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/states/sorabji_state_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_apply.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/states/sorabji_state_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_load.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/states/sorabji_state_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_apply.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/saves/controller_save_init.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/scenes/meta_scene_template.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/scenes/scene_template_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/scenes/scene_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/variations/variation_melody_utils.nim": [],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/utils/utils.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/utils/math_log_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/utils/util_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/proportions/proportions.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/proportions/proportion_temperament_ui_doms.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/proportions/proportion_temperament_ui_layouts.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/proportions/proportion_tree_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/proportions/proportion_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/model/routing/src/path_utils.nim": [],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/containers/container_doms.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/containers/container_layouts.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/melody_fraction_combiner_ui/melody_fraction_combiner_rolls.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/mods_quickjs/js_host_api.nim": [
+      "/Users/dp/Desktop/funis/funis/external/nim_zmq/zmq.nim",
+      "/Users/dp/Desktop/funis/funis/controller/mods_quickjs/quickjs/quickjs.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/states/field_selection.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/states/sorabji_state_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/user_interfaces.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/placeholder_box/placeholder_box_title.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/placeholder_box/placeholder_box_blank.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/placeholder_box/placeholder_box_3D_empty.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/product_ui/product_ui_center.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/menu_ui/menu_ui.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/save_load_ui/save_load_ui.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/input_ui.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/midi_input_ui/midi_input_ui.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/acoustic_string_ui/acoustic_string_center.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/acoustic_string_ui/acoustic_string_right.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/timbre_ui/timbre_ui_partial_tree.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/timbre_ui/timbre_ui_acoustic_string.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/timbre_ui/timbre_ui_dissonance_curves.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/time_duration_ui/time_duration_left.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/frequency_length_ui/frequency_length_left.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/proportion_tree_ui/proportion_tree_left.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/proportion_tree_ui/proportion_tree_center.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/proportion_temperament_ui/proportion_temperament_ui_left.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/proportion_temperament_ui/proportion_temperament_ui_center.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/proportion_generator_ui/proportion_generator_ui.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/fraction_tree_ui/fraction_tree_left.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/fraction_tree_ui/fraction_tree_right.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/scale_ui/scale_ui.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/melody_ui/melody_ui_left.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/variation_melody_ui/variation_melody_tree_left.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/variation_melody_ui/variation_melody_tree_right.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/fraction_container_ui/fraction_container_left.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/melody_container_ui/melody_container_left.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/melody_fraction_combiner_ui/melody_fraction_combiner_left.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/melody_fraction_combiner_ui/melody_fraction_combiner_rolls.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/structure_ui/structure_left.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/instrument_ui/instrument_midi_keyboard_ui.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/instrument_ui/instrument_proportion_harp_ui.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/roll_ui/roll_generic_instrument_ui.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/roll_ui/roll_midi_keyboard_ui.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/roll_ui/roll_proportion_harp_ui.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/track_ui/track_midi_keyboard_ui.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/track_ui/track_proportion_harp_ui.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/ableton_ui/ableton_clip_ui.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/ableton_ui/ableton_clip_filled_ui.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/faust_ui/faust_left_ui.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/combiners/melody_fraction_combiner_layouts.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/containers/containers.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/rolls/rolls.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fractions.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_layouts.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_layout_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_doms.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_layout_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_tree_layouts.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_tree_doms.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/init_gamepads.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/gamepad_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/trees/tree_layout_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/roll_ui/roll_midi_keyboard_ui.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/external/nim_zmq/zmq.nim": [
+      "/Users/dp/Desktop/funis/funis/external/nim_zmq/zmq/bindings.nim",
+      "/Users/dp/Desktop/funis/funis/external/nim_zmq/zmq/connections.nim",
+      "/Users/dp/Desktop/funis/funis/external/nim_zmq/zmq/poller.nim",
+      "/Users/dp/Desktop/funis/funis/external/nim_zmq/zmq/asynczmq.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/external/jsony/src/jsony/objvar.nim": [],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/variations/variation_melody_layouts.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melodies.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/trees/trees.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/fraction_tree_ui/fraction_menus.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/states/sorabji_state_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/screens/screen_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/states/states.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/gamepads.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/keyboards/keyboards.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/mice/mice.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/screens/screens.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/states/state_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/connectors/connector_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects_3d/draw_object_3d_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/screens/screen_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/types/types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_layout_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/frames/frames.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/structure_ui/structure_left.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/liszt/src/liszt/metascene_input_boxes.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/liszt/src/liszt/metascene_input_utils.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/placeholder_box/placeholder_box_title.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/placeholder_box/placeholder_box_blank.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/fraction_container_ui/fraction_container_left.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/meta/meta.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/gamepads.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/keyboards/keyboards.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/mice/mice.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/screens/screens.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/meta/meta_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/shaders/init_shaders.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/shaders/shader_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/trees/tree_layout_doms.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/utils/utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/text_frames/text_frames.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/trees/tree_layout_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/trees/tree_layout_calculations.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/liszt/src/liszt/metascene.nim": [
+      "/Users/dp/Desktop/funis/funis/external/jsony/src/jsony.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/user_interfaces.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/liszt/src/liszt/metascene_input_boxes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/liszt/src/liszt/metascene_input_fields.nim",
+      "/Users/dp/Desktop/funis/funis/controller/liszt/src/liszt/metascene_input_hexagons.nim",
+      "/Users/dp/Desktop/funis/funis/controller/liszt/src/liszt/metascene_osc.nim",
+      "/Users/dp/Desktop/funis/funis/controller/liszt/src/liszt/metascene_load.nim",
+      "/Users/dp/Desktop/funis/funis/controller/liszt/src/liszt/metascene_operation_boxes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_2D/animation_2D_coordinates.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/containers/containers.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/containers/container_doms.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/containers/container_layouts.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/containers/fraction_containers.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/containers/melody_containers.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/liszt/src/liszt/metascene_operation_boxes.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/structures/structure_utils.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/trees/trees.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/save_load_ui/save_load_menu.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/menu/menu.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/gamepad_interactive.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/gamepad_thumbsticks.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/gamepad_outlines.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/input_ui/input_ui_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_layout_navigation.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_layout_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_layout_grids.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_string_oscillations.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/animation_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/string_oscillations/string_oscillation_doms.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/string_oscillations/string_oscillation_paths.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/animations/string_oscillations/string_oscillation_utils.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_layouts.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/trees/trees.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/frames/frames.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_layout_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared_states.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/external/flatty/src/flatty/binny.nim": [],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/controllers/controller_create_boxes.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/sorabji_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/sorabji_display.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/controllers/controller_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/controllers/init_controllers.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/sorabji_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/sorabji_display.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/doms/sorabji_doms.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/controllers/controller_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/boxes/box_caches.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/sorabji_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/operations.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/scenes/scenes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/boxes/box_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/utils/util_types.nim": [],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/melody_fraction_combiner_ui/melody_fraction_combiner_left.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/interaction_modes/selected_box_mode.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/sorabji_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/interaction_modes/interaction_mode_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/ui_settings/ui_settings.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/components.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/liszt/src/liszt/metascene_osc.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects_3d/draw_object_3d_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/shaders/shaders.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw_objects/draw_objects.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/instrument_ui/instrument_midi_keyboard_ui.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/instrument_ui/instrument_proportion_harp_ui.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/clips/faust_layout.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/caches/init_controller_caches.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/sorabji_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/connectors/connectors.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/fields/fields.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/geometry/geometry_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/operations.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/scenes/scene_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/settings/settings.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/caches/controller_cache_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/diffs/diffs/diff_dom.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/doms/doms.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/diffs/diffs/diff_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/doms/doms.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/doms/controller_dom_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/doms/controller_dom_nodes.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/doms/dom_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/doms/dom_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/doms/init_doms.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/caches/controller_cache_box_utils.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/sorabji_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/interaction_modes/interaction_mode_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/operation_types.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/caches/controller_cache_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/variations/variations.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/variations/variation_melody_layouts.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/variations/variation_melody_messages.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/variations/variation_melody_utils.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/movement_operations.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/states/sorabji_states.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/operations/operation_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/roll_ui/roll_generic_instrument_ui.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared_types.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/type_utils.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/timbre_ui/timbre_ui_dissonance_curves.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/timbre_ui/timbre_ui_partial_utils.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/model/routing/src/routing_types.nim": [],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/frames/frame_layouts.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/draw.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/gamepads/gamepad_utils.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/inputs/shared/shared.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/diffs/diffs/diff_float_hooks.nim": [],
+    "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/connectors/connectors.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/connectors/connector_doms.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/connectors/connector_caches.nim",
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji/display/connectors/connector_types.nim"
+    ],
+    "/Users/dp/Desktop/funis/funis/controller/user_interfaces/src/scale_ui/scale_ui.nim": [
+      "/Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim",
+      "/Users/dp/Desktop/funis/funis/controller/user_interfaces_sizes/src/user_interfaces_sizes.nim"
+    ]
+  }
+}
+initForest took (seconds: 1, nanosecond: 482331639)
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/ui_settings/ui_settings.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/components.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/ui_settings/color_schemes.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/ui_settings/init_settings.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/clips/clips.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/combiners/combiners.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/containers/containers.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/faust_playback/faust_playback.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fractions.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/text_frames/text_frames.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/frames/frames.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/instruments/instruments.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melodies.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/menu/menu.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/proportions/proportions.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/rolls/rolls.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/scales/scales.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/structures/structures.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/tracks/tracks.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/trees/trees.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/utils/utils.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/variations/variations.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/waveforms/waveforms.nim
+Found /Users/dp/Desktop/funis/funis/controller/ravel/src/ravel/draw/colors/colors.nim
+Found /Users/dp/Desktop/funis/funis/controller/ravel/src/ravel.nim
+Found /Users/dp/Desktop/funis/funis/controller/sorabji/src/sorabji.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/clips/faust_layout.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/combiners/melody_fraction_combiner_layouts.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/containers/container_doms.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/containers/container_layouts.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/containers/fraction_containers.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/containers/melody_containers.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_layouts.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_layout_utils.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_doms.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_layout_types.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_tree_layouts.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/fractions/fraction_tree_doms.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/text_frames/text_frame_layouts.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/text_frames/text_frame_colors.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/text_frames/text_frame_doms.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/frames/frame_layouts.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/frames/frame_doms.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/instruments/instrument_ui_layouts.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_layout_grids.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_layout_notes.nim
+Found /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melody_layout_navigation.nim
+path @[/Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/melodies/melodies.nim, /Users/dp/Desktop/funis/funis/controller/user_interfaces_shared/src/user_interfaces_shared/components/components.nim]

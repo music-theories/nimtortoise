@@ -4,13 +4,20 @@ import chronos/asyncproc
 import stew/byteutils
 import chronicles
 import ../protocol/[enums, types]
-import ../langserver/[langserver_types, langserver_utils, langserver_messaging]
+import ../langserver/[langserver_types, langserver_messaging]
 
 # === textDocument/formatting ===
+proc getNphPath*(): Option[string] =
+  let path = findExe "nph"
+  if path == "":
+    none(string)
+  else:
+    some path
+
 proc format*(
   ls: LanguageServer, nphPath: string, uri: FileUri
 ): Future[Option[TextEdit]] {.async.} =
-  let filePath = ls.uriStorageLocation(uri)
+  let filePath = uriToStashFilePath(ls.files.storageDir, uri)
   if not fileExists(string(filePath)):
     warn "File doesn't exist ", filePath = filePath, uri = uri
     return none(TextEdit)

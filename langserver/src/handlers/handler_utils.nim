@@ -66,7 +66,7 @@ proc initLabelRangeForOpenFiles*(
   response: Suggest,
   ls: LanguageServer,
 ): Option[Range] = 
-  let uri = pathToUri(response.filepath)
+  let uri = toUri(response.filepath)
   let asLspFilePositionStart = toLspFilePosition(
     NimsuggestFilePosition(
       line: response.line,
@@ -91,7 +91,7 @@ proc toLocationJsonForOpenFiles*(
   response: Suggest,
   ls: LanguageServer,
 ): Option[Location] = 
-  let uri = pathToUri(response.filepath)
+  let uri = toUri(response.filepath)
   let labelRange = initLabelRangeForOpenFiles(response, ls)
   if labelRange.isSome:
     let rangeJson = labelRange.get()
@@ -104,7 +104,7 @@ proc toLocationJsonForOpenFiles*(
     return none(Location)
 
 proc getLspFilePositionByOpeningFile*(
-  filepath: FilePath, 
+  filepath: FilePathAbs,
   position: NimsuggestFilePosition
 ): LspFilePosition =
   ## Convert a nimsuggest UTF-8 column to a UTF-16 column by reading the file from disk.
@@ -134,7 +134,7 @@ proc initLabelRangeForAnyFile*(
     line: response.line,
     col: response.column
   )
-  let uri = pathToUri(response.filepath)
+  let uri = toUri(response.filepath)
   if uri in ls.files.openFiles:
     let labelRange = initLabelRangeForOpenFiles(response, ls)
     if labelRange.isSome:
@@ -156,7 +156,7 @@ proc initLabelRangeForAnyFile*(
 proc toLocationJsonForAnyFile*(
   response: Suggest, ls: LanguageServer,
 ): Location = 
-  let uri = pathToUri(response.filepath)
+  let uri = toUri(response.filepath)
   let labelRange = initLabelRangeForAnyFile(response, ls)
   return Location %* {
     "uri": uri, 

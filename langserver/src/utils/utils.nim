@@ -1,16 +1,14 @@
-import std/[unicode, uri, strformat, os, strutils, options, json, jsonutils, net]
+import std/[unicode, uri, os, strutils, options, json, jsonutils, net]
 # import with
 import chronos, chronicles
 import "$nim/compiler/pathutils"
 import json_rpc/private/jrpc_sys
 import macros
 import ../protocol/types as protocolTypes
-export FileUri, FilePath
+export FileUri, FilePathAbs, FilePathRel, DirPathAbs, DirPathRel
+export toUri, toFilePathAbs, toDirPathAbs
 
 type
-  UriParseError* = object of Defect
-    uri: FileUri
-
   FingerTable = seq[tuple[u16pos, offset: int]]
 
 proc writeStackTrace*(ex = getCurrentException()) =
@@ -74,62 +72,6 @@ proc utf8to16*(fingerTable: FingerTable, utf8pos: int): int =
       result -= finger.offset
     else:
       break
-
-func toFileUri*(x: string): FileUri = FileUri(x)
-func toFilePath*(x: string): FilePath = FilePath(x)
-
-proc uriToPath*(uri: FileUri): FilePath =
-  ## Convert an RFC 8089 file URI to a native, platform-specific, absolute path.
-  #let startIdx = when defined(windows): 8 else: 7
-  #normalizedPath(uri[startIdx..^1])
-  let uriAsString = $(uri)
-  let parsed = parseUri(uriAsString)
-  if parsed.scheme != "file":
-    var e = newException(
-      UriParseError,
-      fmt"""Invalid scheme in uri "{uriAsString}": {parsed.scheme}, only "file" is supported"""
-    )
-    e.uri = FileUri(uriAsString)
-    raise e
-  if parsed.hostname != "":
-    var e = newException(
-      UriParseError,
-      fmt"""Invalid hostname in uri "{uriAsString}": {parsed.hostname}, only empty hostname is supported""",
-    )
-    e.uri = FileUri(uriAsString)
-    raise e
-  return FilePath(normalizedPath(
-    when defined(windows):
-      parsed.path[1 ..^ 1]
-    else:
-      parsed.path
-  ).decodeUrl())
-
-proc pathToUri*(path: FilePath): FileUri =
-  # This is a modified copy of encodeUrl in the uri module. This doesn't encode
-  # the / character, meaning a full file path can be passed in without breaking
-  # it.
-  let pathAsString = $(path)
-  var output = "file://" & newStringOfCap(pathAsString.len + pathAsString.len shr 2)
-    # assume 12% non-alnum-chars
-  when defined(windows):
-    output.add('/')
-  for c in pathAsString:
-    case c
-    # https://tools.ietf.org/html/rfc3986#section-2.3
-    of 'a' .. 'z', 'A' .. 'Z', '0' .. '9', '-', '.', '_', '~', '/':
-      output.add(c)
-    of '\\':
-      when defined(windows):
-        output.add('/')
-      else:
-        output.add('%')
-        output.add(toHex(ord(c), 2))
-    else:
-      output.add('%')
-      output.add(toHex(ord(c), 2))
-  
-  return FileUri(output)
 
 iterator groupBy*[T, U](
     s: openArray[T], f: proc(a: T): U {.gcsafe, raises: [].}
@@ -204,9 +146,10 @@ proc partial*[A, B, C, D](
   return proc(b: B, c: C): D {.gcsafe, raises: [].} =
     return fn(a, b, c)
 
-proc ensureStorageDir*(): string =
-  result = getTempDir() / "nimtortoise"
-  discard existsOrCreateDir(result)
+proc ensureStorageDir*(): DirPathAbs =
+  let path = getTempDir() / "nimtortoise"
+  discard existsOrCreateDir(path)
+  DirPathAbs(path)
 
 proc either*[T](fut1, fut2: Future[T]): Future[T] {.async.} =
   let res = await race(fut1, fut2)

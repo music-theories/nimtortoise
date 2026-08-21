@@ -9,10 +9,7 @@ import ./fixhelpers
 suite "Fix #7 and #11 — workspace/didRenameFiles":
   generateSimpleNimblePaths()
   let (cmdParams, ls, client) = startServer("tests/projects/simple")
-  client.setWorkspaceConfig(%*[{
-    "maxNimsuggestProcesses": 1,
-    "projectMapping": [{"fileRegex": "tests/projects/simple/src/.*\\.nim", "projectFile": simpleProjectFile()}]
-  }])
+  client.setWorkspaceConfig(%*[{"maxNimsuggestProcesses": 1}])
   doInitialize(client, "tests/projects/simple")
   client.notify("initialized", newJObject())
 
@@ -20,13 +17,17 @@ suite "Fix #7 and #11 — workspace/didRenameFiles":
 
   test "server does not crash after workspace/didRenameFiles":
     echo "    >> server does not crash after workspace/didRenameFiles"
-    sendDidOpen(client, widgetFile)
+    # Open the project entry point first so its nimsuggest is running.
+    # widget.nim will then be assigned to it via isKnownByANimsuggestSlot.
+    sendDidOpen(client, "tests/projects/simple/src/simple.nim")
     check waitForNsInit(client, simpleProjectFile())
+    sendDidOpen(client, widgetFile)
+    waitFor sleepAsync(500)
 
     sendDidRename(client, widgetFile, "tests/projects/simple/src/widget_renamed.nim")
     waitFor sleepAsync(500)
 
-    let hoverBackGirl = sendHover(client, widgetFile, 7, 5)
+    discard sendHover(client, widgetFile, 7, 5)
     check true
     echo "    >> DONE: server does not crash after workspace/didRenameFiles"
 
@@ -41,6 +42,8 @@ suite "Fix #7 and #11 — workspace/didRenameFiles":
     )
     echo "    >> DONE: publishDiagnostics clears errors for old URI after rename"
 
+  stopServer(client)
+
 suite "Fix #12A — openFiles sync on didClose":
   generateSimpleNimblePaths()
   let (cmdParams, ls, client) = startServer("tests/projects/simple")
@@ -51,8 +54,9 @@ suite "Fix #12A — openFiles sync on didClose":
   test "closing one file does not break hover on another file":
     echo "    >> closing one file does not break hover on another file"
     sendDidOpen(client, "tests/projects/simple/src/simple.nim")
-    sendDidOpen(client, "tests/projects/simple/src/widget.nim")
     check waitForNsInit(client, simpleProjectFile())
+    sendDidOpen(client, "tests/projects/simple/src/widget.nim")
+    waitFor sleepAsync(300)
 
     client.notify("textDocument/didClose", %* {
       "textDocument": {"uri": fixtureUri("tests/projects/simple/src/widget.nim")}
@@ -62,3 +66,5 @@ suite "Fix #12A — openFiles sync on didClose":
     discard sendHover(client, "tests/projects/simple/src/simple.nim", 4, 5)
     check true
     echo "    >> DONE: closing one file does not break hover on another file"
+
+  stopServer(client)

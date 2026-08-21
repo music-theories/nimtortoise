@@ -1,15 +1,15 @@
 import ./[
-  dispatcher, dispatcher_utils,
+  dispatcher, dispatcher_utils, dispatcher_did_open, dispatcher_did_change, dispatcher_did_save, dispatcher_did_close, dispatcher_did_rename, 
   init_langserver, langserver_types, langserver_utils,
-  langserver_nimsuggest, langserver_messaging, 
+  langserver_messaging, 
   query_types,
   transports,
-  capability_configs
+  capability_configs,
 ]
 
 export   
-  dispatcher, dispatcher_utils,
+  dispatcher, dispatcher_utils, dispatcher_did_open, dispatcher_did_change, dispatcher_did_save, dispatcher_did_close, dispatcher_did_rename, 
   init_langserver, langserver_types, langserver_utils,
-  langserver_nimsuggest, langserver_messaging, 
+  langserver_messaging, 
   query_types,
   transports, capability_configs

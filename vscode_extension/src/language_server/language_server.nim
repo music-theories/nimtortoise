@@ -288,7 +288,7 @@ proc startLanguageServer(tryInstall: bool, state: ExtensionState) {.async.} =
         refreshNotifications(state.statusProvider, nots),
     )
 
-    await refreshNimbleTasks()
+    # await refreshNimbleTasks()
 
     let expiredTime = state.config.getInt("notificationTimeout")
     if expiredTime > 0:

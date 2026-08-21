@@ -1,40 +1,74 @@
-import std/[json, options, times]
+import std/[json, options, times, tables]
 import chronos
 import chronicles
+import forest
 import ./[configuration_types]
 
 func inlayHintsEnabled*(cnf: NlsConfig): bool =
   return cnf.inlayHints.typeHints.enable or cnf.inlayHints.exceptionHints.enable or cnf.inlayHints.parameterHints.enable
 
+proc initPerformanceSettings*(): Table[PerformanceSettingKind, PerformanceSetting] = 
+  result = initTable[PerformanceSettingKind, PerformanceSetting]()
+
+  result[PerformanceSettingKind.HIGHEST] =  PerformanceSetting(
+    kind: PerformanceSettingKind.HIGHEST,
+    fileCheckThrottling: initDuration(milliseconds = 200),
+    updateOnChange: true,
+    description: "Update open dependencies on change. Low request throttling. Highest CPU usage."
+  )
+  result[PerformanceSettingKind.HIGH] = PerformanceSetting(
+    kind: PerformanceSettingKind.HIGH,
+    fileCheckThrottling: initDuration(seconds = 1),
+    updateOnChange: true,
+    description: "Update open dependencies on change. Medium request throttling. High CPU usage."
+  )
+  result[PerformanceSettingKind.LOW] = PerformanceSetting(
+    kind: PerformanceSettingKind.LOW,
+    fileCheckThrottling: initDuration(seconds = 1),
+    updateOnChange: false,
+    description: "Only update dependencies on save.  Medium request throttling. Low CPU usage."
+  )
+  result[PerformanceSettingKind.LOWEST] = PerformanceSetting(
+    kind: PerformanceSettingKind.LOWEST,
+    fileCheckThrottling: initDuration(seconds = 5),
+    updateOnChange: false,
+    description: "Only update dependencies on save.  High request throttling. owest CPU usage."
+  )
+
+const performanceSettings = initPerformanceSettings()
+
 proc initDefaultNlsConfig*(): NlsConfig = 
   return NlsConfig(
     # --- Files/Folders ---
-    projectMapping: @[],
-    workingDirectoryMapping: @[],
+    # projectMapping: @[],
+    # workingDirectoryMapping: @[],
     # --- Save Settings ---
-    checkOnSave: false,
-    formatOnSave: false,
+    # checkOnSave: true,
+    # checkDependentsOnChange: true,
+    # formatOnSave: false,
     # --- Langserver settings --- 
     # langserverTimeout: 1_800_000, # in MS - This is 30 mins
-    fileCheckDelay: 1000, # in MS
+    # fileCheckDelay: initDuration(milliseconds = 1000), # in MS
+    performance: performanceSettings[PerformanceSettingKind.LOW],
     # -- Nimsuggest Settings ---
     maxNimsuggestProcesses: 2, # max number of nimsuggest processes to keep alive. 0 means unlimited.
     maxNimsuggestCrashRetries: 3, # auto-restart attempts before giving up on a crashed slot
-    nimsuggestPath: "nimsuggest",
+    nimsuggestPath: FilePathAbs(""), # OR should it be "nimsuggest"?
     nimsuggestIdleTimeout: initDuration(seconds = 1800), 
     nimsuggestRequestTimeout: initDuration(seconds = 30), 
-    logNimsuggest: true, # TODO - check createNimuggest function
+    nimsuggestSpawnTimeout: initDuration(seconds = 60),
+    logNimsuggest: true, 
     inlayHints: NlsInlayHintsConfig(
       typeHints: NlsInlayTypeHintsConfig(
-        enable: true
+        enable: false
       ),
       exceptionHints: NlsInlayExceptionHintsConfig(
-        enable: true,
+        enable: false, # THIS SHOULD NEVER BE ON!
         hintStringLeft: "🔔",
         hintStringRight: ""
       ),
       parameterHints: NlsInlayParameterHintsConfig(
-        enable: true
+        enable: false
       ),
     ),
     notificationVerbosity: NlsNotificationVerbosity.nvInfo,
@@ -51,26 +85,26 @@ proc nlsConfigFromJson*(json: JsonNode): NlsConfig =
   if json.kind != JObject:
     return
 
-  if json.hasKey("projectMapping"):
-    result.projectMapping = json["projectMapping"].to(seq[NlsNimsuggestConfig])
-  if json.hasKey("workingDirectoryMapping"):
-    result.workingDirectoryMapping = json["workingDirectoryMapping"].to(seq[NlsWorkingDirectoryMaping])
-  if json.hasKey("checkOnSave"):
-    result.checkOnSave = json["checkOnSave"].getBool()
+  if json.hasKey("performance"):
+    let performanceKind = json["performance"].to(PerformanceSettingKind)
+    result.performance = performanceSettings[performanceKind]
+    
   if json.hasKey("formatOnSave"):
     result.formatOnSave = json["formatOnSave"].getBool()
-  # if json.hasKey("langserverTimeout"):
-  #   result.langserverTimeout = json["langserverTimeout"].getInt()
-  if json.hasKey("fileCheckDelay"):
-    result.fileCheckDelay = json["fileCheckDelay"].getInt()
+
+  # if json.hasKey("fileCheckDelay"):
+  #   result.fileCheckDelay = initDuration(milliseconds = json["fileCheckDelay"].getInt())
+
   if json.hasKey("maxNimsuggestProcesses"):
     result.maxNimsuggestProcesses = json["maxNimsuggestProcesses"].getInt()
   if json.hasKey("maxNimsuggestCrashRetries"):
     result.maxNimsuggestCrashRetries = json["maxNimsuggestCrashRetries"].getInt()
   if json.hasKey("nimsuggestPath"):
-    result.nimsuggestPath = json["nimsuggestPath"].getStr()
+    result.nimsuggestPath = FilePathAbs(json["nimsuggestPath"].getStr())
   if json.hasKey("nimsuggestIdleTimeout"):
     result.nimsuggestIdleTimeout = initDuration(seconds = json["nimsuggestIdleTimeout"].getInt())
+  if json.hasKey("nimsuggestSpawnTimeout"):
+    result.nimsuggestSpawnTimeout = initDuration(seconds = json["nimsuggestSpawnTimeout"].getInt())
   if json.hasKey("nimsuggestRequestTimeout"):
     result.nimsuggestRequestTimeout = initDuration(seconds = json["nimsuggestRequestTimeout"].getInt())
   if json.hasKey("logNimsuggest"):
@@ -116,16 +150,16 @@ proc parseDidChangeConfiguration*(conf: JsonNode): NlsConfig =
 
 proc parseWorkspaceConfigurationResponse*(conf: JsonNode): Option[NlsConfig] =
   ## Parses the response to a workspace/configuration request (pull model).
-  ## Expected format: [<nimTortoise section>, <nim section>] — 1 or 2 elements.
-  ## The nimTortoise section takes priority; the nim section fills in missing values.
+  ## Expected format: [<nimTortoise section>] — single element array.
   try:
     let items = if conf.kind == JArray: conf else: newJArray()
     if items.len == 0:
       return none(NlsConfig)
-    if items[0].kind == JObject:
-      return some(nlsConfigFromJson(items[0]))
-    return none(NlsConfig)
+    if items[0].kind != JObject:
+      return none(NlsConfig)
+    var cfg = nlsConfigFromJson(items[0])
+    return some(cfg)
+    
   except CatchableError:
     debug "Failed to parse workspace/configuration response.", error = getCurrentExceptionMsg()
     return none(NlsConfig)
-  

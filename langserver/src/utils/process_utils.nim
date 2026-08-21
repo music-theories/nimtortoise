@@ -1,19 +1,24 @@
 import std/[sugar, options, net]
 
-# unicode, uri, strformat, os, strutils, options, json, jsonutils, sugar, net, hashes]
-# import with
 import chronos, chronicles, chronos/asyncproc
 import json_rpc/private/jrpc_sys
 import macros
 import stew/byteutils
 
-# import ../nim_tools/nimsuggest/nimsuggest_types
+when defined(posix):
+  import posix
+
+  proc killProcessGroup*(pid: int) =
+    ## Send SIGKILL to the entire process group of `pid`.
+    ## Used to kill a zombie nimsuggest (stuck in a CPU loop) and any
+    ## children it may have spawned.  Safe to call from a signal handler
+    ## because killpg(2) is async-signal-safe.
+    discard posix.killpg(posix.Pid(pid), cint(SIGKILL))
 
 proc shutdownChildProcess*(p: AsyncProcessRef): Future[void] {.async.} =
   try:
     debug "Shutting down process with pid: ", pid = p.processID()
     let exitCode = await p.terminateAndWaitForExit(2.seconds)
-      # debug "Process terminated with exit code: ", exitCode
   except CatchableError:
     try:
       let forcedExitCode = await p.killAndWaitForExit(3.seconds)
@@ -21,6 +26,10 @@ proc shutdownChildProcess*(p: AsyncProcessRef): Future[void] {.async.} =
     except CatchableError:
       debug "Could not kill process in time either!"
       writeStackTrace()
+  try:
+    await p.closeWait()
+  except CatchableError:
+    discard  # pipes may already be closed; that is fine
 
 proc catchOrQuit*(error: Exception) =
   if error of CatchableError:

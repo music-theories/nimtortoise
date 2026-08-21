@@ -1,15 +1,121 @@
-import std/[options, os, strutils, strscans, json, tables, sequtils]
+import std/[json, tables]
 import chronos
-import chronos/asyncproc
 import chronicles
-import stew/byteutils
+import forest
+
 import ../protocol/[types]
 import ../langserver/langserver
 import ../nimsuggest/nimsuggest
-import ../nim_compiler/testrunner
-import ../nim_compiler/nim_compiler
-import ../utils/process_utils
+# import ../nim_compiler/[testrunner, nim_compiler]
+import ../nimble/[nimble]
+# import ../utils/process_utils
 import ../utils/utils
+
+
+# === workspace/executeCommand ===
+# proc resolveSlot(ls: LanguageServer, projectFile: FilePathAbs): Option[NimsuggestSlot] =
+#   ## Find the slot responsible for `projectFile`.
+#   ## The extension sends the active editor file, which may not be a pool entry
+#   ## point; fall back to the open-files table to find the owning slot.
+#   if projectFile in ls.pool.slots:
+#     return some(ls.pool.slots[projectFile])
+#   let uri = toUri(projectFile)
+#   if uri in ls.files.openFiles:
+#     return some(ls.files.openFiles[uri].slot)
+#   return none(NimsuggestSlot)
+
+
+##[
+TODO: Execute command is going to be the main mechanism through which any extension code is run, and the `extensions/listTasks` type requests will just be wrappers around this.  `executeCommand` is the standard LSP way to expose the different functionalities.
+
+These need to be added to the LspExtensionCapability object
+  LspExtensionCapability* = enum
+    #List of extensions this server support. Useful for clients
+    excRestartSuggest = "RestartSuggest"
+    excNimbleTask = "NimbleTask"
+    excRunTests = "RunTests"
+
+WORKING
+- status
+- capabilities
+- suggest/restart
+- listTasks
+- runTask
+TODO
+- 
+
+STUBBED
+- macroExpand
+- runTests
+- cancelTest
+]##
+
+# TODO
+# type 
+  # ExtensionCommand* = object
+  #   case kind*: LspExtensionCapability
+  #   of SERVER_RESTART: discard      
+  #   of NIMSUGGEST_RESTART, NIMSUGGEST_CHECK_PROJECT, NIMSUGGEST_RECOMPILE: 
+  #     slot*: FilePathAbs
+  #   of NIMBLE_LIST_TASKS: discard
+  #   of NIMBLE_RUN_TASK: discard
+  #   of NIM_MACRO_EXPAND: discard
+
+# proc processExtensionCommands*(
+#   ls: LanguageServer, params: ExecuteCommandParams
+# ): Future[JsonNode] {.async.} =
+
+proc executeCommand*(
+  ls: LanguageServer, params: ExecuteCommandParams
+): Future[JsonNode] {.async.} =
+  let projectFile = FilePathAbs(params.arguments[0].getStr)
+  case params.command
+  of "nimtortoise.restart":
+    debug "Restarting nimsuggest", projectFile = projectFile
+    if projectFile in ls.pool.slots:
+      await restartSlot(
+        ls.pool.slots[projectFile],
+        ls.pool,
+        ls.files.openFiles,
+        ls.dependencies,
+        ls.files.storageDir,
+        ls.configurations.currentConfig,
+      )
+
+  of "nimtortoise.checkProject":
+    debug "Checking project", projectFile = projectFile
+    
+    if projectFile in ls.pool.slots:
+      let slot = ls.pool.slots[projectFile]
+      ls.langserverQueue.addLastNoWait(LangserverQuery(
+        kind: LangserverQueryKind.NIMSUGGEST,
+        nimsuggest: NimsuggestQuery[LspFilePosition](
+          id: 0,
+          kind: NimsuggestQueryKind.CHECK_PROJECT,
+          uri: toUri(slot.spawnInfo.entryPoint),
+          dirtyFile: FilePathAbs(""),
+          responseFuture: newFuture[seq[Suggest]]("checkProject"),
+        )
+      ))
+
+  of "nimtortoise.recompile":
+    debug "Recompile Nimsuggest instance ", projectFile = projectFile
+    if projectFile in ls.pool.slots:
+      let slot = ls.pool.slots[projectFile]
+      if slot.isLive():
+        let entryPoint = slot.spawnInfo.entryPoint
+        ls.langserverQueue.addLastNoWait(LangserverQuery(
+          kind: LangserverQueryKind.NIMSUGGEST,
+          nimsuggest: NimsuggestQuery[LspFilePosition](
+            id: 0,
+            kind: NimsuggestQueryKind.RECOMPILE,
+            uri: toUri(entryPoint),
+            dirtyFile: FilePathAbs(""),
+            responseFuture: newFuture[seq[Suggest]]("recompile"),
+          )
+        ))
+
+  result = newJNull()
 
 # === extension/macroExpand ===
 proc expand*(ls: LanguageServer, params: JsonNode): Future[JsonNode] {.async.} =
@@ -29,150 +135,102 @@ proc extensionSuggest*(ls: LanguageServer, params: SuggestParams): Future[Sugges
   debug "extensionSuggest called", action = $params.action, projectFile = params.projectFile
   case params.action
   of saRestart:
-    let projectFilePath = FilePath(params.projectFile)
+    let projectFilePath = FilePathAbs(params.projectFile)
     if ls.pool.slots.hasKey(projectFilePath):
-      asyncSpawn restartSlot(ls.pool.slots[projectFilePath], ls.pool, ls.configurations.currentConfig)
+      asyncSpawn restartSlot(
+        ls.pool.slots[projectFilePath],
+        ls.pool,
+        ls.files.openFiles,
+        ls.dependencies,
+        ls.files.storageDir,
+        ls.configurations.currentConfig,
+      )
     else:
       debug "extensionSuggest: no slot found for project", projectFile = params.projectFile
   of saRestartAll:
-    ls.pool.restartAllNimsuggestInstances(ls.configurations.currentConfig)
+    restartAllNimsuggestInstances(
+      ls.pool, 
+      ls.files.openFiles, 
+      ls.dependencies, 
+      ls.files.storageDir,
+      ls.configurations.currentConfig, 
+    )
   of saNone:
     discard
   return SuggestResult(actionPerformed: params.action)
 
-proc startNimbleProcess(
-  ls: LanguageServer, args: seq[string], workingDir: string = ""
-): Future[AsyncProcessRef] {.async.} =
-  let dir =
-    if workingDir != "": workingDir
-    else: ls.capabilities.lspInitializeParams.getRootPath
-  let nimbleDirEnv = getEnv("NIMBLE_DIR", "<not set>")
-  let homeEnv = getEnv("HOME", "<not set>")
-  let pathEnv = getEnv("PATH", "<not set>")
-  debug "startNimbleProcess environment",
-    args = args,
-    workingDir = dir,
-    NIMBLE_DIR = nimbleDirEnv,
-    HOME = homeEnv,
-    PATH = pathEnv
-  await startProcess(
-    "nimble",
-    arguments = args,
-    options = {UsePath},
-    workingDir = dir,
-    stdoutHandle = AsyncProcess.Pipe,
-    stderrHandle = AsyncProcess.Pipe,
-  )
 
-proc tasks*(ls: LanguageServer, conf: JsonNode): Future[seq[NimbleTask]] {.async.} =
-  let rootPath: string = ls.capabilities.lspInitializeParams.getRootPath
-  debug "Received tasks ", rootPath = rootPath
-  debug "tasks: deleting NIMBLE_DIR before nimble tasks",
-    NIMBLE_DIR_before = getEnv("NIMBLE_DIR", "<not set>"),
-    HOME = getEnv("HOME", "<not set>")
-  delEnv "NIMBLE_DIR"
+# === extension/listTasks ===
+proc listTasks*(ls: LanguageServer, conf: JsonNode): Future[seq[NimbleTask]] {.async.} =  
+  await ls.lsInitialized
+  return await getNimbleTasks(ls.dependencies.nimble)
 
-  # Find nimble directories: check the workspace root first, then one level deep.
-  var nimbleDirs: seq[string]
-  if walkFiles(rootPath / "*.nimble").toSeq.len > 0:
-    nimbleDirs.add(rootPath)
-  else:
-    for entry in walkDir(rootPath):
-      if entry.kind == pcDir:
-        if walkFiles(entry.path / "*.nimble").toSeq.len > 0:
-          nimbleDirs.add(entry.path)
+# === extension/tasks ===
+proc tasks*(ls: LanguageServer, conf: JsonNode): Future[seq[NimbleTask]] {.async.} =  
+  await ls.lsInitialized
+  return await getNimbleTasks(ls.dependencies.nimble)
 
-  if nimbleDirs.len == 0:
-    warn "No .nimble files found in workspace root or immediate subdirectories",
-      rootPath = rootPath
-    return @[]
-
-  for dir in nimbleDirs:
-    debug "Running nimble tasks in directory", dir = dir
-    let process = await ls.startNimbleProcess(@["tasks"], workingDir = dir)
-    let exitCode = await process.waitForExit(InfiniteDuration)
-    if exitCode != 0:
-      warn "nimble tasks failed", dir = dir, exitCode = exitCode
-      await process.shutdownChildProcess()
-      continue
-    let output = string.fromBytes(await process.stdoutStream.read())
-    var name, desc: string
-    for line in output.splitLines:
-      if scanf(line, "$+  $*", name, desc):
-        #first run of nimble tasks can compile nim and output the result of the compilation
-        if name.isWord:
-          result.add NimbleTask(
-            name: name.strip(), description: desc.strip(), projectDir: dir
-          )
-    await process.shutdownChildProcess()
 
 # === extension/runTask ===
 proc runTask*(
-    ls: LanguageServer, params: RunTaskParams
+  ls: LanguageServer, params: RunTaskParams
 ): Future[RunTaskResult] {.async.} =
-  let process = await ls.startNimbleProcess(params.command, workingDir = params.workingDir)
-  let res = await process.waitForExit(InfiniteDuration)
-  result.command = params.command
-  let prefix = "\""
-  while not process.stdoutStream.atEof():
-    var lines = process.stdoutStream.readLine().await.splitLines
-    for line in lines.mitems:
-      if line.startsWith(prefix):
-        line = line.unescape(prefix)
-      if line != "":
-        result.output.add line
-
-  debug "Ran nimble cmd/task", command = $params.command, output = $result.output
-  await process.shutdownChildProcess()
-
+  await ls.lsInitialized
+  return await runNimbleTask(params)
+  
 # === extension/listTests === 
-proc listTests*(
-  ls: LanguageServer, params: ListTestsParams
-): Future[ListTestsResult] {.async.} =
-  let config = ls.configurations.currentConfig
-  let nimPath = config.getNimPath()
-  if nimPath.isNone:
-    error "Nim path not found when listing tests"
-    return ListTestsResult(
-      projectInfo: TestProjectInfo(
-        entryPoint: params.entryPoint, suites: initTable[string, TestSuiteInfo]()
-      )
-    )
-  let workspaceRoot = ls.capabilities.lspInitializeParams.getRootPath
-  let testProjectInfo = await listTests(params.entryPoint, nimPath.get(), workspaceRoot)
-  result.projectInfo = testProjectInfo
+# proc listTests*(
+#   ls: LanguageServer, params: ListTestsParams
+# ): Future[ListTestsResult] {.async.} =
+#   let config = ls.configurations.currentConfig
+#   let nimPath = config.getNimPath()
+#   if nimPath.isNone:
+#     error "Nim path not found when listing tests"
+#     return ListTestsResult(
+#       projectInfo: TestProjectInfo(
+#         entryPoint: params.entryPoint, suites: initTable[string, TestSuiteInfo]()
+#       )
+#     )
+#   # let workspaceRoot = ls.capabilities.lspInitializeParams.getRootPath
+#   let testProjectInfo = await listTests(
+#     FilePathAbs(params.entryPoint),
+#     FilePathAbs(nimPath.get()),
+#     ls.files.rootPath
+#   )
+#   result.projectInfo = testProjectInfo
 
-# === extension/runTest === 
-proc runTests*(
-    ls: LanguageServer, params: RunTestParams
-): Future[RunTestProjectResult] {.async.} =
-  let config = ls.configurations.currentConfig
-  let nimPath = getNimPath(config)
-  if nimPath.isNone:
-    error "Nim path not found when running tests"
-    return RunTestProjectResult()
-  let workspaceRoot = ls.capabilities.lspInitializeParams.getRootPath
-  await runTests(
-    params.entryPoint,
-    nimPath.get(),
-    params.suiteName,
-    params.testNames,
-    workspaceRoot,
-    ls,
-  )
+# # === extension/runTest === 
+# proc runTests*(
+#   ls: LanguageServer, params: RunTestParams
+# ): Future[RunTestProjectResult] {.async.} =
+#   let config = ls.configurations.currentConfig
+#   let nimPath = getNimPath(config)
+#   if nimPath.isNone:
+#     error "Nim path not found when running tests"
+#     return RunTestProjectResult()
+#   debug "TODO Add test runner"
+#   return RunTestProjectResult()
+#   # let workspaceRoot = ls.capabilities.lspInitializeParams.getRootPath
+#   # await runTests(
+#   #   ls,
+#   #   params.entryPoint,
+#   #   nimPath.get(),
+#   #   params.suiteName,
+#   #   params.testNames,
+#   #   workspaceRoot,
+#   # )
 
-# === extension/cancelTest === 
-proc cancelTest*(
-    ls: LanguageServer, params: JsonNode
-): Future[CancelTestResult] {.async.} =
-  debug "Cancelling test"
-  if ls.testRunProcess.isSome:
-    await shutdownChildProcess(ls.testRunProcess.get)
-    ls.testRunProcess = none(AsyncProcessRef)
-    return CancelTestResult(cancelled: true)
-  return CancelTestResult(cancelled: false)
+# # === extension/cancelTest === 
+# proc cancelTest*(
+#   ls: LanguageServer, params: JsonNode
+# ): Future[CancelTestResult] {.async.} =
+#   debug "Cancelling test"
+#   if ls.testRunProcess.isSome:
+#     await shutdownChildProcess(ls.testRunProcess.get)
+#     ls.testRunProcess = none(AsyncProcessRef)
+#     return CancelTestResult(cancelled: true)
+#   return CancelTestResult(cancelled: false)
 
-# === extension/recompile === 
 # === extension/restartServer === 
 
 # TODO

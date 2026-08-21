@@ -1,11 +1,10 @@
-import std/[sugar, sequtils, tables, strformat, strscans, json, strutils, parsejson, sets]
+import std/[sugar, sequtils, tables, strformat, strscans, json, strutils, parsejson, sets, options]
 import chronos
 import chronos/asyncproc
 import chronicles
 import json_serialization
 
 import ../nim_compiler/nim_expand
-import ../nim_compiler/nim_compiler
 import ../nimsuggest/nimsuggest
 import ../langserver/langserver
 import ../configurations/configurations
@@ -28,20 +27,20 @@ proc supportSignatureHelp*(cc: LspClientCapabilities): bool =
   if cc.isNil:
     return false
   let caps = cc.textDocument
-  caps.isSome and caps.get.signatureHelp.isSome
+  return caps.isSome() and caps.get.signatureHelp.isSome()
 
 
-proc nsCapabilities*(ls: LanguageServer, uri: FileUri): set[NimSuggestCapability] =
-  ## Returns the live nimsuggest capabilities for the slot serving `uri`.
-  ## Safe to call synchronously after queryAt/queryFile returns — by that point
-  ## processQueries has already awaited slot.ns.get so the slot is READY.
-  let slotOpt = resolvedSlot(ls.pool, ls.files.openFiles, uri)
-  if slotOpt.isNone:
-    return {}
-  let nsOpt = slotOpt.get.resolvedNs
-  if nsOpt.isNone:
-    return {}
-  nsOpt.get.capabilities
+# proc nsCapabilities*(ls: LanguageServer, uri: FileUri): set[NimSuggestCapability] =
+#   ## Returns the live nimsuggest capabilities for the slot serving `uri`.
+#   ## Safe to call synchronously after queryAt/queryFile returns — by that point
+#   ## processQueries has already awaited slot.ns.get so the slot is READY.
+#   let slotOpt = resolvedSlot(ls.pool, ls.files.openFiles, uri)
+#   if slotOpt.isNone:
+#     return {}
+#   let nsOpt = slotOpt.get.resolvedNs
+#   if nsOpt.isNone:
+#     return {}
+#   nsOpt.get.capabilities
 
 proc processCompletionQuery(
   ls: LanguageServer, 
@@ -49,7 +48,7 @@ proc processCompletionQuery(
   nimsuggestResponse: seq[Suggest]
 ): seq[CompletionItem] = 
   result = nimsuggestResponse.map(toCompletionItem)
-  if ls.capabilities.lspClientCapabilities.supportSignatureHelp() and nsCon in ls.nsCapabilities(q.uri):
+  if ls.capabilities.lspClientCapabilities.supportSignatureHelp() and nsCon in ls.pool.nimsuggest.capabilities:
     #show only unique overloads if we support signatureHelp
     var unique = initTable[string, CompletionItem]()
     for completion in result:
@@ -177,7 +176,7 @@ proc processHoverQuery(
         id: 0.uint,
         kind: NimsuggestQueryKind.HOVER,
         uri: query.uri,
-        dirtyFile: ls.uriToStash(query.uri),
+        dirtyFile: uriToStashFilePath(ls.files.storageDir,  query.uri),
         responseFuture: newFuture[seq[Suggest]]("nimsuggestQuery"),
         position: LspFilePosition(
           line: Line0Based(macroLine0),
@@ -189,18 +188,16 @@ proc processHoverQuery(
       if expandedResponse.len > 0 and expandedResponse[0].doc != "":
         content.value.add &"```nim\n{expandedResponse[0].doc}\n```"
       else:
-        let nimPath = getNimPath(config)
-        if nimPath.isSome:
-          let nimExpanded = await nimExpandMacro(nimPath.get, suggest, string(uriToPath(query.uri)))
-          content.value.add &"```nim\n{nimExpanded}\n```"
+        let nimPath = ls.dependencies.nim.nimExe
+        let nimExpanded = await nimExpandMacro(nimPath, suggest, string(toFilePathAbs(query.uri)))
+        content.value.add &"```nim\n{nimExpanded}\n```"
 
     if suggest.section == ideDef and suggest.symkind in ["skProc"] and config.nimExpandArc:
       debug "#Expanding arc", suggest = suggest[]
-      let nimPath = getNimPath(config)
-      if nimPath.isSome:
-        let expanded = await nimExpandArc(nimPath.get, suggest, string(uriToPath(query.uri)))
-        let arcContent = "#Expanded arc \n" & expanded
-        content.value.add &"```nim\n{arcContent}\n```"
+      let nimPath = ls.dependencies.nim.nimExe
+      let expanded = await nimExpandArc(nimPath, suggest, string(toFilePathAbs(query.uri)))
+      let arcContent = "#Expanded arc \n" & expanded
+      content.value.add &"```nim\n{arcContent}\n```"
 
     return some(Hover(
       contents: some(%content), 
@@ -288,7 +285,7 @@ proc processSignatureHelpQuery(
   nimsuggestResponse: seq[Suggest]
 ): Option[SignatureHelp] = 
   # nsCapabilities is valid now — slot is READY after addQueryToQueue returns
-  if nsCon notin ls.nsCapabilities(query.uri):
+  if nsCon notin ls.pool.nimsuggest.capabilities:
     return none[SignatureHelp]()
   let signatures = nimsuggestResponse.map(toSignatureInformation)
   if signatures.len() > 0:
@@ -317,12 +314,12 @@ proc signatureHelp*(
 
 # === textDocument/documentSymbol ===
 proc processDocumentSymbolResponses*(
-  nimsuggestResponses: seq[Suggest],
   ls: LanguageServer,
+  nimsuggestResponses: seq[Suggest],
 ): seq[SymbolInformation] =
   result = @[]
   for response in nimsuggestResponses:
-    let uri = pathToUri(response.filepath)
+    let uri = toUri(response.filepath)
     let labelRange = initLabelRangeForAnyFile(response, ls)
     let locationJson = Location %* {
       "uri": uri, 
@@ -335,13 +332,6 @@ proc processDocumentSymbolResponses*(
     }
     result.add(symbolInformationJson)  
 
-
-# proc processDocumentSymbolQuery(
-#   ls: LanguageServer,
-#   nimsuggestResponse: seq[Suggest]
-# ): seq[SymbolInformation] =
-#   return nimsuggestResponse.map(x => x.toUtf16Pos(ls).toSymbolInformation)
-
 proc documentSymbols*(
     ls: LanguageServer, params: DocumentSymbolParams, id: int
 ): Future[seq[SymbolInformation]] {.async.} =
@@ -351,15 +341,15 @@ proc documentSymbols*(
     NimsuggestQueryKind.DOCUMENT_SYMBOLS
   )
   let response = await ls.addQueryToQueue(query)
-  return processDocumentSymbolResponses(response, ls)
+  return processDocumentSymbolResponses(ls, response)
 
 # === textDocument/prepareRename ===
 proc processPrepareRenameQuery(
   ls: LanguageServer,
   nimsuggestResponse: seq[Suggest]
 ): JsonNode =
-  let projectDir = ls.capabilities.lspInitializeParams.getRootPath
-  if nimsuggestResponse.len > 0 and string(nimsuggestResponse[0].filePath).isRelTo(projectDir):
+  # let projectDir = ls.capabilities.lspInitializeParams.getRootPath
+  if nimsuggestResponse.len > 0 and string(nimsuggestResponse[0].filePath).isRelTo(string(ls.files.rootPath)):
     let locationJson = toLocationJsonForAnyFile(
       nimsuggestResponse[0], ls
     )
@@ -386,13 +376,13 @@ proc processRenameQuery(
   nimsuggestResponse: seq[Suggest]
 ): WorkspaceEdit =
   # Build up list of edits that the client needs to perform for each file
-  let projectDir = ls.capabilities.lspInitializeParams.getRootPath
+  # let projectDir = ls.capabilities.lspInitializeParams.getRootPath
   var edits = newJObject()
   for reference in nimsuggestResponse:
     # Only rename symbols in the project.
     # If client supports prepareRename then an error will already have been thrown
-    let uri = pathToUri(reference.filePath)
-    if string(reference.filePath).isRelTo(projectDir):
+    let uri = toUri(reference.filePath)
+    if string(reference.filePath).isRelTo(string(ls.files.rootPath)):
       if string(uri) notin edits:
         edits[string(uri)] = newJArray()
 
@@ -503,22 +493,29 @@ proc inlayHint*(
 ): Future[seq[InlayHint]] {.async.} =
   debug "inlayHint received..."
   let configuration = ls.configurations.currentConfig
+  if not inlayHintsEnabled(configuration):
+    return @[]
+
+  # nimsuggest flags: typeHints=on by default, exceptionHints=off by default.
+  # +parameterHints is not a recognised nimsuggest flag and is silently ignored.
+  var inlayHintsOptions = ""
+  if not configuration.inlayHints.typeHints.enable:
+    inlayHintsOptions &= " -typeHints"
+  if configuration.inlayHints.exceptionHints.enable:
+    inlayHintsOptions &= " -exceptionHints" # THIS SHOULD NEVER BE ON
 
   let query = ls.initNimsuggestInlayHintQuery(
-    id, 
+    id,
     params.textDocument.uri,
     params.`range`.start.line,
     params.`range`.start.character,
     params.`range`.`end`.line,
     params.`range`.`end`.character,
-    " +exceptionHints +parameterHints",
+    inlayHintsOptions,
   )
   let responses = await ls.addQueryToQueue(query)
-  # nsProtocolVersion is valid now — slot is READY after queryInlayHints returns
-  let protocolVersion = nsProtocolVersion(
-    ls.pool, ls.files.openFiles, params.textDocument.uri
-  )
-  if protocolVersion < 4:
+  
+  if ls.pool.nimsuggest.protocol < 4:
     return @[]
 
   return processInlayHintResponses(
@@ -531,12 +528,11 @@ proc codeAction*(
   ls: LanguageServer, params: CodeActionParams
 ): Future[seq[CodeAction]] {.async.} =
   let uri = params.textDocument.uri
-  let fileInfo = ls.files.openFiles.getOrDefault(uri)
-  let projectUri =
-    if fileInfo != nil:
-      fileInfo.slot.projectFile.pathToUri
-    else:
-      uri
+  var projectUri = uri
+  let slotCheck = getSlotThatOwnsUri(ls.pool, uri)
+  if slotCheck.isSome():
+    projectUri = toUri(slotCheck.get().spawnInfo.entryPoint)
+
   return
     seq[CodeAction] %* [
       {

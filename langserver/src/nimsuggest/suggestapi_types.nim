@@ -1,7 +1,8 @@
-import std/[options, sets, times, deques]
+import std/[options, deques]
 
 import chronos
 import chronos/asyncproc
+import forest
 
 import ../protocol/types
 
@@ -33,13 +34,13 @@ type
     ideType
     ideExpand
 
-  NimsuggestCallback* = proc(self: Nimsuggest): void {.gcsafe, raises: [].}
-  ProjectCallback* = proc(self: Project): void {.gcsafe, raises: [].}
+  # NimsuggestCallback* = proc(self: Nimsuggest): void {.gcsafe, raises: [].}
+  # ProjectCallback* = proc(self: Project): void {.gcsafe, raises: [].}
 
   Suggest* = ref object
     section*: IdeCmd
     qualifiedPath*: seq[string] # part of 'qualifiedPath'
-    filePath*: FilePath
+    filePath*: FilePathAbs
     line*: int # Starts at 1
     column*: int # Starts at 0
     doc*: string # Not escaped (yet)
@@ -77,29 +78,34 @@ type
     tooltip*: string
 
   NimsuggestImpl* = object
-    openFiles*: OrderedSet[FileUri]
-    successfullCall*: bool
     port*: int
-    root*: FilePath
+    process*: AsyncProcessRef
+    failed*: bool
+    errorMessage*: string
     requestQueue*: Deque[SuggestCall]
     processing*: bool
     timeout*: int
-    timeoutCallback*: NimsuggestCallback
-    protocolVersion*: int
     capabilities*: set[NimSuggestCapability]
-    nimSuggestPath*: string
-    version*: string
-    project*: Project
+    protocolVersion*: int
 
   NimSuggest* = ref NimsuggestImpl
 
-  Project* = ref object
-    ns*: Future[NimSuggest]
-    file*: FilePath
-    process*: AsyncProcessRef
-    errorCallback*: Option[ProjectCallback]
-    errorMessage*: string
-    failed*: bool
-    lastCmd*: string
-    lastCmdDate*: Option[DateTime]
-  
+type
+  NimsuggestSettings* = object
+    exePath*: FilePathAbs # Path to nimsuggest binary.
+    protocol*: int # The version of the nimsuggest protocol
+    capabilities*: set[NimSuggestCapability] # Capabilities
+
+  NimsuggestSpawnInfo* = object
+    entryPoint*: FilePathAbs
+    workingDir*: DirPathAbs
+    nimbleFile*: Option[FilePathAbs]
+    paths*:      seq[DirPathAbs]
+    extraArgs*:  seq[string]
+
+type 
+  SpecialKind* = enum
+    HELLO, 
+    GOODBYE,
+    SOMETHING_ELSE
+    

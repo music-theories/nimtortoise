@@ -3,7 +3,7 @@ import chronos
 import unittest2
 
 import ../src/utils/utils
-import ./fixhelpers
+import fixhelpers
 
 suite "Fix #19 — cascade prevention at maxNimsuggestProcesses=1":
   generateSimpleNimblePaths()
@@ -27,3 +27,5 @@ suite "Fix #19 — cascade prevention at maxNimsuggestProcesses=1":
     waitFor sleepAsync(2000)
     check waitForInstanceCount(client, 1, 3000)
     echo "    >> DONE: opening a second unimported file does not cascade-restart into a loop"
+
+  stopServer(client)

@@ -1,22 +1,23 @@
 {
-  "nimTortoise.projectMapping": [
-    {
-      "projectFile": "langserver/src/nimtortoise.nim",
-      "fileRegex": "langserver/src/.*\\.nim"
-    },
-    {
-      "projectFile": "langserver/tests/all.nim",
-      "fileRegex": "langserver/tests/.*\\.nim"
-    },
-    {
-      "projectFile": "vscode_extension/src/vscode_nim_tortoise.nim",
-      "fileRegex": "vscode_extension/src/.*\\.nim"
-    },
-  ],
+  // "nimTortoise.projectMapping": [
+  //   {
+  //     "projectFile": "langserver/src/nimtortoise.nim",
+  //     "fileRegex": "langserver/src/.*\\.nim"
+  //   },
+  //   {
+  //     "projectFile": "langserver/tests/all.nim",
+  //     "fileRegex": "langserver/tests/.*\\.nim"
+  //   },
+  //   {
+  //     "projectFile": "vscode_extension/src/vscode_nim_tortoise.nim",
+  //     "fileRegex": "vscode_extension/src/.*\\.nim"
+  //   },
+  // ],
   "nimTortoise.maxNimsuggestProcesses": 2,
-  "nimTortoise.test.entryPoints": [
-    "langserver/tests/all.nim"
-  ],
+  "nimTortoise.lsp.path": "/Users/dp/Desktop/software_libraries/nim_tortoise/langserver/bin/nimtortoise",
+  "nimTortoise.lsp.trace.server": "verbose",
+  "nimTortoise.nimbleAutoSetup": false,
+  "nimTortoise.inlayHints.typeHints.enable": false,
   "editor.tokenColorCustomizations": {
     "textMateRules": [
       {
@@ -24,5 +25,6 @@
         "settings": { "foreground": "#FF8C00" }
       }
     ]
-  }
+  },
+  "nimTortoise.performance": "HIGHEST"
 }

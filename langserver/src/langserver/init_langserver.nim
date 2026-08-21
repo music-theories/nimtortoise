@@ -1,31 +1,31 @@
-import std/[
-  macros, options,
-  strformat, sequtils,
-  hashes, tables, sets, setutils,
-  json, times, tables
-]
+import std/[macros, options, tables, setutils, json]
 
 import chronos
 import json_serialization
 import json_rpc/[servers/socketserver]
 import chronicles
 
-import ../nimble/nimble_types
+import forest
+
+import ../nph/formatting
+
 import ../protocol/[enums, types]
 import ../configurations/configurations
 import ../nimsuggest/nimsuggest
 import ../utils/utils
+import ../utils/asyncprocmonitor
 
-import ./[langserver_types, query_types, langserver_messaging]
+import ./[
+  query_types, langserver_messaging, 
+  capability_configs,
+  langserver_types
+]
 
-# proc sendStatusChanged*(ls: LanguageServer) {.raises: [].}
-
-proc initLanguageServer*(params: CommandLineParams, storageDir: string): LanguageServer =
+proc initLanguageServer*(params: CommandLineParams, storageDir: DirPathAbs): LanguageServer =
   let currentConfig = initDefaultNlsConfig()
   let configReady = newAsyncEvent()
   result = LanguageServer(
     capabilities: LanguageServerCapabilities(
-      serverMode: params.mode.get(ServerMode.lsp),
       extensionCapabilities: LspExtensionCapability.items.toSet,
     ),
     configurations: LanguageServerConfigurations(
@@ -37,8 +37,7 @@ proc initLanguageServer*(params: CommandLineParams, storageDir: string): Languag
     ),
     files: LanguageServerFiles(
       openFiles: newTable[FileUri, NlsFileInfo](),
-      idleOpenFiles: newTable[FileUri, NlsFileInfo](),
-      filesWithDiags: initHashSet[FilePath](),
+      # idleOpenFiles: newTable[FileUri, NlsFileInfo](),
       storageDir: storageDir,
     ),
     messaging: LanguageServerMessaging(
@@ -47,7 +46,7 @@ proc initLanguageServer*(params: CommandLineParams, storageDir: string): Languag
       responseNames: newTable[string, string](),
       projectErrors: @[],
     ),
-    nimDumpCache: initTable[string, NimbleDumpInfo](),
+    # nimbleDumpCache: initTable[FilePathAbs, NimbleDumpInfo](),
     cmdLineClientProcessId: params.clientProcessId,
     lspQueue: newAsyncQueue[LspDispatchItem](),
     langserverQueue: newAsyncQueue[LangserverQuery](),
@@ -57,12 +56,8 @@ proc initLanguageServer*(params: CommandLineParams, storageDir: string): Languag
   # initNimsuggestInstances will update maxSlots from config and spawn entry points.
   let ls = result
   result.pool = NimsuggestPool(
-    slots: initTable[FilePath, NimsuggestSlot](), 
+    slots: initTable[FilePathAbs, NimsuggestSlot](),
     maxSlots: currentConfig.maxNimsuggestProcesses, 
-    fileCheckDelay: initDuration(milliseconds = currentConfig.fileCheckDelay),
-    # timeout: currentConfig.langserverTimeout,
-    nimsuggestPath: currentConfig.nimsuggestPath, # Set in initNimsuggestInstances
-    nimVersion: "", # Set in initNimsuggestInstances
     notifyProc: proc(meth: string, params: JsonNode) {.gcsafe, raises: [].} =
     ls.notify(meth, params),
     statusChangedProc: proc() {.gcsafe, raises: [].} =
@@ -73,27 +68,195 @@ proc initLanguageServer*(params: CommandLineParams, storageDir: string): Languag
 proc tick*(ls: LanguageServer): Future[void] {.async.} =
   try:
     ls.removeCompletedPendingRequests()
-    for slot in ls.pool.idleSlots(ls.configurations.currentConfig):
-      # Send STOP and remove from pool FIRST so that any checkFile spawned by
-      # makeIdleFile routes through an already-stopped slot and gets @[] cleanly,
-      # rather than racing with a live TCP connection being torn down.
-      debug "Removing idle nimsuggest", projectFile = slot.projectFile
-      discard await execStop(slot, ls.pool)
-      ls.pool.removeSlot(slot.projectFile)
-      ls.notify("window/showMessage", %*{
-        "type": MessageType.Info.int,
-        "message": fmt"Nimsuggest for {slot.projectFile} was stopped because it was idle for too long",
-      })
-      # Evict owned open files to idleOpenFiles so they re-open silently on next use.
-      # Use direct table lookup (not withValue) to avoid holding a pointer into the
-      # table's internal storage across the makeIdleFile call, which calls
-      # openFiles.del(uri) and can invalidate that pointer.
-      for uri in slot.ownedUris.toSeq:
-        if uri in ls.files.openFiles:
-          let fileInfo = ls.files.openFiles[uri]
-          ls.files.idleOpenFiles[uri] = fileInfo
-          ls.files.openFiles.del(uri)
-    ls.sendStatusChanged
+    ls.sendStatusChanged()
   except CatchableError as ex:
     error "Error in tick", msg = ex.msg
     writeStacktrace(ex)
+
+
+# initialize = capability exchange
+# initialized = startup work begins
+
+
+
+# === initialize ===
+proc initialize*(
+  p: tuple[ls: LanguageServer, onExit: OnExitCallback], 
+  params: LspInitializeParams
+): Future[LspInitializeResult] {.async.} =
+  # initialize — a request (client waits for a response). The client sends its capabilities and the server responds with its own capabilities. This stores lspInitializeParams, sets up the client process monitor, and returns LspServerCapabilities. Nimsuggest is not started here.
+  proc onClientProcessExitAsync(): Future[void] {.async.} =
+    debug "onClientProcessExitAsync"
+    await p.ls.pool.stopAllNimsuggestSlotsInPool()
+    await p.onExit()
+
+  proc onClientProcessExit() {.closure, gcsafe.} =
+    try:
+      debug "onClientProcessExit"
+      waitFor onClientProcessExitAsync()
+    except Exception:
+      error "Error in onClientProcessExit ", msg = getCurrentExceptionMsg()
+
+  debug "Initialize received..."
+  if params.processId.isSome:
+    let pid = params.processId.get
+    if pid.kind == JInt:
+      debug "Registering monitor for process ", pid = pid.num
+      var pidInt = int(pid.num)
+      if p.ls.cmdLineClientProcessId.isSome:
+        if p.ls.cmdLineClientProcessId.get == pidInt:
+          debug "Process ID already specified in command line, no need to register monitor again"
+        else:
+          debug "Warning! Client Process ID in initialize request differs from the one, specified in the command line. This means the client violates the LSP spec!"
+          debug "Will monitor both process IDs..."
+          hookAsyncProcMonitor(pidInt, onClientProcessExit)
+      else:
+        hookAsyncProcMonitor(pidInt, onClientProcessExit)
+  p.ls.capabilities.lspInitializeParams = params
+  p.ls.capabilities.lspClientCapabilities = params.capabilities
+  result = LspInitializeResult(
+    capabilities: LspServerCapabilities(
+      textDocumentSync: some(
+        %TextDocumentSyncOptions(
+          openClose: some(true),
+          change: some(TextDocumentSyncKind.Full.int),
+          willSave: some(false),
+          willSaveWaitUntil: some(true),
+          save: some(SaveOptions(includeText: some(true))),
+        )
+      ),
+      hoverProvider: some(true),
+      workspace: some(
+        ServerCapabilities_workspace(
+          workspaceFolders: some(WorkspaceFoldersServerCapabilities()),
+          fileOperations: some(
+            ServerCapabilities_workspace_fileOperations(
+              didRename: some(
+                FileOperationRegistrationOptions(
+                  filters: @[
+                    FileOperationFilter(
+                      scheme: some("file"),
+                      pattern: FileOperationPattern(glob: "**/*.nim"),
+                    )
+                  ]
+                )
+              ),
+              didDelete: some(
+                FileOperationRegistrationOptions(
+                  filters: @[
+                    FileOperationFilter(
+                      scheme: some("file"),
+                      pattern: FileOperationPattern(glob: "**/*.nim"),
+                    )
+                  ]
+                )
+              ),
+            )
+          ),
+        )
+      ),
+      completionProvider:
+        CompletionOptions(triggerCharacters: some(@["."]), resolveProvider: some(false)),
+      signatureHelpProvider: SignatureHelpOptions(triggerCharacters: some(@["(", ","])),
+      definitionProvider: some(true),
+      declarationProvider: some(true),
+      typeDefinitionProvider: some(true),
+      referencesProvider: some(true),
+      documentHighlightProvider: some(true),
+      workspaceSymbolProvider: some(true),
+      executeCommandProvider: some(
+        ExecuteCommandOptions(
+          commands: some(@[
+            "nimtortoise.recompile",
+            "nimtortoise.restart",
+            "nimtortoise.checkProject"
+          ])
+        )
+      ),
+      inlayHintProvider: some(InlayHintOptions(resolveProvider: some(false))),
+      documentSymbolProvider: some(true),
+      codeActionProvider: some(true),
+      documentFormattingProvider: some(getNphPath().isSome),
+    )
+  )
+  # Support rename by default, but check if we can also support prepare
+  result.capabilities.renameProvider = %true
+  if params.capabilities.textDocument.isSome:
+    let docCaps = params.capabilities.textDocument.unsafeGet()
+    # Check if the client support prepareRename
+    #TODO do the test on the action
+    if docCaps.rename.isSome and docCaps.rename.get().prepareSupport.get(false):
+      result.capabilities.renameProvider = %*{"prepareProvider": true}
+
+  debug "Initialize completed. Nimsuggest instances will start after configuration arrives."
+
+  let ls = p.ls
+  ls.capabilities.lspServerCapabilities = result.capabilities
+
+# === initialized ===
+proc initialized*(ls: LanguageServer, _: JsonNode): Future[void] {.async.} =
+  # initialized — a notification (no response). Sent by the client after it has processed the initialize response and is ready to proceed. This is where real work happens: config is fetched, configReady fires, initNimsuggestInstances runs, and lsInitialized is completed.
+  debug "Client initialized."
+  ls.maybeRegisterCapabilityDidChangeConfiguration()
+
+  if ls.supportsConfigurationRequest:
+    debug "Requesting configuration from the client"
+    
+    let configurationParams = %*{"items": [{"section": "nimTortoise"}]}
+    
+    let configFuture = ls.call("workspace/configuration", configurationParams)
+
+    try:
+      let conf = await configFuture
+      debug "Received the following configuration", configuration = conf
+      let newConfiguration: Option[NlsConfig] = parseWorkspaceConfigurationResponse(conf)
+      if newConfiguration.isSome: 
+        let newConfigValue = newConfiguration.get()
+        let newConfigurationIsDifferent = isDifferentFrom(newConfigValue, ls.configurations.currentConfig)
+
+        if newConfigurationIsDifferent:
+          ls.configurations.currentConfig = newConfigValue
+
+      ls.configurations.configReady.fire()
+    except CatchableError as ex:
+      debug "Failed to receive workspace configuration", error = ex.msg
+
+  else:
+    debug "Client does not support workspace/configuration"
+    ls.configurations.configReady.fire()
+
+  let paramsRootPath: Option[FileUri] = ls.capabilities.lspInitializeParams.rootUri
+
+  if paramsRootPath.isNone():
+    debug "initialized: no rootPath found.  Quitting."
+    return 
+  
+  else:
+    let rootUri: FileUri = paramsRootPath.get()
+    if string(rootUri).len > 0:
+      let path = toDirPathAbs(rootUri)
+      debug "getRootPath: rootUri on LSPInitializeParams found ", path = path
+      ls.files.rootPath = path
+    else:
+      debug "getRootPath: rootUri on LSPInitializeParams is none()."
+      return
+
+  let config = ls.configurations.currentConfig
+
+  # Update pool settings from config (pool was created with defaults in initLanguageServer)
+  ls.pool.maxSlots = config.maxNimsuggestProcesses
+
+  # Get all nimble information and build dependency tree
+  ls.dependencies = await initForest(ls.files.rootPath)
+  let nimsuggestPath = await getNimSuggestPath(
+    ls.dependencies.nim, config
+  )
+
+  ls.pool.nimsuggest.exePath = nimsuggestPath
+  ls.pool.nimsuggest.protocol = getNimsuggestProtocolVersion(nimsuggestPath)
+  ls.pool.nimsuggest.capabilities = getNimsuggestCapabilities(nimsuggestPath)
+
+  if not ls.lsInitialized.finished:
+    ls.lsInitialized.complete()
+
+let usingMyMind = SpecialKind.GOODBYE

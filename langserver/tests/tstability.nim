@@ -1,5 +1,6 @@
 import unittest2
 import ./tbughelpers
+import ./fixhelpers
 
 ## tstability.nim — rewrite-compatible port of test_fixes/tstab1+2+3.nim
 ##
@@ -77,6 +78,7 @@ suite "Stability — sequential open + hover, maxNs=2":
     )
     check result.kind in {JNull, JArray}
 
+  stopServer(client)
 
 suite "Stability — interleaved open/close/reopen, maxNs=2":
   let (cmdParams, ls, client) = startCombinedServer(2)
@@ -121,6 +123,7 @@ suite "Stability — interleaved open/close/reopen, maxNs=2":
     )
     check result.kind in {JNull, JArray}
 
+  stopServer(client)
 
 suite "Stability — rapid hover across all files, maxNs=2":
   let (cmdParams, ls, client) = startCombinedServer(2)
@@ -163,3 +166,5 @@ suite "Stability — rapid hover across all files, maxNs=2":
       %* {"textDocument": {"uri": uriSimple}})
     check rPkga.kind   in {JNull, JArray}
     check rSimple.kind in {JNull, JArray}
+
+  stopServer(client)

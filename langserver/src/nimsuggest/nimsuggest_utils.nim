@@ -1,9 +1,13 @@
-import std/[options, tables]
+import std/[strutils, tables, options, times, sets]
 import chronos
 import chronicles
+
+import forest
+
 import ../utils/utils
-import ./[suggestapi_types, nimsuggest_types]
 import ../protocol/types
+
+import ./[suggestapi_types, nimsuggest_types]
 
 proc mailboxHasQueryOfKind*(
   slot: NimsuggestSlot, 
@@ -28,7 +32,7 @@ proc mailboxHasChangedQueryForSameUriAnyOtherUri*(
       else:
         return false
 
-proc getFilePath*(s: Suggest): FilePath = s.filePath
+proc getFilePath*(s: Suggest): FilePathAbs = s.filePath
 
 proc toNimsuggestFilePosition*(
   position: LspFilePosition,
@@ -118,7 +122,6 @@ proc toNimsuggestQuery*(
     ))
   of NimsuggestQueryKind.DOCUMENT_SYMBOLS,
     NimsuggestQueryKind.WORKSPACE_SYMBOLS,
-    NimsuggestQueryKind.CHECK_FILE,
     NimsuggestQueryKind.CHECK_PROJECT,
     NimsuggestQueryKind.RECOMPILE,
     NimsuggestQueryKind.KNOWN:
@@ -127,12 +130,68 @@ proc toNimsuggestQuery*(
       responseFuture: q.responseFuture, cancelled: q.cancelled,
       kind: q.kind,
     ))
+  of NimsuggestQueryKind.CHECK_FILE:
+    return some(NimsuggestQuery[NimsuggestFilePosition](
+      id: q.id, 
+      uri: q.uri, 
+      dirtyFile: q.dirtyFile,
+      kind: NimsuggestQueryKind.CHECK_FILE,
+      isDependency: q.isDependency,
+      saved: q.saved,
+      responseFuture: q.responseFuture, 
+      cancelled: q.cancelled,
+    ))
   of NimsuggestQueryKind.CHANGED:
     return some(NimsuggestQuery[NimsuggestFilePosition](
       id: q.id, uri: q.uri, dirtyFile: q.dirtyFile,
-      responseFuture: q.responseFuture, 
+      responseFuture: q.responseFuture,
       cancelled: q.cancelled,
       kind: NimsuggestQueryKind.CHANGED,
-      saved: q.saved      
+      isDependency: q.isDependency,
+      saved: q.saved,
     ))
+  of NimsuggestQueryKind.SHUTDOWN:
+    return none(NimsuggestQuery[NimsuggestFilePosition])
 
+proc writeStashFile*(
+  storageDir: DirPathAbs,
+  uri: FileUri,
+  text: string
+): FilePathAbs = 
+  result = FilePathAbs("")
+  # Write the initial stash file
+  let storagePath = uriToStashFilePath(storageDir, uri)
+  try:
+    writeFile(string(storagePath), text)
+  except IOError as ex:
+    warn "Failed to write stash file; hover/completion may show stale content",
+      path = string(storagePath), msg = ex.msg
+  except OSError as ex:
+    warn "Failed to write stash file; hover/completion may show stale content",
+      path = string(storagePath), msg = ex.msg
+  
+  return storagePath
+
+proc initNlsFileInfo*(
+  params: TextDocumentItem
+): NlsFileInfo = 
+  # Build finger table for UTF-16 mapping
+  var fingerTable: seq[seq[tuple[u16pos, offset: int]]] = @[]
+  for line in params.text.splitLines:
+    fingerTable.add(line.createUTFMapping())
+
+  # Register in the file table (sync, atomic)
+  return NlsFileInfo(
+    fingerTable: fingerTable,
+    textDocument: params,
+    lastChanged: times.now(),
+    lastChecked: times.now(),
+  )
+
+proc getSlotThatOwnsUri*(
+  pool: NimsuggestPool, uriToCheck: FileUri
+): Option[NimsuggestSlot] = 
+  for entryPoint, s in pool.slots:
+    if uriToCheck in s.ownedUris:
+      return some(s)
+  return none(NimsuggestSlot)

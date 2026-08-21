@@ -10,6 +10,7 @@ import chronos
 import json_serialization
 import json_rpc/[servers/socketserver]
 import chronicles
+import forest
 
 import ../protocol/[enums, types]
 import ../configurations/configurations
@@ -55,10 +56,9 @@ proc toPendingRequestStatus(pr: PendingRequest): PendingRequestStatus =
 
 
 proc progressSupported*(ls: LanguageServer): bool =
-  result = ls.capabilities.serverMode == lsp and
-    ls.capabilities.lspInitializeParams.capabilities.window
-      .get(ClientCapabilities_window()).workDoneProgress
-      .get(false)
+  return ls.capabilities.lspInitializeParams.capabilities.window
+    .get(ClientCapabilities_window()).workDoneProgress
+    .get(false)
 
 proc progress*(ls: LanguageServer, token, kind: string, title = "") =
   if ls.progressSupported:
@@ -98,19 +98,19 @@ proc getLspStatus*(ls: LanguageServer): NimLangServerStatus {.raises: [].} =
             continue
           seenPorts.incl(ns.port)
           var nsStatus = NimSuggestStatus(
-            projectFile: string(slot.projectFile),
-            capabilities: ns.capabilities.toSeq,
-            version: ns.version,
-            path: ns.nimSuggestPath,
+            projectFile: string(slot.spawnInfo.entryPoint),
+            capabilities: ns.capabilities.toSeq(),
+            version: "TODO Nimsuggest Version",
+            path: $(ls.pool.nimsuggest.exePath),
             port: ns.port,
           )
-          for open in ns.openFiles.toSeq():
-            nsStatus.openFiles.add string(open)
+          for open in slot.ownedUris.toSeq():
+            nsStatus.openFiles.add(string(open))
           result.nimsuggestInstances.add nsStatus
       except CatchableError:
         discard
   for openFile in ls.files.openFiles.keys:
-    let openFilePath = uriToPath(openFile)
+    let openFilePath = toFilePathAbs(openFile)
     result.openFiles.add string(openFilePath)
 
   result.pendingRequests = ls.messaging.pendingRequests.values.toSeq().map(toPendingRequestStatus)
@@ -126,7 +126,7 @@ proc addProjectFileToPendingRequest*(ls: LanguageServer, id: uint, uri: FileUri)
   # WHAT DOES THIS ACTUALLY DO?
   try:
     if id in ls.messaging.pendingRequests:
-      ls.messaging.pendingRequests[id].projectFile = some string(uriToPath(uri))
+      ls.messaging.pendingRequests[id].projectFile = some string(toFilePathAbs(uri))
       ls.sendStatusChanged()
   except CatchableError as e:
     error "addProjectFileToPendingRequest failed", uri = uri, msg = e.msg

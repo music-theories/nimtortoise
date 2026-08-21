@@ -22,6 +22,19 @@ import status_panel/nimlspstatuspanel
 
 var state: ExtensionState
 
+proc setPerformance() {.async.} =
+  let items = newArrayWith[VscodeQuickPickItem](
+    VscodeQuickPickItem{label: "HIGHEST", description: "Update open dependencies on change. Low request throttling. Highest CPU usage."},
+    VscodeQuickPickItem{label: "HIGH",    description: "Update open dependencies on change. Medium request throttling. High CPU usage."},
+    VscodeQuickPickItem{label: "LOW",     description: "Only update dependencies on save. Medium request throttling. Low CPU usage."},
+    VscodeQuickPickItem{label: "LOWEST",  description: "Only update dependencies on save. High request throttling. Lowest CPU usage."},
+  )
+  let selected = await vscode.window.showQuickPick(items)
+  if selected.isNil or not selected.toJs().to(bool):
+    return
+  await vscode.workspace.getConfiguration("nimTortoise").update("performance", selected.label)
+  nimUtils.ext.statusProvider.emitter.fire(nil)
+
 proc showNimLangServerStatus() {.async.} =
   let lspStatus = await fetchLspStatus(state)
   refreshLspStatus(state.statusProvider, lspStatus)
@@ -36,6 +49,7 @@ proc activate*(ctx: VscodeExtensionContext): void {.async.} =
   )
   nimUtils.ext = state
 
+  vscode.commands.registerCommand("nimTortoise.setPerformance", setPerformance)
   vscode.commands.registerCommand("nimTortoise.run.file", runFile)
   vscode.commands.registerCommand("nimTortoise.debug.file", debugFile)
   vscode.commands.registerCommand(
@@ -112,12 +126,14 @@ proc activate*(ctx: VscodeExtensionContext): void {.async.} =
   nimbleWatcher.onDidChange(proc(uri: VscodeUri) =
     # console.log("*********nimbleWatcher.onDidChange called", uri)
     if uri.path == vscode.window.activeTextEditor.document.uri.path:
-      discard refreshNimbleTasks()
+      discard 
+      # We will now change to wait for user input.
+      # discard refreshNimbleTasks()
     #TODO update tasks here
       # provideNimbleTasksDecorations(ctx, vscode.window.activeTextEditor.document)
   )
   ctx.subscriptions.add(nimbleWatcher)
-  initializeTests(ctx, nimUtils.ext)
+  # initializeTests(ctx, nimUtils.ext)
 
 proc deactivate*(): void {.async.} =
   await stopLanguageServer(nimUtils.ext)

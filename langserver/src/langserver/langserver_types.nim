@@ -3,9 +3,10 @@ import chronos
 import chronos/[asyncproc, threadsync]
 import json_rpc/servers/socketserver
 
+import forest
+
 import ../protocol/types
 import ../configurations/configuration_types
-import ../nimble/nimble_types
 import ../nimsuggest/nimsuggest_types
 import ../configurations/configuration_types
 import ./[query_types]
@@ -13,13 +14,9 @@ import ./[query_types]
 type
   CommandLineParams* = object
     clientProcessId*: Option[int]
-    mode*: Option[ServerMode]
+    # mode*: Option[ServerMode]
     transport*: Option[TransportMode]
     port*: Port #only for sockets
-
-  ServerMode* = enum
-    lsp = "lsp"
-    mcp = "mcp"
 
   TransportMode* = enum
     stdio = "stdio"
@@ -49,18 +46,11 @@ type
   LspDispatchItem* = object
     dispatch*: proc(): Future[void] {.gcsafe, raises: [].}
 
-
 type
   LanguageServerCapabilities* = object
-    case serverMode*: ServerMode
-    of lsp:
-      lspClientCapabilities*: LspClientCapabilities
-      lspServerCapabilities*: LspServerCapabilities
-      lspInitializeParams*: LspInitializeParams
-    of mcp:
-      mcpClientCapabilities*: McpClientCapabilities
-      mcpServerCapabilities*: McpServerCapabilities
-      mcpInitializeParams*: McpInitializeParams
+    lspClientCapabilities*: LspClientCapabilities
+    lspServerCapabilities*: LspServerCapabilities
+    lspInitializeParams*: LspInitializeParams
     extensionCapabilities*: set[LspExtensionCapability]
 
 type
@@ -77,8 +67,8 @@ type
     pendingRequests*: Table[uint, PendingRequest]
     responseMap*: TableRef[string, Future[JsonNode]]
     responseNames*: TableRef[string, string]
-      ## Parallel to responseMap: maps request-id → RPC method name.
-      ## Used to include the method name in "id not found" error logs.
+    ## Parallel to responseMap: maps request-id → RPC method name.
+    ## Used to include the method name in "id not found" error logs.
     inlayHintsRefreshRequest*: Future[JsonNode]
     projectErrors*: seq[ProjectError]
     lastStatusSent*: JsonNode
@@ -103,6 +93,7 @@ type
     capabilities*: LanguageServerCapabilities
     configurations*: LanguageServerConfigurations
     transport*: LanguageServerTransport
+    dependencies*: Forest
     files*: LanguageServerFiles
     pool*: NimsuggestPool
     messaging*: LanguageServerMessaging
@@ -116,8 +107,9 @@ type
     cmdLineClientProcessId*: Option[int]
 
     isShutdown*: bool
-    nimDumpCache*: Table[string, NimbleDumpInfo]
     lsInitialized*: Future[void]
+    
+    # nimbleDumpCache*: Table[FilePathAbs, NimbleDumpInfo]
     ## Completed after initNimsuggestInstances finishes (config + nimble dump + entry-point spawns).
     ## DID_OPEN polls this before the spawn path so files are routed to the correct
     ## pre-spawned entry-point slot rather than spawning nimsuggest using themselves.

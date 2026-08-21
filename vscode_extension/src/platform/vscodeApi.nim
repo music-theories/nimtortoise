@@ -874,6 +874,10 @@ proc getStr*(
   c: VscodeWorkspaceConfiguration, section: cstring
 ): cstring {.importcpp: "#.get(@)".}
 
+proc update*(
+  c: VscodeWorkspaceConfiguration, section: cstring, value: cstring
+): Future[void] {.importcpp.}
+
 proc getStrArray*(
   c: VscodeWorkspaceConfiguration, section: cstring
 ): Array[cstring] {.importcpp: "#.get(@)".}

@@ -124,6 +124,7 @@ type
   LSPInstallPathKind* = enum
     lspPathSetting, lspPathLocal, lspPathGlobal, lspPathInvalid
 
+  #TODO!!!
   LspExtensionCapability* = enum #List of extensions the lsp server support.
     excNone = "None"
     excRestartSuggest = "RestartSuggest"

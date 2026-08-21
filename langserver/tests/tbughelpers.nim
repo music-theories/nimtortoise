@@ -4,7 +4,6 @@ import std/[os, json, options]
 import chronos
 
 import ./fixhelpers
-export fixhelpers
 
 # rootUri = tests/projects, so tryRelativeTo strips that prefix.
 # Regexes are relative to that root.

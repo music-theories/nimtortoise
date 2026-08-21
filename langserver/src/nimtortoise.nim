@@ -3,12 +3,20 @@ import json_rpc/[servers/socketserver, private/jrpc_sys, jsonmarshal, rpcclient,
 import chronicles, chronos
 import ./configurations/configurations
 import ./nimsuggest/nimsuggest
-import ./langserver/[langserver, langserver_types, transports, dispatcher]
+import ./langserver/langserver
 import ./utils/process_utils
 import ./handlers/handlers as lsp
-import ./utils/utils as globalUtils
+import ./utils/utils
 import ./utils/asyncprocmonitor
-import ./protocol/types
+import ./protocol/[types, enums]
+
+export 
+  configurations,
+  nimsuggest,
+  langserver,
+  process_utils,
+  utils,
+  types, enums
 
 when defined(posix):
   import posix
@@ -19,7 +27,7 @@ proc registerMcpRoutes(srv: RpcSocketServer, ls: LanguageServer) =
 
 proc registerLspRoutes(srv: RpcSocketServer, ls: LanguageServer) =
   srv.register(
-    "initialize", wrapRpc(partial(lsp.initialize, (ls: ls, onExit: ls.onExit)))
+    "initialize", wrapRpc(partial(initialize, (ls: ls, onExit: ls.onExit)))
   ) #use from ls
   srv.register(
     "textDocument/completion",
@@ -83,14 +91,16 @@ proc registerLspRoutes(srv: RpcSocketServer, ls: LanguageServer) =
     "extension/capabilities", wrapRpc(partial(lsp.extensionCapabilities, ls))
   )
   srv.register("extension/suggest", wrapRpc(partial(lsp.extensionSuggest, ls)))
+  srv.register("extension/listTasks", wrapRpc(partial(lsp.listTasks, ls)))
   srv.register("extension/tasks", wrapRpc(partial(lsp.tasks, ls)))
   srv.register("extension/runTask", wrapRpc(partial(lsp.runTask, ls)))
-  srv.register("extension/listTests", wrapRpc(partial(lsp.listTests, ls)))
-  srv.register("extension/runTests", wrapRpc(partial(lsp.runTests, ls)))
-  srv.register("extension/cancelTest", wrapRpc(partial(lsp.cancelTest, ls)))
+  # TESTS REMOVED
+  # srv.register("extension/listTests", wrapRpc(partial(lsp.listTests, ls)))
+  # srv.register("extension/runTests", wrapRpc(partial(lsp.runTests, ls)))
+  # srv.register("extension/cancelTest", wrapRpc(partial(lsp.cancelTest, ls)))
   #Notifications
   srv.register("$/cancelRequest", wrapRpc(partial(lsp.cancelRequest, ls)))
-  srv.register("initialized", wrapRpc(partial(lsp.initialized, ls)))
+  srv.register("initialized", wrapRpc(partial(initialized, ls)))
   srv.register("textDocument/didOpen", wrapRpc(partial(lsp.didOpen, ls)))
   srv.register("textDocument/didSave", wrapRpc(partial(lsp.didSave, ls)))
   srv.register("textDocument/didClose", wrapRpc(partial(lsp.didClose, ls)))
@@ -158,10 +168,10 @@ proc handleParams(): CommandLineParams =
       except ValueError:
         stderr.writeLine("Invalid client process ID: ", pidStr)
         quit 1
-    if param == "--lsp":
-      result.mode = some ServerMode.lsp
-    if param == "--mcp":
-      result.mode = some ServerMode.mcp
+    # if param == "--lsp":
+    #   result.mode = some ServerMode.lsp
+    # if param == "--mcp":
+    #   result.mode = some ServerMode.mcp
     if param == "--stdio":
       result.transport = some TransportMode.stdio
     if param == "--socket":
@@ -180,8 +190,8 @@ proc handleParams(): CommandLineParams =
     if result.port == default(Port):
       result.port = getNextFreePort()
     echo &"port={result.port}"
-  if result.mode.isNone:
-    result.mode = some ServerMode.lsp
+  # if result.mode.isNone:
+  #   result.mode = some ServerMode.lsp
   if result.transport.isNone:
     result.transport = some TransportMode.stdio
 
@@ -193,7 +203,7 @@ proc registerProcMonitor(ls: LanguageServer) =
     proc onCmdLineClientProcessExitAsync(): Future[void] {.async.} =
       debug "onCmdLineClientProcessExitAsync"
 
-      await ls.pool.stopNimsuggestProcesses()
+      await ls.pool.stopAllNimsuggestSlotsInPool()
       waitFor ls.onExit()
 
     proc onCmdLineClientProcessExit() {.closure.} =
@@ -222,18 +232,20 @@ proc main*(cmdLineParams: CommandLineParams): LanguageServer =
   ]#
 
   let startupProgressToken = "startupMessage"
-  result = initLanguageServer(cmdLineParams, ensureStorageDir())
+  result = initLanguageServer(
+    cmdLineParams, ensureStorageDir()
+  )
   case result.transport.transportMode
   of stdio:
     result.startStdioServer()
   of socket:
     result.startSocketServer(cmdLineParams.port)
 
-  case result.capabilities.serverMode
-  of lsp:
-    result.transport.srv.registerLspRoutes(result)
-  of mcp:
-    result.transport.srv.registerMcpRoutes(result)
+  # case result.capabilities.serverMode
+  # of lsp:
+  result.transport.srv.registerLspRoutes(result)
+  # of mcp:
+  #   result.transport.srv.registerMcpRoutes(result)
 
   result.registerProcMonitor()
 
@@ -248,10 +260,19 @@ when isMainModule:
     when defined(posix):
       onSignal(SIGINT, SIGTERM, SIGHUP, SIGQUIT, SIGPIPE):
         debug "Terminated via signal", sig
-        ls.pool.stopNimsuggestProcessesP()
+        ls.pool.stopAllNimsuggestSlotsInPoolP()
         exitnow(1)
     runForever()
   except Exception as e:
     error "Error in main"
     writeStackTrace e
     quit(1)
+
+
+# let kinder = SpecialKind.GOODBYE
+
+# proc hereIsAnotherThingThatIam(): bool = 
+#   return true
+
+# let somethingElse: bool = hereIsAnotherThingThatIam()
+

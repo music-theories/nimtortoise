@@ -1,9 +1,11 @@
-import std/[json, sets, tables, times]
+import std/[json, sets, tables, times, options]
 import chronos
+import chronos/asyncproc
+import regex
 import ./suggestapi_types
 import ../protocol/types
 import ../utils/utils as globalUtils
-export FileUri, FilePath
+export FileUri, FilePathAbs, FilePathRel, DirPathAbs, DirPathRel
 
 # === NIMSUGGEST QUERIES ===
 # LSP File Position
@@ -39,12 +41,13 @@ type
     CHECK_PROJECT      ## chk     — full project diagnostics
     RECOMPILE          ## recompile — force full in-process recompile
     KNOWN              ## known     — is this file in the module graph?
+    SHUTDOWN           ## sentinel  — drains remaining queries, shuts down process, exits loop
 
   NimsuggestQuery*[P] = ref object
     id*: uint
     uri*: FileUri
       ## Source URI. Used to resolve the on-disk path and stash path.
-    dirtyFile*: FilePath
+    dirtyFile*: FilePathAbs
       ## Stash path when openFiles[uri].changed is true, else "".
     responseFuture*: Future[seq[Suggest]]
       ## Completed by the query processor when nimsuggest replies.
@@ -67,12 +70,16 @@ type
       expand*: tuple[position: P, tag: string]
     of NimsuggestQueryKind.DOCUMENT_SYMBOLS,
       NimsuggestQueryKind.WORKSPACE_SYMBOLS,
-      NimsuggestQueryKind.CHECK_FILE,
       NimsuggestQueryKind.CHECK_PROJECT,
       NimsuggestQueryKind.RECOMPILE,
       NimsuggestQueryKind.KNOWN:
       discard
-    of NimsuggestQueryKind.CHANGED:
+    of NimsuggestQueryKind.SHUTDOWN:
+      shutdownFuture*: Future[void]
+        ## Completed by processNimsuggestQueries after shutdownChildProcess returns.
+        ## execStop awaits this to know the OS process is confirmed dead.
+    of NimsuggestQueryKind.CHECK_FILE, NimsuggestQueryKind.CHANGED:
+      isDependency*: bool
       saved*: bool
 
 # === NIMSUGGEST SLOT TYPES ====
@@ -84,26 +91,55 @@ type
     STOPPING  ## STOP running; queries return @[].
     CRASHED   ## Process exited unexpectedly; RESTART queued by processor.
 
+##[
+Realize that there are three types of file:
+- the entry point file
+- the working directory nimsuggest is running from
+- The base nimble project.
+
+e.g.
+in `langserver`:
+if I have opened a file in the `tests` folder:
+- file I'm working on: langserver/tests/textensions.nim
+- entry point: langserver/tests/all.nim
+- workingDirectory: langserver/tests
+- base nimble project folder: langserver (langserver/nimtortoise.nimble)
+]##
+
+type
   NimsuggestSlot* = ref object
     state*: SlotState
-    projectFile*: FilePath # Entry-point .nim path. Stable across restarts. Key in pool.slots.
-    workingDir*: string  # Working directory passed to nimsuggest at spawn time. Stable across restarts.
+    # entryFile*: FilePath # Entry-point .nim path. 
+    spawnInfo*: NimsuggestSpawnInfo
+    # projectFile*: FilePathAbs # Entry-point .nim path. Stable across restarts. Key in pool.slots.
+    # workingDir*: DirPathAbs   # Working directory passed to nimsuggest at spawn time. Stable across restarts.
+    # nimblePaths*: seq[string]
+      ## A list of flags from any relevant nimble.paths files.   These are passed to nimsuggest when it runs.  I wonder if these should be part of the nimbleDumpCache?
+      ## isEntryPoint*: bool
+      ## Discovered via nimble dump during `initialized`.
     ownedUris*: HashSet[FileUri]
       ## The single source of truth for which URIs this slot serves.
+    crashedUris*: HashSet[FileUri]
+      ## URIs that caused a SIGSEGV in this slot's process.
     ns*: Future[NimSuggest]
       ## pending = SPAWNING, completed = READY, failed = CRASHED.
       ## SlotState is the sole lifecycle authority; ns is the async handle.
+    spawnProcess*: Option[AsyncProcessRef]
+      ## Set immediately after startProcess forks the OS process, before the
+      ## port is read.  Allows stopNimsuggestSlot to kill a SPAWNING slot
+      ## (e.g. nimsuggest stuck in a CPU loop) by sending SIGKILL to its
+      ## process group before the 120 s port-read timeout expires.
     queryMailbox*: AsyncQueue[NimsuggestQuery[LspFilePosition]]
       ## IDE query commands. processQueries dequeues and dispatches to TCP.
     lastCmdTime*: DateTime
       ## Updated after each successful query. Drives LRU eviction policy.
-    isEntryPoint*: bool
-      ## Discovered via nimble dump during `initialized`.
     crashCount*: int
       ## Incremented on unhandled exit. Reset to 0 on successful init.
-    crashedUris*: HashSet[FileUri]
-      ## URIs that caused a SIGSEGV in this slot's process.
-      ## Cleared by RESTART (explicit user action = clean slate).
+
+type
+  ProjectMapping* = object
+    projectFile*: FilePathAbs
+    fileRegex: Regex2
 
 # === NIMSUGGEST POOL TYPES ===
 type
@@ -111,12 +147,13 @@ type
   StatusChangedProc* = proc() {.gcsafe, raises: [].}
 
   NimsuggestPool* = ref object
-    slots*: Table[FilePath, NimsuggestSlot]
+    slots*: Table[FilePathAbs, NimsuggestSlot]
+    crashedSlots*: HashSet[FilePathAbs]
+      ## Module entry points that failed (timed out or crashed) during background
+      ## spawn this session. Background spawn is skipped for these until the user
+      ## saves a file in the project, which clears the entry from this set.
     maxSlots*: int
-    fileCheckDelay*: times.Duration # int   ## Quiet-period threshold in ms before per-file diagnostics run. Set in initNimsuggestInstances.
-    nimsuggestPath*: string  ## Path to nimsuggest binary. Set in initNimsuggestInstances.
-    nimVersion*: string      ## Nim version string for logging.
-    # timeout*: int            ## Per-request timeout in ms.
+    nimsuggest*: NimsuggestSettings
     notifyProc*: NotifyProc
       ## Sends a JSON-RPC notification to the client (e.g. window/showMessage).
       ## Set by initLanguageServer. May be nil — check before calling.
@@ -124,13 +161,8 @@ type
       ## Called when a slot transitions to READY or is removed.
       ## Triggers extension/statusUpdate. Set by initLanguageServer. May be nil.
 
-
 type
   NlsFileInfo* = ref object of RootObj
-    slot*: NimsuggestSlot
-      ## The pool slot responsible for this file. Assigned in addFileToOpenFiles.
-      ## Always non-nil for any file present in ls.files.openFiles.
-    # changed*: bool
     fingerTable*: seq[seq[tuple[u16pos, offset: int]]]
     lastChanged*: DateTime
       ## Updated on every DID_CHANGE.
@@ -141,8 +173,6 @@ type
 
 type
   LanguageServerFiles* = object
-    openFiles*: TableRef[FileUri, NlsFileInfo]
-    idleOpenFiles*: TableRef[FileUri, NlsFileInfo]
-    filesWithDiags*: HashSet[FilePath]
-    storageDir*: string
-  
+    openFiles*:   TableRef[FileUri, NlsFileInfo]
+    storageDir*:  DirPathAbs
+    rootPath*:    DirPathAbs

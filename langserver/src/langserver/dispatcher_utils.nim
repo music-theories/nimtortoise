@@ -1,10 +1,11 @@
-import std/[options, os, sets, tables, algorithm, sequtils, strutils, times]
+import std/[options, tables, algorithm, sequtils, times, sets]
 import chronos
 import chronicles
-import regex
-import ../nimsuggest/[suggestapi_types, nimsuggest_types, nimsuggest_slots]
+import forest
+
+import ../nimsuggest/[suggestapi_types, nimsuggest_types, nimsuggest_utils]
 import ../protocol/types
-import ./[langserver_types, langserver_utils]
+import ./[langserver_types]
 import ../utils/utils
 
 
@@ -25,7 +26,7 @@ proc checkNimsuggestSlotKnowsURI(slot: NimsuggestSlot, uri: FileUri): Future[Opt
         id: 0.uint,
         kind: NimsuggestQueryKind.KNOWN,
         uri: uri,
-        dirtyFile: FilePath(""),
+        dirtyFile: FilePathAbs(""),
         responseFuture: newFuture[seq[Suggest]]("known"),
       )
       slot.queryMailbox.addLastNoWait(knownQuery)
@@ -44,7 +45,7 @@ proc checkNimsuggestSlotKnowsURI(slot: NimsuggestSlot, uri: FileUri): Future[Opt
       id: 0.uint,
       kind: NimsuggestQueryKind.KNOWN,
       uri: uri,
-      dirtyFile: FilePath(""),
+      dirtyFile: FilePathAbs(""),
       responseFuture: newFuture[seq[Suggest]]("known"),
     )
     slot.queryMailbox.addLastNoWait(knownQuery)
@@ -56,7 +57,6 @@ proc checkNimsuggestSlotKnowsURI(slot: NimsuggestSlot, uri: FileUri): Future[Opt
       return none(NimsuggestSlot)
   of SlotState.STOPPED, SlotState.STOPPING, SlotState.CRASHED:
     return none(NimsuggestSlot)
-
 
 proc isKnownByANimsuggestSlot*(pool: NimsuggestPool, uri: FileUri): Future[Option[NimsuggestSlot]] {.async.} =
   var futures: seq[Future[Option[NimsuggestSlot]]]
@@ -71,7 +71,7 @@ proc isKnownByANimsuggestSlot*(pool: NimsuggestPool, uri: FileUri): Future[Optio
     if res.isSome:
       possibleNimsuggestSlots.add(res.get())
 
-  possibleNimsuggestSlots.sort(proc(a, b: NimsuggestSlot): int = cmp(string(a.projectFile), string(b.projectFile)))
+  possibleNimsuggestSlots.sort(proc(a, b: NimsuggestSlot): int = cmp(string(a.spawnInfo.entryPoint), string(b.spawnInfo.entryPoint)))
 
   if possibleNimsuggestSlots.len > 0:
     return some(possibleNimsuggestSlots[0])
@@ -83,43 +83,12 @@ proc addFileToOpenFiles*(
   nimsuggestSlot: NimsuggestSlot,
   params: TextDocumentItem
 ) = 
-  # Write the initial stash file
-  let storagePath = ls.uriStorageLocation(params.uri)
-  try:
-    writeFile(string(storagePath), params.text)
-  except IOError as ex:
-    warn "Failed to write stash file; hover/completion may show stale content",
-      path = string(storagePath), msg = ex.msg
-  except OSError as ex:
-    warn "Failed to write stash file; hover/completion may show stale content",
-      path = string(storagePath), msg = ex.msg
-
-  # Build finger table for UTF-16 mapping
-  var fingerTable: seq[seq[tuple[u16pos, offset: int]]] = @[]
-  for line in params.text.splitLines:
-    fingerTable.add(line.createUTFMapping())
-
-  # Register in the file table (sync, atomic)
-  let fileInfo = NlsFileInfo(
-    slot: nimsuggestSlot,
-    # changed: true,
-    fingerTable: fingerTable,
-    textDocument: params,
-    lastChanged: times.now(),
-    lastChecked: times.now(),
+  let writtenStashFile = writeStashFile(
+    ls.files.storageDir, params.uri, params.text
   )
+  let fileInfo = initNlsFileInfo(params)
+  nimsuggestSlot.ownedUris.incl(params.uri)
   ls.files.openFiles[params.uri] = fileInfo
-
-  if params.uri in ls.files.idleOpenFiles:
-    ls.files.idleOpenFiles.del(params.uri)
-
-  # Register ownership in the slot (sync, atomic with above)
-  nimsuggestSlot.assignUri(params.uri)
-  # Also sync the live NimSuggest's openFiles set so getLspStatus displays correctly.
-  # execSpawn copies ownedUris → ns.openFiles at spawn time, but files opened on an
-  # already-READY slot are not reached by that path.
-  if nimsuggestSlot.state == SlotState.READY:
-    nimsuggestSlot.ns.read.openFiles.incl(params.uri)
 
 proc sortNimsuggestByDate(a, b: NimsuggestSlot): int = 
   if a.lastCmdTime == b.lastCmdTime:
@@ -152,67 +121,57 @@ proc nimsuggestSlotToEvict*(pool: NimsuggestPool): NimsuggestSlot =
   ## Within each tier, the least recently used slot is chosen.
   ## Precondition: pool has at least one slot.
   assert pool.slots.len > 0, "nimsuggestSlotToEvict called on empty pool"
+  var allCandidates: seq[NimsuggestSlot] = @[]
 
-  for state in [SlotState.STOPPED, SlotState.CRASHED, SlotState.STOPPING, SlotState.READY, SlotState.SPAWNING]:
-    var candidates: seq[NimsuggestSlot]
-    for slot in pool.slots.values:
-      if slot.state == state:
-        candidates.add(slot)
-    if candidates.len > 0:
-      return lruAmong(candidates)
+  ## First check STOPPED
+  var stoppedCandidates: seq[NimsuggestSlot] = @[]
+  for slot in pool.slots.values:
+    if slot.state == SlotState.STOPPED or slot.state == SlotState.STOPPING:
+      stoppedCandidates.add(slot)
+      allCandidates.add(slot)
 
-  # Unreachable if precondition holds, but satisfies the compiler.
-  raiseAssert "nimsuggestSlotToEvict: pool has slots but none matched any state"
-
-
-proc queryFile*(ls: LanguageServer, uri: FileUri, kind: NimsuggestQueryKind): Future[seq[Suggest]] =
-  ## Creates a NimsuggestQuery and enqueues it on the owning slot's query mailbox.
-  ## Returns a Future completed by processQueries when nimsuggest responds.
-  result = newFuture[seq[Suggest]]("queryFile")
-  let fileInfo = ls.files.openFiles.getOrDefault(uri)
-  if fileInfo == nil:
-    result.complete(@[])
-    return
-  let dirtyFile = ls.uriToStash(uri)
+  if stoppedCandidates.len > 0:
+    return lruAmong(stoppedCandidates)
   
-  fileInfo.slot.queryMailbox.addLastNoWait(NimsuggestQuery[LspFilePosition](
-    kind: kind,
-    uri: uri,
-    dirtyFile: dirtyFile,
-    responseFuture: result,
-  ))
+  # Then check CRASHED
+  var crashedCandidates: seq[NimsuggestSlot] = @[]
+  for slot in pool.slots.values:
+    if slot.state == SlotState.CRASHED:
+      crashedCandidates.add(slot)
+      allCandidates.add(slot)
 
-var compiledRegexCache {.threadvar.}: Table[string, Regex2]
+  if crashedCandidates.len > 0:
+    return lruAmong(crashedCandidates)
 
-proc getCompiledRegex(pattern: string): Regex2 =
-  ## Returns a cached compiled Regex2 for pattern, compiling it on first use.
-  ## Chronos is single-threaded cooperative, so no locking is needed.
-  if pattern notin compiledRegexCache:
-    compiledRegexCache[pattern] = re2(pattern)
-  compiledRegexCache[pattern]
+  # Then check READY slots 
+  var readyButEmptyCandidates: seq[NimsuggestSlot] = @[]
+  var readyButFullCandidates: seq[NimsuggestSlot] = @[]
+  for slot in pool.slots.values:
+    if slot.state == SlotState.READY:
+      if slot.ownedUris.len == 0:
+        readyButEmptyCandidates.add(slot)
+      else:
+        readyButFullCandidates.add(slot)
+      allCandidates.add(slot)
+  
+  # Prefer READY slots with no owned URIs...
+  if readyButEmptyCandidates.len > 0:
+    return lruAmong(readyButEmptyCandidates)
 
-proc clearCompiledRegexCache*() =
-  ## Invalidate the regex cache. Call after workspace configuration changes so
-  ## that stale projectMapping patterns are not reused across config updates.
-  compiledRegexCache.clear()
+  # ... then those that do own URIs...
+  if readyButFullCandidates.len > 0:
+    return lruAmong(readyButFullCandidates)
 
-proc getIntendedProject*(ls: LanguageServer, uri: FileUri): FilePath =
-  ## ProjectMapping regex lookup only. No slot creation, no LRU fallback.
-  ## Returns FilePath("") if no mapping matches.
-  let path = uri.uriToPath
-  let rootPath =
-    case ls.capabilities.serverMode
-    of lsp: ls.capabilities.lspInitializeParams.getRootPath
-    of mcp: ls.capabilities.mcpInitializeParams.getRootPath
-  let pathRelativeToRoot = string(path).tryRelativeTo(rootPath)
-  let config = ls.configurations.currentConfig
-  for mapping in config.projectMapping:
-    var m: RegexMatch2
-    if find(string(path), getCompiledRegex(mapping.fileRegex), m):
-      if mapping.projectFile == "":
-        return path  # regex matched but no projectFile — file is its own project
-      return FilePath(
-        if isAbsolute(mapping.projectFile): mapping.projectFile
-        else: rootPath / mapping.projectFile
-      )
-  return FilePath("")
+  # Then finally, SPAWNING slots (we gotta give them a chance!!!)
+  var spawningCandidates: seq[NimsuggestSlot] = @[]
+  for slot in pool.slots.values:
+    if slot.state == SlotState.SPAWNING:
+      spawningCandidates.add(slot)
+      allCandidates.add(slot)
+
+  if spawningCandidates.len > 0:
+    return lruAmong(spawningCandidates)
+  
+  return lruAmong(allCandidates)
+  # Unreachable if precondition holds, but satisfies the compiler.
+  # raiseAssert "nimsuggestSlotToEvict: pool has slots but none matched any state"

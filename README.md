@@ -24,8 +24,9 @@ A fork and rewrite of [`nimlangserver`](https://github.com/nim-lang/langserver) 
 |-----------|------------|
 | [`langserver/`](langserver/) | The Nim language server — a ground-up rewrite of `nimlangserver` |
 | [`vscode_extension/`](vscode_extension/) | The VS Code extension — an LSP-only fork of `vscode-nim` |
+| [`forest/`](forest/) | A Nim library for building dependency graphs across Nim projects. Used by `langserver`.  This also contains a collection of markdown files documenting the workings, quirks and idiosyncracies of the nim ecosystem that I discovered while rewriting the language server.  Maybe useful if you are attempting a similar type of project to this. |
 
-The two components are designed to work together but are independent. The language server speaks standard LSP and will work with any LSP-capable editor.
+The language server and VS Code Extension are designed to work together but are independent. The language server speaks standard LSP and will work with any LSP-capable editor.
 
 You should be able to use `nimtortoise` as a drop-in replacement for `nimlangserver`, but I would recommend using the VS Code extension, as it removes many inefficiencies.  Note: The extension is written in Nim and compiled to JavaScript. It is not a TypeScript extension.
 
@@ -106,9 +107,131 @@ I am now using this tool daily and I hope it is helpful for other `nim` users.
 
 ---
 
+## v0.2.0
+
+### `projectMapping` is no longer required
+
+You no longer need to use `projectMapping` in `settings.json` to get the language server to JSON to tell the language server which nimsuggest process should handle which file.  Instead, at launch, the server finds every nimble file in the folder and gets the appropriate `entryPoints`, `testEntryPoints` and `<srcDir>+<bin>` entryPoints used by `nimble` when it runs.  When a file is opened, entry point with the longest common path prefix to the opened file is selected — with a graceful fallback to the file itself if it turns out to be an "orphan" file not reachable from any entry point.
+
+Previously, getting correct diagnostics in a multi-entry-point project required a manual `projectMapping` block in `.vscode/settings.json` that listed regex patterns mapping file paths to their project entry point. No more!
+
+The `projectMapping` and `workingDirectoryMapping` settings have been removed entirely.
+
+### Forest: a new dependency tree library
+
+The automatic entry point discovery is powered by a new standalone library, `forest/`, that builds a complete import graph for a Nim project by combining `nim dump` and `nimble dump` metadata. On a 100,000-line codebase it completes in under one second.
+
+The Forest is now used in two places:
+
+- **Entry point selection** — routing each opened file to the correct nimsuggest slot (the fix for the missing diagnostics bug described below).
+- **Transitive dependency updates** — when a file is saved, the server queries the Forest for every file that imports the saved file (directly or transitively) and sends re-check requests for all of them. Previously, only the directly importing files were updated; indirect dependents would continue to show stale diagnostics until the session was restarted.
+
+The library ships with a comprehensive reference document (`forest/README.md`) covering every Nim project file type (`.nim`, `.nimble`, `nimble.paths`, `nimble.lock`, `nimble.develop`, `config.nims`, `.nims`, `nim.cfg`), how they relate to each other, and how the compiler resolves them.
+
+## Fix: Updating dependencies
+
+`Forest` has allowed a major set of bugs to be fixed that result from a particular `nimsuggest` quirk.  One problem I repeatedly encountered was as follows.  
+
+Let's say I have `file_a.nim` with the following type:
+
+```nim
+# file_a.nim
+type
+    SpecialType* = object
+        magical*: string
+```
+
+And I have `file_b.nim` that imports `file_a.nim` and uses its type:
+
+```nim
+# file_b.nim
+import ./file_a.nim
+let aVariableThatUsesAType = SpecialType(magical: "always")
+```
+
+And these both live in the same folder, and I have both of them open in a IDE, next to each other, editing them and looking at the diagnostics I receive back from the language server.  In the current state, there will be no errors.  But then, let's say, I change the type in `file_a.nim`, so that now `file_b.nim`'s usage of it is incompatible:
+
+```nim
+# file_a.nim
+type
+    SpecialType* = object
+        magical*: int
+```
+
+The language server should give diagnostics to `file_b.nim` with a little red squiggly line and informing the user about a type incompatibility.  And it will - as long as `file_b.nim` directly imports `file_a.nim`.  
+
+Now, when you change a file, you need to send a `changed` message to `nimsuggest` to tell it to update its knowledge of this file within its stored module graph.  The command looks like:
+
+```
+changed "/abs/path/to/file.nim";"/abs/path/to/dirtyfile.nim":0:0
+```
+
+When you send a `changed` message for `file_a.nim`, nimsuggest does mark `file_b.nim` as dirty — but only because `file_b.nim` directly imports `file_a.nim`. The propagation stops at one hop. So in the two-file case, this works correctly.
+
+The problem arises with an intermediate file in the chain. Say we introduce `file_c.nim`:
+
+```nim
+# file_c.nim
+import ./file_a.nim
+export file_a
+```
+
+```nim
+# file_b.nim
+import ./file_c.nim
+let aVariableThatUsesAType = SpecialType(magical: "always")
+```
+
+Now, if `file_c.nim` is closed (not being edited), and I change `file_a.nim` so that `magical` becomes `int`, nimsuggest receives `changed file_a` and marks `file_c` dirty — but stops there. `file_b.nim` is two hops away and is never marked dirty. Asking nimsuggest to check `file_b.nim` returns no errors, because it sees a clean cached result.
+
+The fix is to walk the import chain and send a sequence of `chkFile` commands — not extra `changed` messages. Sending `changed` only marks a file dirty and clears its stored errors; it does not recompile. What actually triggers error propagation is recompilation, which happens when `chkFile` is called on a dirty file. Each `chkFile` recompiles that file and then marks its own direct importers dirty, setting up the next step:
+
+1. `chkFile file_a ; stash_a` — recompiles `file_a` from the stash; marks `file_c` dirty
+2. `chkFile file_c ; ""` — `file_c` is now dirty; recompiles it; marks `file_b` dirty
+3. `chkFile file_b ; stash_b` — `file_b` is now dirty; recompiles it; error found
+
+This langserver uses `forest` to find the intermediate files between the changed file and each open dependent, then queues this cascade of `chkFile` commands automatically whenever a file is edited.
+
+### Performance Settinga
+
+Because the language server is having to send more requests to `nimsuggest` this has created an increase in CPU usage.  In order to combat this, there is a new `performance` selector, found in the `Nim Tortoise` settings in VS Code.  Choose between `HIGHEST`, `HIGH`, `LOW` and `LOWEST` - each of which uses a different mix of request throttling and choosing when to save so you can better regulate where and when to allocate resources.  The `HIGHEST` setting checks and gives diagnostics back for any open dependencies on any change, meaning that this setting can be quite intensive.  `HIGH` is similar, but increases the amount of request throttling from a window of 250ms out to 1 second.  `LOW` also uses the same 1 second window, but will only update open files which are the dependencies of each other upon the user saving.  And `LOWEST` also uses the "only update dependencies upon saving" approach, but with a much larger request throttling window of 5 seconds.
+
+### Missing diagnostics bug — fixed
+
+In the previous release, diagnostics (errors, warnings, hints) were silently dropped for large numbers of files because each file was being routed to the wrong nimsuggest slot. The entry point selection logic used simple string heuristics that failed for projects with multiple entry points or non-standard directory layouts.
+
+### Four queuing and dispatch bugs fixed
+
+1. **Dead-slot query accumulation** — previously, `STOPPED` or `CRASHED` `nimsuggest` slots could still have messsages sent to them, creating futures that would never complete. It now returns immediately with an empty result for dead slots.
+2. **`DID_CLOSE` deadlock** — previously, if a `nimsuggest` slot had stopped, the  close handler was awaiting a `CHECK_FILE` that could block indefinitely. `DID_CLOSE` is now fire-and-forget.
+3. **Crash respawn loop** — previously, a freshly respawned `nimsuggest` slot could hang indefinitely because of `attemptCrashRespawn`.
+4. **`DID_CHANGE` slot state check** — the change handler was enqueuing work without checking slot state first. Stopped or crashed slots now receive an immediate empty completion instead of accumulating orphaned futures.
+
+### Other fixes
+
+- **Timeout bug** — a timed-out nimsuggest query could leave the slot in an inconsistent state, causing all subsequent queries to that slot to also time out.
+- **Multiline comment autocomplete** — fixed incorrect closing token insertion when the cursor was inside a multiline comment block.
+- **Accidental restarts from configuration updates** — the server was restarting the full nimsuggest pool on every `workspace/didChangeConfiguration` notification, even when the incoming values were identical to what was already configured. An `isDifferentFrom()` comparison now suppresses no-op restarts.
+- **Stash not cleared on save** — `DID_SAVE` now correctly tells nimsuggest to stop reading from the temporary stash file and revert to the on-disk version. Previously, hover and diagnostics after a save continued to show pre-save buffer content until the session was restarted.
+- **Gensym and `:anonymous` highlights** — compiler-internal symbol names (`:anonymous`, `:result`, `:tmp`, backtick-suffixed gensyms from macro expansion) were causing highlights to be the wrong length and misaligned.  These names are now filtered or cleaned up before being passed to the client.
+
+### Other additions
+
+- **More readable type mismatch messages for procs** — a new formatter (`utils/type_mismatch_format.nim`) decomposes complex type mismatch errors for `proc`s into readable parameter-by-parameter lists, handling nested generics, optional types, and parameters with default values.
+- **Dependency checking at startup** — the server now verifies, at startup and on each file open, that a file is actually reachable from its project entry point. Orphaned files (not imported by anything) are flagged and handled gracefully rather than causing silent failures downstream.
+- **Formalised extension protocol** — extension capabilities (`RestartSuggest`, `NimbleTask`, `RunTests`) and nimsuggest capabilities (`con`, `exceptionInlayHints`, `unknownFile`) are now defined in `protocol/extensions.nim` rather than scattered as magic strings.
+- **`.vscode/settings.json` namespace** — all settings entries have been switched from the `nim.` prefix to `nimTortoise.` to prevent conflicts when `nimlangserver` or `vscode-nim` are also installed.
+- Internal refactoring (81 files changed).  Including splitting the single 1,198-line `protocol/types.nim` into seven focused modules, extracting LSP handlers into per-domain modules and creating separate dispatcher files for `textDocument/didOpen` and `textDocument/didChange`.
+
+### Removal of Exception Inlay Hints
+
+During writing this version, I discovered a bug where, on certain types of files (maybe ones with an extensive use of generics, templates and/or macros - it's unclear to me...), passing the flag `--exceptionInlayHints:on` to nimsuggest will cause it to catastrophically spiral into an infinite loop that eats up 100% CPU and never terminates.  For this reason, this setting is always set to OFF and can never be toggled on.  For simpler types of files, this setting also seems to contribute to much longer startup times.  
+
+---
+
 ## Problems
 
-What follows is a documented catalogue of the problems in the original `nimlangserver` + `vscode-nim` combination that the rewrite is designed to fix.
+What follows is a catalogue of the problems in the original `nimlangserver` + `vscode-nim` combination that the rewrite is designed to fix.
 
 ### The extension/server split
 
@@ -125,6 +248,10 @@ In practice this meant:
 Nimsuggest was spawned from the `initialize` handler, before any workspace configuration had been requested from the client. This meant `projectMapping`, `maxNimsuggestProcesses`, and all other routing rules were empty at spawn time. Processes were started with default settings and the configuration that arrived later was ignored or only partially applied.
 
 The more painful variant of this: VS Code launched from the Dock (macOS) inherits a minimal `PATH` that does not include `~/.nimble/bin`. The extension found an older Homebrew nimble instead of the user's current version. That older nimble could not resolve Nim 2.x packages from the local cache and fell back to its exponential-time SAT solver (`findMinimalFailingSet`). The result was `nimble` running at 100% CPU for over a minute before the language server could do anything at all.
+
+Mock launching in the Dock it using: 
+
+```env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin HOME="$HOME" USER="$USER" TMPDIR="$TMPDIR" nimble dump```
 
 Even when nimble was found correctly, it was sometimes invoked with an absolute path passed as an argument when it expected a relative one, producing silently empty output. `entryPoints`, `nimDir`, and `srcDir` all came back as empty strings, and the server continued as though nothing had gone wrong.
 
@@ -237,6 +364,8 @@ Startup is around 10–15 seconds for a 100,000+ line monorepo on a 2019 MacBook
 
 Two changes drive this improvement: the extension now runs `nimble setup` automatically on first activation if `nimble.paths` is absent (generating all search paths in one fast pass, bypassing the SAT solver on every subsequent launch), and `nimble dump` results are cached per `.nimble` file so the expensive SAT solve only happens once per session.
 
+`~/.nimble/bin` is prepended to the environment of every child process, ensuring `nim`, `nimble`, and `nimsuggest` are found regardless of how VS Code was launched (GUI launch vs. terminal launch differ in the `PATH` they inherit)
+
 ### Correctness through serialisation
 
 One of the primary causes of incorrect information in the old codebase was that many parts of the code could issue nimsuggest queries concurrently — racing each other to read from and write to the same TCP connection, producing stale responses, incorrect highlights, and occasional crashes.
@@ -291,40 +420,19 @@ This brought observed CPU usage from 90–99% during editing down to under 25% f
 
 Transitive dependencies are also handled: when a file is saved, nimsuggest re-checks all files that import it, propagating changes across module boundaries correctly.
 
-### Configuration reliability
-
-The configuration layer was rewritten from a state machine of `Option[T]` fields — prone to nil dereferences whenever an optional was unwrapped without a guard — to a simple `NlsConfig` object with non-optional fields and explicit defaults. Configuration values are now parsed by `nlsConfigFromJson`, which overlays incoming JSON onto those defaults and never produces a nil field. An `isDifferentFrom` comparison prevents unnecessary server restarts when configuration events arrive that don't actually change anything.
-
 ### Monorepo support
 
-- **`projectMapping`**: regex-based file-to-project routing lets each file in a monorepo be directed to the correct nimsuggest instance without manual intervention
-- **`workingDirectoryMapping`**: per-project working-directory override for non-standard layouts
+Entry point routing is now handled automatically by the Forest (see 0.1.4 release notes). The language server discovers every `.nimble` file in the workspace, runs `nim dump` on each entry point, and routes each opened file to the correct nimsuggest instance without any manual configuration. The former `projectMapping` and `workingDirectoryMapping` settings have been removed.
+
 - **`nimTortoise.test.entryPoints`**: array of test entry points (one per sub-project) for the test runner, falling back to the singular `test.entryPoint` for single-project repos
 
-### Other extension improvements
-
-- **PATH augmentation**: `~/.nimble/bin` is prepended to the environment of every child process, ensuring `nim`, `nimble`, and `nimsuggest` are found regardless of how VS Code was launched (GUI launch vs. terminal launch differ in the `PATH` they inherit)
-- **`nimTortoise.` namespace**: all settings and commands use this prefix, allowing the extension to coexist with or replace `vscode-nim` without key conflicts
-- **Socket transport**: an alternative `transportMode: "socket"` connects the extension to a running language server on a TCP port, enabling a debugger to be attached to the server process during development
-- **Exception inlay hints**: exception annotations are rendered as editor underline decorations with configurable prefix symbols (`nimTortoise.inlayHints.exceptionHints.hintStringLeft/Right`) rather than inline text hints, making them visually distinct
-- **Nimble task code lenses**: tasks in `.nimble` files are surfaced as clickable `$(play-circle) Run task` code lenses directly in the editor
-- **Debug integration**: CodeLLDB launch configurations are generated automatically for the active file or project
-
 ---
-
-## Reflections (by Claude)
-
-> "Nim Tortoise started as a collection of targeted bug fixes — a renamed-file handler here, a `PATH` guard there — and grew into a ground-up rewrite once it became clear that the underlying architecture could not be patched into correctness. The core insight driving everything is simple: a language server is a concurrent system serving a single logical resource (the nimsuggest process), and that resource must be accessed under strict ordering guarantees, not optimistic concurrency.
-
-> The two-level queue architecture is the rewrite's central success. By funnelling every file event and every nimsuggest query through the same FIFO before anything reaches nimsuggest, the entire class of race-condition bugs — stale hover responses, duplicate diagnostics, incorrect highlights after a rename — is eliminated structurally rather than patched case by case. The same queue enables the deduplication and throttling that keeps CPU usage low: the processor simply inspects what is already waiting in the mailbox before committing to a query."
-
 
 ## Known Limitations
 
 ### Stubbed features
 
 - **Macro expansion** (`extension/macroExpand`): always returns null. The "Expand Macro" hover action in VS Code produces no output.
-- **`didChangeConfiguration` over-restarts**: any change to the configuration — including toggling a single inlay hint category — triggers a full pool teardown and rebuild, incurring the cold-compile penalty for every slot.
 
 I have rewritten the extension and language server to focus on doing one thing well:
 
@@ -347,31 +455,20 @@ Key settings at a glance:
 
 | Setting | Default | What it does |
 |---------|---------|--------------|
+| `nimTortoise.transportMode` | `"stdio"` | Transport to connect to the language server (`stdio` or `socket`) |
 | `nimTortoise.lsp.path` | `""` | Path to the language server binary (falls back to `nimlangserver` in PATH) |
+| `nimTortoise.checkOnSave` | `false` | Run project-wide diagnostics on save |
+| `nimTortoise.formatOnSave` | `false` | Format with `nph` on save (if `nph` is installed). |
+| `nimTortoise.fileCheckDelay` | `1000` | Quiet period in ms after last edit before per-file diagnostics run |
 | `nimTortoise.nimsuggestPath` | `"nimsuggest"` | Path to the nimsuggest binary |
+| `nimTortoise.nimsuggestSpawnTimeout` | `60` | Timeout in seconds before stopping a nimsuggest process if it is spawning. |
 | `nimTortoise.maxNimsuggestProcesses` | `2` | Max nimsuggest processes (0 = unlimited) |
 | `nimTortoise.maxNimsuggestCrashRetries` | `3` | Restart attempts before a crashed nimsuggest is abandoned |
-| `nimTortoise.nimsuggestIdleTimeout` | `120000` | Idle timeout in ms before stopping a nimsuggest process |
-| `nimTortoise.projectMapping` | `[]` | Per-file project mapping via regex |
-| `nimTortoise.workingDirectoryMapping` | `[]` | Override the working directory used when running nimsuggest for a given project |
-| `nimTortoise.checkOnSave` | `false` | Run project-wide diagnostics on save |
-| `nimTortoise.fileCheckDelay` | `1000` | Quiet period in ms after last edit before per-file diagnostics run |
-| `nimTortoise.formatOnSave` | `false` | Format with `nph` on save |
+| `nimTortoise.nimsuggestIdleTimeout` | `120` | Idle timeout in ms before stopping a nimsuggest process |
 | `nimTortoise.inlayHints.typeHints.enable` | `true` | Show inferred type annotations |
 | `nimTortoise.inlayHints.parameterHints.enable` | `true` | Show parameter name hints |
-| `nimTortoise.inlayHints.exceptionHints.enable` | `true` | Show exception inlay hints |
-| `nimTortoise.nimExpandMacro` | `false` | Expand macro calls on hover |
-| `nimTortoise.nimExpandArc` | `false` | Expand ARC on proc definition hover |
-| `nimTortoise.transportMode` | `"stdio"` | Transport to connect to the language server (`stdio` or `socket`) |
-
-Full settings reference is in [vscode_extension/README.md](vscode_extension/README.md).
-
----
-
-## Documentation
-
-- [langserver/README.md](langserver/README.md) — how nimsuggest and the language server work together, best practices for project setup, architecture details
-- [vscode_extension/README.md](vscode_extension/README.md) — full settings reference, commands, debugging setup, test runner, development guide
+| `nimTortoise.nimExpandMacro` | `false` | Expand macro calls on hover (TODO) |
+| `nimTortoise.nimExpandArc` | `false` | Expand ARC on proc definition hover (TODO) |
 
 ---
 

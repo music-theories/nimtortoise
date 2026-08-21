@@ -1,5 +1,6 @@
 import unittest2
 import ./tbughelpers
+import fixhelpers
 
 ## tknownbug3.nim — Documents Known Bug 3: assume-known-when-busy, no retry.
 ##
@@ -47,3 +48,5 @@ suite "Known Bug 3 — assume-known-when-busy: no retry [EXPECTED FAIL]":
     let hover = sendHover(client, orphanRel, 7, 5)
     check hover.kind == JObject       # FAILS: returns JNull
     check hover["contents"]["value"].getStr.contains("double")
+
+  stopServer(client)

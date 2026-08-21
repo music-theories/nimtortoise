@@ -186,13 +186,8 @@ proc wrapContentWithContentLength*(content: string): string =
   &"Content-Length: {contentLength}{CRLF}{CRLF}{content}\n"
 
 proc writeOutput*(ls: LanguageServer, content: JsonNode) =
-  let res =
-    case ls.capabilities.serverMode
-    of lsp:
-      wrapContentWithContentLength($content)
-    of mcp:
-      $content & "\n"
-
+  let res = wrapContentWithContentLength($content)
+    
   try:
     case ls.transport.transportMode
     of stdio:
@@ -349,11 +344,7 @@ proc startStdioServer*(ls: LanguageServer) =
   ls.transport.stdinContext = createShared(ReadStdinContext)
   ls.transport.stdinContext.onMainReadSignal = ThreadSignalPtr.new().expect("")
   ls.transport.stdinContext.onStdReadSignal = ThreadSignalPtr.new().expect("")
-  case ls.capabilities.serverMode
-  of lsp:
-    createThread(stdinThread, readLspStdin, ls.transport.stdinContext)
-  of mcp:
-    createThread(stdinThread, readMcpStdin, ls.transport.stdinContext)
+  createThread(stdinThread, readLspStdin, ls.transport.stdinContext)
   asyncSpawn ls.startStdioLoop()
 
 proc processClientLoop*(

@@ -1,87 +1,18 @@
-import std/[options, sets, strutils, tables, os, sequtils, times, json]
+import std/[options, sets, strutils, tables, json]
 import chronos
 import chronicles
+
+import forest
+
 import ../nph/formatting
 import ../nimsuggest/nimsuggest
+
 import ../configurations/configurations
 import ../protocol/types
-import ../handlers/request_process
+
 import ../utils/utils
-import ./[langserver_types, query_types,  dispatcher_utils, langserver_nimsuggest, langserver_utils, capability_configs]
-
-proc consolidateNimsuggestInstances(
-  ls: LanguageServer,
-  newSlot: NimsuggestSlot,
-): Future[seq[FilePath]] {.async.} =
-  # Consolidation: for each other slot, check if the new slot subsumes it.
-  var slotsToRemove: seq[FilePath] = @[]
-  for projectPath, oldSlot in ls.pool.slots:
-    if oldSlot.projectFile == newSlot.projectFile: continue
-    let knownQuery = NimsuggestQuery[LspFilePosition](
-      id: 0.uint,
-      kind: NimsuggestQueryKind.KNOWN,
-      uri: pathToUri(oldSlot.projectFile),
-      dirtyFile: FilePath(""),
-      responseFuture: newFuture[seq[Suggest]]("known"),
-    )
-    newSlot.queryMailbox.addLastNoWait(knownQuery)
-    let response = await knownQuery.responseFuture
-    let newSlotKnowsOldSlot = checkNimsuggestKnownResponse(response)
-    if newSlotKnowsOldSlot:
-      debug "consolidateNimsuggestInstances: new slot knows old slot", newSlotProjectFile = newSlot.projectFile, oldSlotProjectFile = oldSlot.projectFile
-      # New slot knows old slot's entry point → it imported old slot entirely.
-      # Transfer all owned URIs and shut the old slot down.
-      newSlot.ownedUris.incl(pathToUri(oldSlot.projectFile))
-      if pathToUri(oldSlot.projectFile) in ls.files.openFiles:
-        ls.files.openFiles[pathToUri(oldSlot.projectFile)].slot = newSlot
-      for oldSlotUri in oldSlot.ownedUris.toSeq:
-        debug "consolidateNimsuggestInstances: reassign owned uri ", oldSlotUri = oldSlotUri
-        
-        oldSlot.ownedUris.excl(oldSlotUri)
-        newSlot.ownedUris.incl(oldSlotUri)
-        if oldSlotUri in ls.files.openFiles:
-          ls.files.openFiles[oldSlotUri].slot = newSlot
-        if newSlot.state == SlotState.READY:
-          newSlot.ns.read.openFiles.incl(oldSlotUri)
-
-      discard await execStop(oldSlot, ls.pool)
-      slotsToRemove.add(oldSlot.projectFile)
-    else:
-      debug "consolidateNimsuggestInstances: new slot does not know old slot", newSlotProjectFile = newSlot.projectFile, oldSlotProjectFile = oldSlot.projectFile
-
-  debug "consolidateNimsuggestInstances: remove slots", slotsToRemove = slotsToRemove
-  for s in slotsToRemove:
-    ls.pool.removeSlot(s)
-  
-  return slotsToRemove
-
-proc createNewSuggestSlotAndConsolidate(
-  ls: LanguageServer,
-  filePath: FilePath,
-  params: TextDocumentItem
-): Future[NimsuggestSlot] {.async.} =
-
-  let workingDir = ls.getWorkingDir(filePath)
-  let newSlot = newSlot(filePath, isEntryPoint = true, workingDir)
-  ls.pool.addSlot(newSlot)
-  debug "createNewSuggestSlotAndConsolidate: spawn new nimsuggest slot", workingDir = workingDir
-  let successfulSpawn = await execSpawn(newSlot, ls.pool, filePath, ls.configurations.currentConfig)
-  if successfulSpawn:
-    debug "createNewSuggestSlotAndConsolidate:add file to open files", filePath = $(filePath)
-    ls.addFileToOpenFiles(newSlot, params)
-    asyncSpawn processNimsuggestQueries(
-      newSlot, ls.pool, ls.files.openFiles, 
-      ls.configurations.currentConfig,
-      ls.notify
-    )
-    # Consolidation: for each other slot, check if the new slot subsumes it.
-    discard await ls.consolidateNimsuggestInstances(newSlot)
-    
-  else:
-    debug "createNewSuggestSlotAndConsolidate: spawn unsuccessful"
-    ls.pool.removeSlot(filePath)
-  return newSlot
-
+import ./[langserver_types, query_types, capability_configs]
+import ./[dispatcher_did_open, dispatcher_did_change, dispatcher_did_save, dispatcher_did_close, dispatcher_did_rename]
 
 proc waitForLsInitialized*(ls: LanguageServer): Future[void] {.async.} =
   ## Waits until initNimsuggestInstances has completed (config received, nimble dump
@@ -89,11 +20,13 @@ proc waitForLsInitialized*(ls: LanguageServer): Future[void] {.async.} =
   ## Uses polling so a timeout does not cancel the shared lsInitialized future.
   if ls.lsInitialized.finished:
     return
-  debug "DID_OPEN: waiting for ls initialization (initNimsuggestInstances not yet done)"
+  debug "waitForLsInitialized: waiting for ls initialization (initNimsuggestInstances not yet done)"
   var elapsed = 0
+  # TODO - NOTE - Should this 60-second-limit be a constant or in the configurations?
   while not ls.lsInitialized.finished and elapsed < 60_000:
     await sleepAsync(100)
     inc elapsed, 100
+
   if not ls.lsInitialized.finished:
     warn "initNimsuggestInstances did not complete within timeout; proceeding anyway"
 
@@ -108,6 +41,7 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
   ## Invariant: use `while true` not tail recursion. Each recursive async call
   ## creates a new Future object that is never freed until the chain resolves
   ## (which for an infinite loop means never), corrupting the heap under ORC.
+  var saveCounter = 0
   while true:
     debug "processLangserverQueue: waiting for next item", queueLen = ls.langserverQueue.len
     let query = await ls.langserverQueue.popFirst()
@@ -118,351 +52,131 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
     # TODO: Check all paths through the dispatcher result in any pending futures being completed.
     debug "processLangserverQueue: dequeued item", kind = $query.kind
     case query.kind
+    of LangserverQueryKind.SHUTDOWN:
+      await ls.pool.stopAllNimsuggestSlotsInPool()
+      query.shutdown.complete(true)
+      ls.isShutdown = true
+      return 
     of LangserverQueryKind.NIMSUGGEST:
       let q = query.nimsuggest
       # Refresh dirtyFile at dispatch time. The query was constructed in the LSP
       # handler before any FILE_ACCESS (DID_CHANGE) in front of it was processed,
       # so dirtyFile may have been captured as "" even though changed=true by now.
-      if q.kind == NimsuggestQueryKind.CHANGED and q.saved:
-        q.dirtyFile = FilePath("")
-      else:
-        q.dirtyFile = ls.uriToStash(q.uri)
+      # if q.kind == NimsuggestQueryKind.CHANGED and q.saved:
+      #   q.dirtyFile = FilePathAbs("")
+      # else:
+      q.dirtyFile = uriToStashFilePath(ls.files.storageDir, q.uri)
+
       # First, check if the current file is owned by a nimsuggest instance
+      let path = toFilePathAbs(q.uri)
       if q.uri in ls.files.openFiles:
         let fileInfo = ls.files.openFiles[q.uri]
-        fileInfo.slot.queryMailbox.addLastNoWait(q)
-        
-        debug "processLangserverQueue: dispatcher added message to slot mailbox", uri = q.uri, kind = $q.kind, fileInfoIsNil = (fileInfo == nil), projectFile = fileInfo.slot.projectFile
+
+        let slotCheck = getSlotThatOwnsUri(ls.pool, q.uri)
+        if slotCheck.isSome():
+          let slotThatOwnsUri = slotCheck.get()
+          
+          # If a slot is stopped, crashed or stopping, do not attempt to restart - this should happen when a user saves, open changes a file - otherwise any random dragging a mouse across a file would cause a restart. 
+          # TODO/NOTE: Is KNOWN treated correctly?
+          case slotThatOwnsUri.state
+          of SlotState.READY, SlotState.SPAWNING:
+            debug "processLangserverQueue: dispatcher adding message to slot mailbox", uri = q.uri, kind = $q.kind, fileInfoIsNil = (fileInfo == nil), entryPoint = slotThatOwnsUri.spawnInfo.entryPoint
+
+            slotThatOwnsUri.queryMailbox.addLastNoWait(q)
+
+          of SlotState.STOPPING, SlotState.STOPPED, SlotState.CRASHED:
+            debug "processLangserverQueue: slot is inactive", uri = q.uri, state = slotThatOwnsUri.state
+            if not q.responseFuture.finished:
+              q.responseFuture.complete(@[])
+            continue
+
+        else:
+          # File is open but no slot owns it (e.g. the slot was evicted from the pool).
+          debug "processLangserverQueue: file is open but no slot owns it", uri = q.uri
+          if not q.responseFuture.finished:
+            q.responseFuture.complete(@[])
+
+      elif path in ls.pool.slots:
+        let slot = ls.pool.slots[path]
+        case slot.state
+        of SlotState.READY, SlotState.SPAWNING:
+          debug "processLangserverQueue: Add path-level query to mailbox. ", uri = q.uri, kind = $q.kind
+          ls.pool.slots[path].queryMailbox.addLastNoWait(q)
+        else:
+          debug "processLangserverQueue: Could not add path-level message to mailbox. Slot is not live.", uri = q.uri, kind = $q.kind
+          q.responseFuture.complete(@[])
 
       else:
-        debug "processLangserverQueue: Could not add message to mailbox, file is no longer open. ", uri = q.uri, kind = $q.kind
+        debug "processLangserverQueue: Could not add message to mailbox", uri = q.uri, kind = $q.kind
         q.responseFuture.complete(@[])
 
     of LangserverQueryKind.FILE_ACCESS:
       let q = query.fileAccess
       case q.kind
       of FileAccessQueryKind.DID_OPEN:
-        let uri = q.didOpen.textDocument.uri
-        # Check if file is already open
-        if uri in ls.files.openFiles:
-          debug "didOpenFile: URI already tracked, skipping", uri = uri
-          # TODO/NOTE: Do I have to complete the future here?
-          # q.responseFuture.complete(@[])
-
-        else:
-          # Check if file is known to any nimsuggest instance
-          debug "didOpen: calling isKnownByANimsuggestSlot", uri = uri
-          let fileIsKnown: Option[NimsuggestSlot] = await isKnownByANimsuggestSlot(ls.pool, uri)
-          debug "didOpen: isKnownByANimsuggestSlot returned", uri = uri, isKnown = fileIsKnown.isSome
-
-          if fileIsKnown.isSome:
-            debug "didOpen: known file, calling addFileToOpenFiles", uri = uri
-            ls.addFileToOpenFiles(fileIsKnown.get(), q.didOpen.textDocument)
-            debug "didOpen: known file, addFileToOpenFiles done", uri = uri
-            discard ls.queryFile(uri, NimsuggestQueryKind.CHECK_FILE)
-          else:
-            # This file is not known by any running nimsuggest instance.
-            # Check there is a free nimsuggest slot
-            let filePath: FilePath = uriToPath(uri)
-
-            debug "didOpen: Check if it is a true orphan", uri = uri, filePath = filePath
-            # does it have a project file?
-            let intendedProjectPath: FilePath = getIntendedProject(ls, uri)
-
-            if string(intendedProjectPath) != "" and intendedProjectPath != filePath:
-              # File maps to a specific project entry point (via projectMapping regex).
-              debug "didOpen: It has an intended project file", uri = uri, intendedProjectPath = intendedProjectPath
-              if ls.pool.slots.hasKey(intendedProjectPath):
-                # Slot already running for the intended project — assign directly.
-                debug "didOpen: Intended project slot already running, assigning directly", uri = uri, intendedProjectPath = intendedProjectPath
-                discard await createNewSuggestSlotAndConsolidate(ls, filePath, q.didOpen.textDocument)
-                
-              else:
-                # No slot for this project yet — spawn it, then check if it knows our file.
-                debug "didOpen: No slot for the project yet, so spawn it ", intendedProjectPath = intendedProjectPath
-                let projectWorkingDir = ls.getWorkingDir(intendedProjectPath)
-                let newProjectSlot = newSlot(
-                  intendedProjectPath,
-                  isEntryPoint = true,
-                  workingDir = projectWorkingDir
-                )
-                ls.pool.addSlot(newProjectSlot)
-                let intendedProjectSpawn = await execSpawn(newProjectSlot, ls.pool, intendedProjectPath, ls.configurations.currentConfig)
-                if intendedProjectSpawn:
-                  asyncSpawn processNimsuggestQueries(
-                    newProjectSlot, ls.pool, ls.files.openFiles, 
-                    ls.configurations.currentConfig,
-                    ls.notify
-                  )
-                  let projectKnownQuery = NimsuggestQuery[LspFilePosition](
-                    id: 0.uint,
-                    kind: NimsuggestQueryKind.KNOWN,
-                    uri: uri,
-                    dirtyFile: FilePath(""),
-                    responseFuture: newFuture[seq[Suggest]]("known"),
-                  )
-                  newProjectSlot.queryMailbox.addLastNoWait(projectKnownQuery)
-                  let projectResponse = await projectKnownQuery.responseFuture
-                  let thisProjectKnowsTheFile = checkNimsuggestKnownResponse(projectResponse)
-                  if thisProjectKnowsTheFile:
-                    debug "didOpen: The project does know the current file.", fileThatKnows = intendedProjectPath,  fileThatIsKnown = uri
-                      #Here is where consolidation is needed.
-                    ls.addFileToOpenFiles(newProjectSlot, q.didOpen.textDocument)
-                    discard await ls.consolidateNimsuggestInstances(newProjectSlot)
-                    discard ls.queryFile(uri, NimsuggestQueryKind.CHECK_FILE)
-                  else:
-                    debug "didOpen: The project does not know the current file. Spin up a new standalone orphan."
-                    discard await execStop(newProjectSlot, ls.pool)
-                    ls.pool.removeSlot(intendedProjectPath)
-                    discard await createNewSuggestSlotAndConsolidate(ls, filePath, q.didOpen.textDocument)
-                else:
-                  ls.pool.removeSlot(intendedProjectPath)
-
-            else:
-              # True orphan (no mapping) or file is its own entry point.
-              let entryPoint = if string(intendedProjectPath) != "": intendedProjectPath else: filePath
-              debug "didOpen: Spawning standalone nimsuggest", entryPoint = entryPoint
-              discard await createNewSuggestSlotAndConsolidate(ls, entryPoint, q.didOpen.textDocument)
-
-            let needToEvict = ls.pool.maxSlots > 0 and ls.pool.slots.len > ls.pool.maxSlots
-              
-            debug "didOpen: Should slot be evicted?", maxSlots = ls.pool.maxSlots, filledSlots = ls.pool.slots.len 
-            if needToEvict:
-              # Evict a slot.
-              let slotToEvict = nimsuggestSlotToEvict(ls.pool)
-              debug "didOpen: Evicting a slot.", slotToEvict = slotToEvict.projectFile
-              while slotToEvict.queryMailbox.len > 0:
-                let pendingQ = slotToEvict.queryMailbox.popFirstNoWait()
-                if not pendingQ.responseFuture.finished:
-                  pendingQ.responseFuture.complete(@[])
-              # slotToEvict.pendingChangedUris.clear()
-
-              let successfulStop = await execStop(slotToEvict, ls.pool)
-              if successfulStop:
-                debug "didOpen: Removing from slot: ", projectFile = slotToEvict.projectFile
-                # Move evicted files to idleOpenFiles so they can be re-assigned on next use.
-                # for uri in slotToEvict.ownedUris:
-                  # if uri in ls.files.openFiles:
-                    # ls.files.idleOpenFiles[uri] = ls.files.openFiles[uri]
-                    # ls.files.openFiles.del(uri)
-                ls.pool.removeSlot(slotToEvict.projectFile)
+        await ls.processDidOpenQuery(q)
             
       of FileAccessQueryKind.DID_CHANGE:
-        let uri = q.didChange.textDocument.uri
-        let contentChanges = q.didChange.contentChanges
-        let openFiles = ls.files.openFiles.keys.toSeq()
-        debug "Dispatcher: DID_CHANGE ", uri = uri, openFiles = openFiles
-    
-        if uri notin ls.files.openFiles:
-          continue
-        let stashLocation = ls.uriStorageLocation(uri)
-        let file = open(string(stashLocation), fmWrite)
-
-        ls.files.openFiles[uri].fingerTable = @[]
-        # ls.files.openFiles[uri].changed = true
-        if contentChanges.len <= 0:
-          file.close()
-          continue
-        for line in contentChanges[0].text.splitLines:
-          # fingertable is 0-based.
-          ls.files.openFiles[uri].fingerTable.add(line.createUTFMapping())
-          file.writeLine(line)
-        file.close()
-
-        # We should schedule a changed query, nimsuggets doesn't know it has changed.
-        ls.files.openFiles[uri].lastChanged = times.now()
-        
-        let changedQuery = NimsuggestQuery[LspFilePosition](
-          id: 0, # NOTE: Check that this doesn't get cancelled accidentally
-          kind: NimsuggestQueryKind.CHANGED,
-          uri: uri,
-          dirtyFile: stashLocation, #ls.uriToStash(uri),
-          responseFuture: newFuture[seq[Suggest]]("nimsuggestQuery"),
-          saved: false
-        )
-        
-        debug "processLangserverQueue: DID_CHANGE dispatcher adding CHANGED message to slot mailbox", uri = uri
-
-        ls.files.openFiles[uri].slot.queryMailbox.addLastNoWait(changedQuery)
+        await ls.processDidChangeQuery(q)
 
       of FileAccessQueryKind.DID_SAVE:
-        let uri = q.didSave.textDocument.uri
-        debug "didSave: file", uri = uri
-        if uri in ls.files.openFiles:
-          let fileInfo = ls.files.openFiles[uri]
-          if uri in fileInfo.slot.crashedUris:
-            fileInfo.slot.crashedUris.excl(uri)
-
-          if q.didSave.text.isSome:
-            let stashLocation = ls.uriStorageLocation(uri)
-            let file = open(string(stashLocation), fmWrite)
-            fileInfo.fingerTable = @[]
-            for line in q.didSave.text.get.splitLines:
-              fileInfo.fingerTable.add(line.createUTFMapping())
-              file.writeLine(line)
-            file.close()
-
-          debug "didSave: sending CHANGED query", uri = uri
-          # Directly query nimsuggest
-          let changedQuery = NimsuggestQuery[LspFilePosition](
-            id: 0,
-            kind: NimsuggestQueryKind.CHANGED,
-            uri: uri,
-            dirtyFile: ls.uriStorageLocation(uri),
-            saved: true,
-            responseFuture: newFuture[seq[Suggest]]("nimsuggestQuery"),
-          )
-          fileInfo.slot.queryMailbox.addLastNoWait(changedQuery)
-
-        if ls.configurations.currentConfig.checkOnSave:
-          debug "Checking project", uri = uri
-          let slotForUri = ls.pool.slotForUri(uri)
-          if slotForUri.isSome:
-            let slotToUse = slotForUri.get()
-            let chkQuery = NimsuggestQuery[LspFilePosition](
-              id: 0,
-              kind: NimsuggestQueryKind.CHECK_PROJECT,
-              uri: pathToUri(slotToUse.projectFile),
-              dirtyFile: FilePath(""),
-              responseFuture: newFuture[seq[Suggest]]("checkProject"),
-            )
-            slotToUse.queryMailbox.addLastNoWait(chkQuery)
+        await ls.processDidSaveQuery(q)
 
       of FileAccessQueryKind.DID_CLOSE:
-        let uri = q.didClose.textDocument.uri
-        debug "Closed the following document:", uri = uri
-        if uri notin ls.files.openFiles:
-          continue
-        let fileInfo = ls.files.openFiles[uri]
-        # if fileInfo.changed:
-        let checkQuery = await ls.queryFile(uri, NimsuggestQueryKind.CHECK_FILE)
-
-        fileInfo.slot.unassignUri(uri)
-        # If the slot has no remaining tracked files, shut it down — important for standalone orphan slots.
-        debug "Check the amount of owned uris for this slot:", uri = uri, ownedUris = fileInfo.slot.ownedUris.len
-        if fileInfo.slot.ownedUris.len == 0 and ls.pool.slots.len > 1:
-          # The ls.pool.slots.len > 1 qualification means that if there is only one slot left, it is persisted, so nimsuggest is not constantly spawning and stopping.
-          debug "Stopping this slot:", uri = uri
-          discard await execStop(fileInfo.slot, ls.pool)
-          ls.pool.removeSlot(fileInfo.slot.projectFile)
-        ls.files.openFiles.del(uri)
-
-      of FileAccessQueryKind.WILL_SAVE_WAIT_UNTIL:
-        let uri = q.willSave.textDocument.uri
-        let config = ls.configurations.currentConfig
-        let nphPath = getNphPath()
-
-        let shouldFormat =
-          nphPath.isSome and ls.capabilities.lspServerCapabilities.documentFormattingProvider.get(false) and
-          config.formatOnSave
-
-        if shouldFormat:
-          debug "Formatting document before save", uri = uri
-          # THis runs the formatting 
-          let formatTextEdit = await format(ls, nphPath.get(), uri)
-          if formatTextEdit.isSome:
-            q.willSaveResponse.complete(@[formatTextEdit.get])
-          else:
-            q.willSaveResponse.complete(@[])
-        else:
-          q.willSaveResponse.complete(@[])
+        await ls.processDidCloseQuery(q)
 
       of FileAccessQueryKind.DID_RENAME_FILES:
-        for r in q.renameFiles.files:
-          let oldUri = r.oldUri
-          let newUri = r.newUri
-          debug "File renamed", oldUri = oldUri, newUri = newUri
-          let oldStash = ls.uriStorageLocation(oldUri)
-          let newStash = ls.uriStorageLocation(newUri)
-          let oldPath: FilePath = uriToPath(oldUri)
-          let newPath: FilePath = uriToPath(newUri)
-
-          if string(oldStash).fileExists:
-            try:
-              moveFile(string(oldStash), string(newStash))
-            except Exception as e:
-              debug "Failed to move stash file on rename",
-                oldStash = oldStash, newStash = newStash, msg = e.msg
-
-          if string(oldPath).endsWith(".nimble"):
-            ls.nimDumpCache.del(string(oldPath))
-            ls.nimDumpCache.del(string(uriToPath(newUri)))
-
-          if oldUri in ls.files.openFiles:
-            let fileInfo = ls.files.openFiles[oldUri]
-            let slot = fileInfo.slot
-            slot.unassignUri(oldUri)
-            slot.assignUri(newUri)
-            ls.files.openFiles[newUri] = NlsFileInfo(
-              slot: slot,
-              fingerTable: fileInfo.fingerTable,
-              lastChanged: fileInfo.lastChanged,
-              lastChecked: fileInfo.lastChecked,
-              textDocument: TextDocumentItem(
-                uri: newUri,
-                languageId: fileInfo.textDocument.languageId,
-                version: fileInfo.textDocument.version,
-                text: fileInfo.textDocument.text,
-              ),
-            )
-            ls.files.openFiles.del(oldUri)
-
-            if string(newPath).endsWith(".nim"):
-              # RECOMPILE The Nimsuggest Instance
-              debug "processCommands: sending recompile", projectFile = slot.projectFile
-              let recompileQuery = NimsuggestQuery[LspFilePosition](
-                kind: NimsuggestQueryKind.RECOMPILE,
-                uri: pathToUri(slot.projectFile),
-                dirtyFile: FilePath(""),
-                responseFuture: newFuture[seq[Suggest]]("recompile"),
-              )
-              slot.queryMailbox.addLastNoWait(recompileQuery)
-
+        await ls.processDidRenameQuery(q)
+       
       of FileAccessQueryKind.DID_DELETE_FILES:
         for f in q.deleteFiles.files:
           let uri = f.uri
           debug "File deleted", uri = uri
-          let path: FilePath = uriToPath(uri)
-          if string(path).endsWith(".nimble"):
-            ls.nimDumpCache.del(string(path))
+          let path = toFilePathAbs(uri)
+
           if uri in ls.files.openFiles:
-            let fileInfo = ls.files.openFiles[uri]
-            fileInfo.slot.unassignUri(uri)
             ls.files.openFiles.del(uri)
 
-            if string(path).endsWith(".nim"):
-              let recompileQuery = NimsuggestQuery[LspFilePosition](
-                kind: NimsuggestQueryKind.RECOMPILE,
-                uri: pathToUri(fileInfo.slot.projectFile),
-                dirtyFile: FilePath(""),
-                responseFuture: newFuture[seq[Suggest]]("recompile"),
-              )
-              fileInfo.slot.queryMailbox.addLastNoWait(recompileQuery)
+            let slotCheck = getSlotThatOwnsUri(ls.pool, uri)
+            if slotCheck.isSome():
+              let slotThatOwnsUri = slotCheck.get()
+              slotThatOwnsUri.ownedUris.excl(uri)
+            
+              if string(path).endsWith(".nim"):
+                let recompileQuery = NimsuggestQuery[LspFilePosition](
+                  kind: NimsuggestQueryKind.RECOMPILE,
+                  uri: toUri(slotThatOwnsUri.spawnInfo.entryPoint),
+                  dirtyFile: FilePathAbs(""),
+                  responseFuture: newFuture[seq[Suggest]]("recompile"),
+                )
+                slotThatOwnsUri.queryMailbox.addLastNoWait(recompileQuery)
 
       of FileAccessQueryKind.DID_CHANGE_CONFIGURATION:
         debug "Changed configuration: "
-        var receivedConfigJson: JsonNode
+        let oldConfiguration = ls.configurations.currentConfig
+        var newConfiguration: NlsConfig
         if ls.usePullConfigurationModel():
           if ls.supportsConfigurationRequest():
             debug "Requesting configuration from the client"
-            let configurationParams = %*{"items": [{"section": "nimTortoise"}, {"section": "nim"}]}
+            let configurationParams = %*{"items": [{"section": "nimTortoise"}]}
             let configFuture = ls.call("workspace/configuration", configurationParams)
-            receivedConfigJson = await configFuture 
+            let receivedConfigJson = await configFuture
+            debug "workspace/configuration response", response = receivedConfigJson
+            let parsedConfig = parseWorkspaceConfigurationResponse(receivedConfigJson)
+            newConfiguration = parsedConfig.get(oldConfiguration)
           else:
             debug "Client does not support workspace/configuration"
             ls.configurations.configReady.fire()
             continue
         else:
-          receivedConfigJson = q.didChangeConfiguration
-        
-        let oldConfiguration = ls.configurations.currentConfig
-        let newConfiguration = parseDidChangeConfiguration(receivedConfigJson)
+          newConfiguration = parseDidChangeConfiguration(q.didChangeConfiguration)
 
         let newConfigurationIsDifferent = isDifferentFrom(newConfiguration, oldConfiguration)
 
         if newConfigurationIsDifferent:
-          clearCompiledRegexCache()
           ls.configurations.currentConfig = newConfiguration
+
+        debug "Current performance ", kind = $ls.configurations.currentConfig.performance.kind, throttling = $ls.configurations.currentConfig.performance.fileCheckThrottling, updateOnChange = $ls.configurations.currentConfig.performance.updateOnChange
 
         ls.configurations.configReady.fire()
 
@@ -477,3 +191,23 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
             q.formattingResponse.complete(@[])
         else:
           q.formattingResponse.complete(@[])
+      
+      of FileAccessQueryKind.WILL_SAVE_WAIT_UNTIL:
+        let uri = q.willSave.textDocument.uri
+        let config = ls.configurations.currentConfig
+        let nphPath = getNphPath()
+
+        let shouldFormat =
+          nphPath.isSome() and ls.capabilities.lspServerCapabilities.documentFormattingProvider.get(false) and
+          config.formatOnSave
+
+        if shouldFormat:
+          debug "Formatting document before save", uri = uri
+          # THis runs the formatting 
+          let formatTextEdit = await format(ls, nphPath.get(), uri)
+          if formatTextEdit.isSome:
+            q.willSaveResponse.complete(@[formatTextEdit.get])
+          else:
+            q.willSaveResponse.complete(@[])
+        else:
+          q.willSaveResponse.complete(@[])
