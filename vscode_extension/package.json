@@ -326,7 +326,7 @@
                 "nimTortoise.nimsuggestIdleTimeout": {
                     "type": "integer",
                     "default": 1800,
-                    "description": "Timeout in milliseconds after which an idle nimsuggest process is stopped."
+                    "description": "Timeout in seconds after which an idle nimsuggest process is stopped."
                 },
                 "nimTortoise.nimsuggestRequestTimeout": {
                     "type": "integer",

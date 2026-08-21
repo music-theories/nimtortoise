@@ -457,16 +457,15 @@ Key settings at a glance:
 |---------|---------|--------------|
 | `nimTortoise.transportMode` | `"stdio"` | Transport to connect to the language server (`stdio` or `socket`) |
 | `nimTortoise.lsp.path` | `""` | Path to the language server binary (falls back to `nimlangserver` in PATH) |
-| `nimTortoise.checkOnSave` | `false` | Run project-wide diagnostics on save |
+| `nimTortoise.performance` | `"HIGH"`  | Sets performance mode. `HIGHEST`, `HIGH`, `LOW`, `LOWEST`.  `HIGHEST` is most CPU intensive but most responseive and accurate. |
 | `nimTortoise.formatOnSave` | `false` | Format with `nph` on save (if `nph` is installed). |
-| `nimTortoise.fileCheckDelay` | `1000` | Quiet period in ms after last edit before per-file diagnostics run |
 | `nimTortoise.nimsuggestPath` | `"nimsuggest"` | Path to the nimsuggest binary |
 | `nimTortoise.nimsuggestSpawnTimeout` | `60` | Timeout in seconds before stopping a nimsuggest process if it is spawning. |
 | `nimTortoise.maxNimsuggestProcesses` | `2` | Max nimsuggest processes (0 = unlimited) |
 | `nimTortoise.maxNimsuggestCrashRetries` | `3` | Restart attempts before a crashed nimsuggest is abandoned |
-| `nimTortoise.nimsuggestIdleTimeout` | `120` | Idle timeout in ms before stopping a nimsuggest process |
-| `nimTortoise.inlayHints.typeHints.enable` | `true` | Show inferred type annotations |
-| `nimTortoise.inlayHints.parameterHints.enable` | `true` | Show parameter name hints |
+| `nimTortoise.nimsuggestIdleTimeout` | `1800` | Idle timeout in ms before stopping a nimsuggest process |
+| `nimTortoise.inlayHints.typeHints.enable` | `false` | Show inferred type annotations |
+| `nimTortoise.inlayHints.parameterHints.enable` | `false` | Show parameter name hints |
 | `nimTortoise.nimExpandMacro` | `false` | Expand macro calls on hover (TODO) |
 | `nimTortoise.nimExpandArc` | `false` | Expand ARC on proc definition hover (TODO) |
 
