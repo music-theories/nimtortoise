@@ -1,4 +1,5 @@
 import std/[os, tables, sets, algorithm, sequtils, deques]
+import chronicles
 import ./[forest_types]
 import ../resources/resources
 
@@ -51,11 +52,11 @@ proc checkDependency*(
   dependency: Dependency
 ): bool =
   if not fileExists(string(dependency.rootFile)):
-    echo "ROOT FILE DOES NOT EXIST ", string(dependency.rootFile)
+    debug "checkDependency: root file does not exist ", rootFile = string(dependency.rootFile)
     return false
 
   if not fileExists(string(dependency.dependentFile)):
-    echo "DEPENDENT FILE DOES NOT EXIST ", string(dependency.dependentFile)
+    debug "checkDependency: file does not exist ", file = string(dependency.dependentFile)
     return false
 
   return graph.isDependency(
