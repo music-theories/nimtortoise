@@ -5,6 +5,8 @@ import chronos/asyncproc
 import chronicles
 import stew/byteutils
 
+import api
+
 import ../protocol/[enums, types]
 import ../utils/utils
 import ./suggestapi_types

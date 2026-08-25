@@ -26,7 +26,7 @@ proc toJsonHook*(f: Forest): JsonNode =
   result["root"] = newJString(string(f.root))
 
   let nimble = newJObject()
-  for k, d in f.nimble.pairs:
+  for k, d in f.nimble.dump.pairs:
     let entry = newJObject()
     entry["name"] = newJString(d.name)
     entry["srcDir"] = newJString(string(d.srcDir))
@@ -63,10 +63,10 @@ proc debugStr*(f: Forest): string =
 
   # --- Nimble dump ---
   lines.add "=== Nimble ==="
-  if f.nimble.len == 0:
+  if f.nimble.dump.len == 0:
     lines.add "  (none)"
   else:
-    for (k, d) in f.nimble.pairs:
+    for (k, d) in f.nimble.dump.pairs:
       lines.add "  [" & rel(string(k)) & "]"
       lines.add "    name: " & d.name
       if d.entryPoints.len > 0:

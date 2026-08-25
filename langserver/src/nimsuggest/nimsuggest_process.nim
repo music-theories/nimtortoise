@@ -1,4 +1,4 @@
-import std/[options, strformat, sets, tables, times, json, sequtils, algorithm]
+import std/[options, strformat, strutils, sets, tables, times, json, sequtils, algorithm]
 import chronos
 import chronicles
 
@@ -227,11 +227,20 @@ proc processNimsuggestQueries*(
         originalQuery.responseFuture.complete(@[])
 
     of SlotState.READY:
+      discard
       if slot.ns.read().failed:
         let errMsg = slot.ns.read().errorMessage
         if pool.notifyProc != nil and errMsg.len > 0:
-          pool.notifyProc("window/logMessage",
-            %*{"type": 1, "message": fmt"Nimsuggest ({slot.spawnInfo.entryPoint}): {errMsg}"})
+          pool.notifyProc("window/showMessage",
+            %*{"type": 1, "message": fmt"Nimsuggest crashed while processing {originalQuery.kind} on {originalQuery.uri} (project: {slot.spawnInfo.entryPoint}): {errMsg}"})
+
+        # asyncSpawn runNimCheckAfterCrash(
+        #   dependencies.nim.nimExe,
+        #   slot.spawnInfo.entryPoint,
+        #   paths = @[],
+        #   # dependencies.paths.getOrDefault(slot.spawnInfo.entryPoint, @[]),
+        #   pool.notifyProc,
+        # )
         let respawnWasSuccessful = await pool.attemptCrashRespawn(slot, config)
         if not respawnWasSuccessful:
           slot.crashedUris.incl(originalQuery.uri)
@@ -257,7 +266,7 @@ proc processNimsuggestQueries*(
           let queryResponse: seq[Suggest] = await runNimsuggestQuery(slot.ns.read(), q)
           let elapsedMs = inMilliseconds(now() - queryStartTime)
           
-          debug "processNimsuggestQueries: response ", response = $(%*queryResponse), elapsedMs  = elapsedMs
+          # debug "processNimsuggestQueries: response ", response = $(%*queryResponse), elapsedMs  = elapsedMs
 
           q.responseFuture.complete(queryResponse)
           slot.lastCmdTime = now()
@@ -282,9 +291,9 @@ proc processNimsuggestQueries*(
             if q.uri in openFiles:
               openFiles[q.uri].lastChecked = now()
 
-            debug "processNimsuggestQueries: CHECK_FILE response"
-            for s in queryResponse:
-              debug "processNimsuggestQueries: CHECK_FILE response", respone = $s.section, path = s.filePath
+            # debug "processNimsuggestQueries: CHECK_FILE response"
+            # for s in queryResponse:
+            #   debug "processNimsuggestQueries: CHECK_FILE response", respone = $s.section, path = s.filePath
 
             let diagnosticsJson = convertNimSuggestResponseToDiagnostics(
               queryResponse, q.uri, openFiles
@@ -369,7 +378,7 @@ proc restartSlot*(
   discard await pool.stopNimsuggestSlot(slot)
   slot.crashedUris.clear()
   let successfulSpawn = await pool.spawnNewNimsuggestSlot(
-    spawningInfo, pool.nimsuggest, config
+    spawningInfo, pool.nimsuggest, dependencies, config
   )
   if successfulSpawn.isSome:
     asyncSpawn slot.processNimsuggestQueries(

@@ -1,4 +1,4 @@
-import os, std/asyncnet, strutils, chronos, chronos/asyncproc, options
+import os, std/asyncnet, strutils, chronos, chronos/asyncproc, options, sequtils
 
 import unittest2
 

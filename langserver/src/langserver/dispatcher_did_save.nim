@@ -38,6 +38,8 @@ proc processDidSaveQuery*(
       of SlotState.READY, SlotState.SPAWNING:
         debug "didSave: sending CHANGED query", uri = uri
 
+        # TODO - I think this is a place in which you need to check whether this file is owned by a slot, and if not, add it, or create a new slot.  Saving is a clear indication that this file is being worked on.
+
         let changedQuery = NimsuggestQuery[LspFilePosition](
           id: 0,
           kind: NimsuggestQueryKind.CHANGED,
@@ -52,17 +54,15 @@ proc processDidSaveQuery*(
       of SlotState.STOPPING, SlotState.STOPPED, SlotState.CRASHED:
         discard
 
-      # Clear this file's module entry point from crashedSlots — the user
-      # may have fixed the underlying compiler issue (e.g. removed a
-      # problematic import), so give the background spawn another chance.
+      # Clear this file's module entry point from crashedSlots.
       let savedFilePath = toFilePathAbs(uri)
       let savedSpawnInfo = getNimsuggestSpawnInfo(
-        savedFilePath, ls.files.rootPath, ls.dependencies)
+        savedFilePath, ls.files.rootPath, ls.dependencies
+      )
 
-      if savedSpawnInfo.entryPoint != savedFilePath and
-          savedSpawnInfo.entryPoint in ls.pool.crashedSlots:
-            
-        debug "didSave: clearing crashedSlots for module entry point",
-          entryPoint = savedSpawnInfo.entryPoint
+      debug "didSave: clearing crashedSlots for module entry point",
+        entryPoint = savedSpawnInfo.entryPoint,
+        savedFile = savedFilePath
 
-        ls.pool.crashedSlots.excl(savedSpawnInfo.entryPoint)
+      ls.pool.crashedSlots.excl(savedSpawnInfo.entryPoint)
+      ls.pool.crashedSlots.excl(savedFilePath)

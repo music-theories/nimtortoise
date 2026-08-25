@@ -4,6 +4,8 @@ import chronos
 import chronos/asyncproc
 import chronicles
 
+import api
+
 import ../protocol/types
 import ../utils/utils
 import ../utils/process_utils

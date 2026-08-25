@@ -4,6 +4,7 @@ import chronos/[asyncproc, threadsync]
 import json_rpc/servers/socketserver
 
 import forest
+import api
 
 import ../protocol/types
 import ../configurations/configuration_types

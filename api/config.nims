@@ -5,4 +5,3 @@ when withDir(thisDir(), system.fileExists("nimble.paths")):
 # end Nimble config
 
 switch("path", thisDir() & "/../forest/src")
-switch("path", thisDir() & "/../api/src")

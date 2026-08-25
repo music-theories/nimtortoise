@@ -8,6 +8,22 @@ import ../utils/utils
 import ./[langserver_types, query_types]
 import ./[dispatcher_utils]
 
+proc getOpenButUnownedUris(
+  ls: LanguageServer,
+): seq[FileUri] = 
+  result = @[]
+  for f, fileInfo in ls.files.openFiles:
+    let asFilePathAbs = toFilePathAbs(f)
+    var owned = false
+    for entryPoint, slot in ls.pool.slots:
+      if asFilePathAbs == entryPoint:
+        owned = true
+      if f in slot.ownedUris:
+        owned = true
+    
+    if not(owned):
+      result.add(f)
+
 proc consolidateNimsuggestInstances(
   ls: LanguageServer,
   newSlot: NimsuggestSlot,
@@ -99,7 +115,7 @@ proc createSlotWithFallback(
   if spawnInfo.entryPoint notin ls.pool.crashedSlots and
      not ls.pool.slots.hasKey(spawnInfo.entryPoint):
     let moduleSlot = await spawnNewNimsuggestSlot(
-      ls.pool, spawnInfo, ls.pool.nimsuggest, ls.configurations.currentConfig)
+      ls.pool, spawnInfo, ls.pool.nimsuggest, ls.dependencies, ls.configurations.currentConfig)
     if moduleSlot.isSome:
       await ls.startSlotConsumer(moduleSlot.get(), params)
       return moduleSlot
@@ -121,9 +137,17 @@ proc createSlotWithFallback(
     extraArgs: @[],
   )
   let fileSlot = await spawnNewNimsuggestSlot(
-    ls.pool, fileInfo, ls.pool.nimsuggest, ls.configurations.currentConfig)
-  if fileSlot.isSome:
+    ls.pool, fileInfo, ls.pool.nimsuggest, 
+    ls.dependencies, ls.configurations.currentConfig
+  )
+  if fileSlot.isSome():
     await ls.startSlotConsumer(fileSlot.get(), params)
+  else:
+    ls.pool.crashedSlots.incl(filePath)
+    ls.notify("window/logMessage", %*{
+      "type": 4,
+      "message": fmt"Could not start nimsuggest for project {filePath}. "
+    })
   return fileSlot
 
 proc createOrphanSlot(
@@ -184,10 +208,6 @@ proc processDidOpenQuery*(
     # This file is not known by any running nimsuggest instance.
     # Check there is a free nimsuggest slot
     let filePath = toFilePathAbs(uri)
-
-    # Nimsuggest only accepts .nim files as entry points. Skip spawn for
-    # .nimble, .nims, and any other non-.nim files — they are not compilable
-    # by nimsuggest and will crash it with "command expects a filename".
     if not string(filePath).endsWith(".nim"):
       debug "didOpen: Non-.nim file, skipping nimsuggest spawn", uri = uri
       return
@@ -238,6 +258,13 @@ proc processDidOpenQuery*(
 
           else:
             debug "didOpen: Spawning was NOT successful.", entryPoint = spawnInfo.entryPoint
+
+    # If no spawn path added the file to openFiles, add it now with no slot.
+    # Without this, every DID_CHANGE generates a synthetic DID_OPEN that retries
+    # the (doomed) spawn indefinitely.
+    if uri notin ls.files.openFiles:
+      discard writeStashFile(ls.files.storageDir, uri, q.didOpen.textDocument.text)
+      ls.files.openFiles[uri] = initNlsFileInfo(q.didOpen.textDocument)
 
     let needToEvict = ls.pool.maxSlots > 0 and ls.pool.slots.len > ls.pool.maxSlots      
     debug "didOpen: Should slot be evicted?", maxSlots = ls.pool.maxSlots, filledSlots = ls.pool.slots.len, needToEvict = needToEvict

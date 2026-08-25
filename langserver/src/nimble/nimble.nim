@@ -5,6 +5,7 @@ import chronicles
 import stew/byteutils
 
 import forest
+import api
 
 import ../protocol/types
 import ../utils/process_utils
@@ -32,16 +33,14 @@ proc startNimbleProcess*(
   )
 
 proc getNimbleTasks*(
-  nimbleDumpCache: Table[FilePathAbs, NimbleDumpInfo]
+  nimbleDumpCache: NimbleInfo
 ): Future[seq[NimbleTask]] {.async.} =
-  # let rootPath: string = ls.capabilities.lspInitializeParams.getRootPath
-  # debug "Received tasks ", rootPath = rootPath
   debug "tasks: deleting NIMBLE_DIR before nimble tasks",
     NIMBLE_DIR_before = getEnv("NIMBLE_DIR", "<not set>"),
     HOME = getEnv("HOME", "<not set>")
   delEnv "NIMBLE_DIR"
   
-  for nimbleFile, dumpInfo in nimbleDumpCache:
+  for nimbleFile, dumpInfo in nimbleDumpCache.dump:
     let nimbleDirectory = parentDir(string(nimbleFile))
     debug "Running `nimble tasks` in directory to get a list of its tasks", dir = nimbleDirectory
     let process = await startNimbleProcess(@["tasks"], workingDir = nimbleDirectory)
@@ -63,7 +62,7 @@ proc getNimbleTasks*(
           result.add(NimbleTask(
             name: nameStripped, 
             description: desc.strip(), 
-            projectDir: nimbleDirectory
+            projectDir: DirPathAbs(nimbleDirectory)
           ))
           if nameStripped == "build": 
             foundBuild = true
@@ -73,24 +72,26 @@ proc getNimbleTasks*(
       result.add(NimbleTask(
         name: "build", 
         description: "-", 
-        projectDir: nimbleDirectory
+        projectDir: DirPathAbs(nimbleDirectory)
       ))
     if foundTEst == false:
       result.add(NimbleTask(
         name: "test", 
         description: "-", 
-        projectDir: nimbleDirectory
+        projectDir: DirPathAbs(nimbleDirectory)
       ))
     await process.shutdownChildProcess()
 
 proc runNimbleTask*(
-  params: RunTaskParams
-): Future[RunTaskResult] {.async.} =
+  command: seq[string],
+  workingDir: DirPathAbs,
+): Future[NimbleRunTaskResponse] {.async.} =
   let process = await startNimbleProcess(
-    params.command, workingDir = params.workingDir
+    command, 
+    workingDir = string(workingDir)
   )
   let res = await process.waitForExit(InfiniteDuration)
-  result.command = params.command
+  result.command = command
   let prefix = "\""
   while not process.stdoutStream.atEof():
     var lines = process.stdoutStream.readLine().await.splitLines
@@ -100,5 +101,5 @@ proc runNimbleTask*(
       if line != "":
         result.output.add(line)
 
-  debug "Ran nimble cmd/task", command = $params.command, output = $result.output
+  debug "Ran nimble cmd/task", command = $command, output = $result.output
   await process.shutdownChildProcess()

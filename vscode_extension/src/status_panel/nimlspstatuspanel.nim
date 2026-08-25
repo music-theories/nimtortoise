@@ -107,44 +107,14 @@ proc newLspItem*(
     statusItem.iconPath = iconPath.get
   cast[LspItem](statusItem)
 
-proc onLspSuggest*(action, projectFile: cstring) {.async.} =
-  #Handles extension/suggest calls 
-  #(right now only from the restart button in the suggest instance from the nim panel)
-  var projectFile = projectFile
-  if projectFile == "current":
-    var activeEditor: VscodeTextEditor = vscode.window.activeTextEditor
-    console.log("llega")
-    if activeEditor.isNil():
-      return
-    projectFile = activeEditor.document.fileName
-    console.log(projectFile)
-
-  case action
-  of "restart", "restartAll":
-    outputLine((&"Path to file {projectFile}").cstring)
-    let suggestParams = JsObject()
-    suggestParams.action = action
-    suggestParams.projectFile = projectFile
-    let response =
-      await fetchLsp[JsObject, JsObject](ext, "extension/suggest", suggestParams)
-    console.log(response)
-  else:
-    console.error("Action not supported")
-
-proc onCheckProject*() {.async.} =
-  var activeEditor: VscodeTextEditor = vscode.window.activeTextEditor
-  if activeEditor.isNil():
-    return
-  let projectFile = activeEditor.document.fileName
-  let params = newJsObject()
-  params.command = "nimtortoise.checkProject".cstring
-  params.arguments = @[projectFile.toJs()]
-  discard await ext.client.sendRequest("workspace/executeCommand", params)
 
 proc onShowNotification*(args: JsObject) =
-  let message = args.to(cstring)
+  ## args is [message, detail] — detail may be empty/undefined, falls back to message.
+  let arr = args.to(seq[cstring])
+  let title = arr[0]
+  let detail = if arr.len > 1 and arr[1] != "".cstring: arr[1] else: arr[0]
   vscode.window.showInformationMessage(
-    "Details", VscodeMessageOptions(detail: message, modal: true)
+    title, VscodeMessageOptions(detail: detail, modal: true)
   )
 
 proc onDeleteNotification*(args: JsObject) =
@@ -164,8 +134,8 @@ proc newNotificationItem*(notification: Notification): LspItem =
   item.command = newJsObject()
   item.command.command = "nimTortoise.showNotification".cstring
   item.command.title = "Show Notification".cstring
-  item.command.arguments = @[notification.message.toJs()]
-  item.tooltip = notification.message
+  item.command.arguments = @[notification.message.toJs(), notification.detail.toJs()]
+  item.tooltip = if notification.detail != "".cstring: notification.detail else: notification.message
   let color =
     fmt"notifications{capitalizeAscii($notification.kind)}Icon.foreground".cstring
   item.iconPath = vscode.themeIcon(notification.kind, vscode.themeColor(color))
@@ -182,7 +152,7 @@ proc notificationActionItems(lspItem: LspItem): seq[LspItem] =
   item.command = newJsObject()
   item.command.command = "nimTortoise.showNotification".cstring
   item.command.title = "Show Notification".cstring
-  item.command.arguments = @[notification.message.toJs()]
+  item.command.arguments = @[notification.message.toJs(), notification.detail.toJs()]
   item.iconPath =
     vscode.themeIcon("selection", vscode.themeColor("notificationsInfoIcon.foreground"))
   result.add cast[LspItem](item)
@@ -208,73 +178,6 @@ proc globalNotificationActionItems(): seq[LspItem] =
     vscode.themeIcon("trash", vscode.themeColor("notificationsErrorIcon.foreground"))
   @[cast[LspItem](item)]
 
-proc onNimbleTask*(name: cstring, projectDir: cstring = "") {.async.} =
-  let task = ext.getTaskByName(name, projectDir)
-  if task.isNone or task.get.isRunning:
-    console.log("Task already running or not found")
-    return
-  console.log("Executing onNimbleTask", name, projectDir)
-  let taskParams = RunTaskParams(command: @[name], workingDir: projectDir)
-
-  vscode.window
-  .withProgress(
-    VscodeProgressOptions{
-      location: VscodeProgressLocation.notification,
-      cancellable: false,
-      title: cstring(fmt"Nim: running task '{name}'..."),
-    },
-    proc(): Promise[RunTaskResult] =
-      ext.markTaskAsRunning(name, projectDir, true)
-      fetchLsp[RunTaskResult, RunTaskParams](ext, "extension/runTask", taskParams),
-  )
-  .then(
-    proc(taskResult: RunTaskResult) =
-      ext.markTaskAsRunning(name, projectDir, false)
-      outputLine(fmt"Task {name} finished".cstring)
-      for line in taskResult.output:
-        outputLine(line)
-      
-      let panel = vscode.window.createWebviewPanel(
-        "nimTask",
-        cstring(fmt"Nim Task: {name}"),
-        VscodeViewColumn.one,
-        VscodeWebviewPanelOptions()
-      )
-      
-      panel.webview.html = cstring(&"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="UTF-8">
-          <style>
-            body {{ 
-              padding: 10px;
-              font-family: var(--vscode-editor-font-family);
-              font-size: var(--vscode-editor-font-size);
-            }}
-            pre {{
-              background-color: var(--vscode-editor-background);
-              padding: 10px;
-              border-radius: 4px;
-              overflow-x: auto;
-            }}
-          </style>
-        </head>
-        <body>
-          <h2>Task: {name}</h2>
-          <h3>Command:</h3>
-          <pre>{taskResult.command.join(" ")}</pre>
-          <h3>Output:</h3>
-          <pre>{taskResult.output.join("\n")}</pre>
-        </body>
-        </html>
-      """)
-      
-  )
-  .catch(
-    proc(reason: JsObject) =
-      console.error("nimvscode - onNimbleTask Failed", reason)
-  )
 
 proc newNimbleProjectItem*(projectDir: cstring): LspItem =
   let label = ($projectDir).split("/")[^1].cstring
@@ -464,7 +367,8 @@ proc getChildrenImpl(
       var nsItems = @[
         newCheckProjectItem(),
         newLspItem("Capabilities", instance.capabilities.join(", ").cstring),
-        newLspItem("Version", instance.version),
+        newLspItem("Version", cstring($instance.version)),
+        newLspItem("Protocol", cstring($instance.protocol)),
         newLspItem("Path", instance.path),
         newLspItem("Port", cstring($instance.port)),
         newLspItem("Open Files", "", "", TreeItemCollapsibleState_Collapsed, instance = element.instance),
@@ -495,9 +399,3 @@ proc newNimLangServerStatusProvider*(): NimLangServerStatusProvider =
     getChildrenImpl(provider, element)
   provider
 
-proc fetchLspStatus*(state: ExtensionState): Future[NimLangServerStatus] {.async.} =
-  let client = state.client
-  let response = await client.sendRequest("extension/status", ().toJs())
-  let lspStatus = jsonStringify(response).jsonParse(NimLangServerStatus)
-  state.channel.appendLine(($lspStatus).cstring)
-  return lspStatus

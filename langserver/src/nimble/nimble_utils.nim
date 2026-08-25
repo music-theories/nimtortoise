@@ -57,8 +57,8 @@ proc getNimsuggestSpawnInfo*(
     let nf = nimbleFile.get()
     result.nimbleFile = nimbleFile
     workingDir = DirPathAbs(parentDir(string(nf)))
-    if nf in dependencies.nimble:
-      let dumpInfo = dependencies.nimble[nf]
+    if nf in dependencies.nimble.dump:
+      let dumpInfo = dependencies.nimble.dump[nf]
       let nimbleDir = parentDir(string(nf))
       for ep in dumpInfo.entryPoints:
         let abs = FilePathAbs((nimbleDir / string(ep)).normalizedPath)

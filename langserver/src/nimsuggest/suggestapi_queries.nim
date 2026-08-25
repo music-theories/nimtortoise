@@ -5,6 +5,7 @@ import chronos
 import chronicles
 
 import forest
+import api
 
 import ../configurations/configurations
 import ../protocol/types
@@ -17,7 +18,8 @@ proc getNimSuggestPath*(
   nimInfo: NimInfo, conf: NlsConfig
 ): Future[FilePathAbs] {.async.} =
   let nimsuggestPath = expandTilde(string(conf.nimsuggestPath))
-  if nimsuggestPath.len > 0:
+
+  if nimsuggestPath.len > 0 and nimsuggestPath != "nimsuggest":
     debug "findNimsuggestPathAndVersion: Using nimsuggest",
       path = nimsuggestPath
     return FilePathAbs(nimsuggestPath)
@@ -75,6 +77,24 @@ proc getNimsuggestProtocolVersion*(
   else:
     return parseInt(l)
 
+proc getNimsuggestVersion*(
+  nimsuggestPath: FilePathAbs,
+): string {.gcsafe.} =
+  result = ""
+  var process = startProcess(
+    command = string(nimsuggestPath),
+    args = @["--info:nimVer"],
+    options = {poUsePath},
+  )
+  var l: string
+  if not process.outputStream.readLine(l):
+    l = ""
+  var exitCode = process.waitForExit()
+  if exitCode != 0 or l == "":
+    return ""
+  else:
+    return l
+
 proc getNimsuggestCapabilities*(
   nimsuggestPath: FilePathAbs
 ): set[NimSuggestCapability] {.gcsafe.} =
@@ -101,8 +121,6 @@ proc getNimsuggestCapabilities*(
       if cap.isSome:
         result.incl(cap.get)
 
-  # protocolVersion: int, 
-  # capabilities: set[NimSuggestCapability],
 
 proc buildNimsuggestArguments*(
   spawningInfo: NimsuggestSpawnInfo,

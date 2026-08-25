@@ -134,6 +134,9 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
           debug "File deleted", uri = uri
           let path = toFilePathAbs(uri)
 
+          if string(path).endsWith(".nim"):
+            ls.dependencies = await initForest(ls.files.rootPath)
+
           if uri in ls.files.openFiles:
             ls.files.openFiles.del(uri)
 

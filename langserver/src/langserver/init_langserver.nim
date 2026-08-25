@@ -6,6 +6,7 @@ import json_rpc/[servers/socketserver]
 import chronicles
 
 import forest
+import api
 
 import ../nph/formatting
 
@@ -20,6 +21,7 @@ import ./[
   capability_configs,
   langserver_types
 ]
+
 
 proc initLanguageServer*(params: CommandLineParams, storageDir: DirPathAbs): LanguageServer =
   let currentConfig = initDefaultNlsConfig()
@@ -166,11 +168,7 @@ proc initialize*(
       workspaceSymbolProvider: some(true),
       executeCommandProvider: some(
         ExecuteCommandOptions(
-          commands: some(@[
-            "nimtortoise.recompile",
-            "nimtortoise.restart",
-            "nimtortoise.checkProject"
-          ])
+          commands: some(serverCapabilitiesToEndpoints())
         )
       ),
       inlayHintProvider: some(InlayHintOptions(resolveProvider: some(false))),
@@ -252,11 +250,12 @@ proc initialized*(ls: LanguageServer, _: JsonNode): Future[void] {.async.} =
     ls.dependencies.nim, config
   )
 
-  ls.pool.nimsuggest.exePath = nimsuggestPath
-  ls.pool.nimsuggest.protocol = getNimsuggestProtocolVersion(nimsuggestPath)
-  ls.pool.nimsuggest.capabilities = getNimsuggestCapabilities(nimsuggestPath)
+  ls.pool.nimsuggest = NimsuggestSettings(
+    exePath: nimsuggestPath,
+    protocol: getNimsuggestProtocolVersion(nimsuggestPath),
+    version: getNimsuggestVersion(nimsuggestPath),
+    capabilities: getNimsuggestCapabilities(nimsuggestPath)
+  )
 
   if not ls.lsInitialized.finished:
     ls.lsInitialized.complete()
-
-let usingMyMind = SpecialKind.GOODBYE

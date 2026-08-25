@@ -4,16 +4,9 @@ import platform/vscodeApi
 
 from platform/languageClientApi import VscodeLanguageClient
 
+import api
+
 type
-  # Backend* = cstring
-  # Timestamp* = cint
-  # NimsuggestId* = cstring
-
-  # PendingRequestState* = enum
-  #   prsOnGoing = "OnGoing"
-  #   prsCancelled = "Cancelled"
-  #   prsComplete = "Complete"
-
   PendingRequestStatus* = object
     name*: cstring
     projectFile*: cstring
@@ -24,6 +17,7 @@ type
     projectFile*: cstring
     capabilities*: seq[cstring]
     version*: cstring
+    protocol*: cstring
     path*: cstring
     port*: int32
     openFiles*: seq[cstring]
@@ -50,6 +44,7 @@ type
 
   Notification* = object
     message*: cstring
+    detail*: cstring  ## optional longer description shown in the modal; falls back to message
     kind*: cstring
     id*: cstring
     date*: DateTime
@@ -61,76 +56,10 @@ type
 
   LSPVersion* = tuple[major: int, minor: int, patch: int]
 
-  NimbleTask* = object
-    name*: cstring
-    description*: cstring
-    projectDir*: cstring ## absolute directory where nimble was run
-    isRunning*: bool
-
-  RunTaskParams* = object
-    command*: seq[cstring] #command and args
-    workingDir*: cstring ## directory in which to run the task
-  
-  RunTaskResult* = object
-    command*: seq[cstring] #command and args
-    output*: seq[cstring] #output lines
-
-  TestInfo* = object
-    name*: cstring
-    line*: int
-    file*: cstring
-
-  TestSuiteInfo* = object
-    name*: cstring #The suite name, empty if it's a global test
-    tests*: seq[TestInfo]
-
-  TestProjectInfo* = object
-    entryPoint*: cstring
-    suites*: JsAssoc[cstring, TestSuiteInfo]
-    error*: cstring
-
-  ListTestsParams* = object
-    entryPoint*: cstring #can be patterns? if empty we could do the same as nimble does or just run `nimble test args`
-
-  ListTestsResult* = object
-    projectInfo*: TestProjectInfo
-
-  RunTestResult* = object
-    name*: cstring
-    time*: float
-    failure*: cstring
-
-  RunTestSuiteResult* = object
-    name*: cstring
-    tests*: int
-    failures*: int
-    errors*: int
-    skipped*: int
-    time*: float
-    testResults*: seq[RunTestResult]
-  
-  RunTestParams* = object
-    entryPoint*: cstring
-    suiteName*: cstring #Optional, if provided, only run tests in the suite
-    testNames*: seq[cstring] #Optional, if provided, only run the specific tests
-
-  RunTestProjectResult* = object
-    suites*: seq[RunTestSuiteResult]
-    fullOutput*: cstring
-
-  CancelTestResult* = object
-    cancelled*: bool
-
   LSPInstallPathKind* = enum
     lspPathSetting, lspPathLocal, lspPathGlobal, lspPathInvalid
 
-  #TODO!!!
-  LspExtensionCapability* = enum #List of extensions the lsp server support.
-    excNone = "None"
-    excRestartSuggest = "RestartSuggest"
-    excNimbleTask = "NimbleTask"
-    excRunTests = "RunTests"
-    
+type    
   ExtensionState* = ref object
     ctx*: VscodeExtensionContext
     config*: VscodeWorkspaceConfiguration

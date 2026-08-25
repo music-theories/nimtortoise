@@ -46,26 +46,6 @@ proc refreshLspStatus*(
   ext.onExtensionReady()
 
 
-proc fetchListTests*(state: ExtensionState, params: ListTestsParams): Future[ListTestsResult] {.async.} =
-  let client = state.client
-  let response = await client.sendRequest("extension/listTests", params.toJs())
-  console.log(response.jsonStringify())
-  let test = response.jsonStringify().jsonParse(ListTestsResult)
-  return test
-
-proc requestRunTest*(state: ExtensionState, params: RunTestParams): Future[RunTestProjectResult] {.async.} =
-  let client = state.client
-  let response = await client.sendRequest("extension/runTests", params.toJs())
-  console.log(response.jsonStringify())
-  let test = response.jsonStringify().jsonParse(RunTestProjectResult)
-  return test
-
-proc requestCancelTest*(state: ExtensionState): Future[CancelTestResult] {.async.} =
-  let client = state.client
-  let response = await client.sendRequest("extension/cancelTest", ().toJs())
-  console.log(response.jsonStringify())
-  let test = response.jsonStringify().jsonParse(CancelTestResult)
-  return test
 
 proc startClientSocket(portFut: Future[int]): proc(): Future[ServerOptions] {.async.} =
   return proc(): auto {.async.} =
@@ -113,10 +93,6 @@ proc startSocket(
       )
   )
   startClientSocket(portPromise)
-
-proc refreshNimbleTasks*() {.async.} =
-  ext.nimbleTasks = await fetchLsp[seq[NimbleTask]](ext, "extension/tasks")
-
 
 proc next_provideInlayHints(self: JsObject, document: JsObject, viewPort: JsObject, token: JsObject): Promise[JsObject] {.importjs: "#(@)".}
 proc provideInlayHints(document: JsObject, viewPort: JsObject, token: JsObject, next: JsObject): Promise[seq[InlayHint]] {.async.}=
@@ -173,13 +149,13 @@ proc getLspPath(state: ExtensionState): (cstring, LSPInstallPathKind) =
   var lspPath = vscode.workspace.getConfiguration("nimTortoise").getStr("lsp.path")
   if lspPath.isValidLspPath:
     return (lspPath, lspPathSetting)
-  var langserverExec: cstring = "nimlangserver"
+  var langserverExec: cstring = "nimtortoise"
   if process.platform == "win32":
     langserverExec.add ".cmd"
   lspPath = path.join(getLocalLspDir(), "nimbledeps", "bin", langserverExec)
   if isValidLspPath(lspPath):
     return (lspPath, lspPathLocal)
-  lspPath = getBinPath("nimlangserver")
+  lspPath = getBinPath("nimtortoise")
   if isValidLspPath(lspPath):
     return (lspPath, lspPathGlobal)
   return ("".cstring, lspPathInvalid)
@@ -257,6 +233,7 @@ proc startLanguageServer(tryInstall: bool, state: ExtensionState) {.async.} =
     type
       Message = object of JsObject
         message: cstring
+        detail: cstring
         `type`: MessageType
 
       MessageType {.pure.} = enum
@@ -280,6 +257,7 @@ proc startLanguageServer(tryInstall: bool, state: ExtensionState) {.async.} =
         let id = $state.statusProvider.lastId
         let notification = Notification(
           message: message.message,
+          detail: message.detail,
           kind: messageTypToStr(message.`type`),
           id: id.cstring,
           date: now(),
@@ -301,7 +279,7 @@ proc startLanguageServer(tryInstall: bool, state: ExtensionState) {.async.} =
         1000, #refresh time
       )
 
-    outputLine("Nim Language Server started")
+    outputLine("Nim Tortoise Language Server started")
 
 export startLanguageServer
 

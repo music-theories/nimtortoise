@@ -11,6 +11,7 @@ import json_serialization
 import json_rpc/[servers/socketserver]
 import chronicles
 import forest
+import api
 
 import ../protocol/[enums, types]
 import ../configurations/configurations
@@ -99,8 +100,9 @@ proc getLspStatus*(ls: LanguageServer): NimLangServerStatus {.raises: [].} =
           seenPorts.incl(ns.port)
           var nsStatus = NimSuggestStatus(
             projectFile: string(slot.spawnInfo.entryPoint),
-            capabilities: ns.capabilities.toSeq(),
-            version: "TODO Nimsuggest Version",
+            capabilities: ls.pool.nimsuggest.capabilities.toSeq(),
+            version: ls.pool.nimsuggest.version,
+            protocol: $(ls.pool.nimsuggest.protocol),
             path: $(ls.pool.nimsuggest.exePath),
             port: ns.port,
           )
