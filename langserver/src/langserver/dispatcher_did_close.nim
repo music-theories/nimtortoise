@@ -27,14 +27,10 @@ proc processDidCloseQuery*(
       let slotThatOwnsUri = slotCheck.get()
       slotThatOwnsUri.ownedUris.excl(uri)
 
-      # If the slot has no remaining tracked files, shut it down — important for standalone orphan slots.
       debug "Check the amount of owned uris for this slot:", uri = uri, ownedUris = slotThatOwnsUri.ownedUris.len
-      # Check if it is a orphan
+      # I decided to remove the setting where a nimsuggest would not stop if there was only one slot left, as this was causing too many edge cases.
       if slotThatOwnsUri.ownedUris.len == 0:
-        if ls.pool.slots.len > 1 or not(isANimbleEntryPoint(ls.dependencies.nimble, uri)):
-          # The ls.pool.slots.len > 1 qualification means that if there is only one slot left, it is persisted, so nimsuggest is not constantly spawning and stopping.
-          debug "Stopping this slot:", uri = uri
-          discard await stopNimsuggestSlotAndRemoveFromPool(ls.pool, slotThatOwnsUri)
-          ls.pool.removeSlot(slotThatOwnsUri.spawnInfo.entryPoint)
+        debug "Stopping this slot:", uri = uri
+        discard await stopNimsuggestSlotAndRemoveFromPool(ls.pool, slotThatOwnsUri)
 
     ls.files.openFiles.del(uri)

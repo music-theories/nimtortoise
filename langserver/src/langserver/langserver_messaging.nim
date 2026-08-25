@@ -43,7 +43,6 @@ proc showMessage*(
   except CatchableError:
     discard
 
-
 proc toPendingRequestStatus(pr: PendingRequest): PendingRequestStatus =
   result.time =
     case pr.state
@@ -52,9 +51,8 @@ proc toPendingRequestStatus(pr: PendingRequest): PendingRequestStatus =
     else:
       $(pr.endTime - pr.startTime)
   result.name = pr.name
-  result.projectFile = pr.projectFile.get("")
+  result.entryPoint = pr.entryPoint.get(FilePathAbs(""))
   result.state = $pr.state
-
 
 proc progressSupported*(ls: LanguageServer): bool =
   return ls.capabilities.lspInitializeParams.capabilities.window
@@ -84,10 +82,13 @@ proc removeCompletedPendingRequests*(
     ls.messaging.pendingRequests.del id
 
 
-proc getLspStatus*(ls: LanguageServer): NimLangServerStatus {.raises: [].} =
-  result.lspPath = getAppFilename()
-  result.version = LSPVersion
-  result.extensionCapabilities = ls.capabilities.extensionCapabilities.toSeq
+proc getLspStatus*(ls: LanguageServer): NimTortoiseServerStatus {.raises: [].} =
+
+  result.extensionCapabilities = ls.capabilities.extensionCapabilities.toSeq()
+  result.exe = NimTortoiseExeStatus(
+    path: FilePathAbs(getAppFilename()),
+    version: LspVersion
+  )
   var seenPorts = initHashSet[int]()
   if ls.pool != nil:
     for slot in ls.pool.slots.values:
@@ -99,8 +100,7 @@ proc getLspStatus*(ls: LanguageServer): NimLangServerStatus {.raises: [].} =
             continue
           seenPorts.incl(ns.port)
           var nsStatus = NimSuggestStatus(
-            projectFile: string(slot.spawnInfo.entryPoint),
-            capabilities: ls.pool.nimsuggest.capabilities.toSeq(),
+            entryPoint: slot.spawnInfo.entryPoint,
             version: ls.pool.nimsuggest.version,
             protocol: $(ls.pool.nimsuggest.protocol),
             path: $(ls.pool.nimsuggest.exePath),
@@ -108,12 +108,12 @@ proc getLspStatus*(ls: LanguageServer): NimLangServerStatus {.raises: [].} =
           )
           for open in slot.ownedUris.toSeq():
             nsStatus.openFiles.add(string(open))
-          result.nimsuggestInstances.add nsStatus
+          result.pool.add(nsStatus)
       except CatchableError:
         discard
   for openFile in ls.files.openFiles.keys:
     let openFilePath = toFilePathAbs(openFile)
-    result.openFiles.add string(openFilePath)
+    result.openFiles.add(openFilePath)
 
   result.pendingRequests = ls.messaging.pendingRequests.values.toSeq().map(toPendingRequestStatus)
   result.projectErrors = ls.messaging.projectErrors
@@ -124,12 +124,12 @@ proc sendStatusChanged*(ls: LanguageServer) {.raises: [].} =
     ls.notify("extension/statusUpdate", status)
     ls.messaging.lastStatusSent = status
 
-proc addProjectFileToPendingRequest*(ls: LanguageServer, id: uint, uri: FileUri) =
-  # WHAT DOES THIS ACTUALLY DO?
+proc addProjectFileToPendingRequest*(
+  ls: LanguageServer, id: uint, uri: FileUri
+) =
   try:
     if id in ls.messaging.pendingRequests:
-      ls.messaging.pendingRequests[id].projectFile = some string(toFilePathAbs(uri))
+      ls.messaging.pendingRequests[id].entryPoint = some(toFilePathAbs(uri))
       ls.sendStatusChanged()
   except CatchableError as e:
     error "addProjectFileToPendingRequest failed", uri = uri, msg = e.msg
-

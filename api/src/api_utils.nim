@@ -1,7 +1,33 @@
-import std/[json, strutils, jsffi]
+import std/[json, strutils]
 
 import forest
 import ./[api_types]
+
+proc toJsonHook*(x: LspExtensionCapability): JsonNode =
+  newJString($x)
+
+proc toJsonHook*(x: NimSuggestCapability): JsonNode =
+  newJString($x)
+
+proc toJsonHook*(r: ExtensionCommandResponse): JsonNode =
+  result = newJObject()
+  result["kind"] = newJString($r.kind)
+  case r.kind
+  of SERVER_STATUS:
+    result["serverStatus"] = %r.serverStatus
+  of SERVER_CAPABILITIES:
+    result["serverCapabilities"] = %r.serverCapabilities
+  of SERVER_RESTART,
+     NIMSUGGEST_RESTART,
+     NIMSUGGEST_RECOMPILE,
+     NIMSUGGEST_CHECK_PROJECT,
+     NIMSUGGEST_STOP,
+     NIM_MACRO_EXPAND:
+    discard
+  of NIMBLE_LIST_TASKS:
+    result["nimbleListTasks"] = %r.nimbleListTasks
+  of NIMBLE_RUN_TASK:
+    result["nimbleRunTask"] = %r.nimbleRunTask
 
 proc toExtensionCommandRequest*(
   params: ExecuteCommandRequestParams
@@ -14,8 +40,6 @@ proc toExtensionCommandRequest*(
   of $(SERVER_RESTART):
     return ExtensionCommandRequest(kind: SERVER_RESTART)
 
-  of $(NIMSUGGEST_RESTART_ALL):
-    return ExtensionCommandRequest(kind: NIMSUGGEST_RESTART_ALL)
   of $(NIMSUGGEST_RESTART):
     let slotString = 
       if "slot" in params.arguments: params.arguments["slot"].getStr()
@@ -78,7 +102,6 @@ func getAllServerCapabilities*(): seq[LspExtensionCapability] =
     SERVER_STATUS,
     SERVER_CAPABILITIES,
     SERVER_RESTART,
-    NIMSUGGEST_RESTART_ALL,
     NIMSUGGEST_RECOMPILE,
     NIMSUGGEST_RESTART,
     NIMSUGGEST_STOP,
@@ -88,8 +111,14 @@ func getAllServerCapabilities*(): seq[LspExtensionCapability] =
     NIM_MACRO_EXPAND
   ]
 
-func serverCapabilitiesToEndpoints*(): seq[string] = 
+func serverCapabilitiesToEndpoints*(): seq[string] =
   result = @[]
   let capabilities = getAllServerCapabilities()
   for c in capabilities:
-    result.add("nimTortoise." & $(c))
+    result.add($(c))
+
+func messageTypToStr*(typ: MessageType): cstring =
+  case typ
+  of MessageType.Error: "error"
+  of MessageType.Warning: "warning"
+  else: "info"

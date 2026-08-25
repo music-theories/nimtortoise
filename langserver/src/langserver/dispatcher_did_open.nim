@@ -1,4 +1,4 @@
-import std/[options, sets, tables, sequtils, strutils, strformat, json]
+import std/[options, sets, tables, sequtils, strutils, strformat, json, times]
 import chronos
 import chronicles
 import ../nimsuggest/nimsuggest
@@ -170,6 +170,9 @@ proc processDidOpenQuery*(
   # Check if file is already open
   if uri in ls.files.openFiles:
     debug "didOpenFile: URI is already in openFiles", uri = uri
+    ls.files.openFiles[uri].lastSaved = times.now()
+    ls.files.openFiles[uri].lastUserInteraction = times.now()
+
     let slotCheck = getSlotThatOwnsUri(ls.pool, uri)
     if slotCheck.isSome():
       let slotThatOwnsUri = slotCheck.get()
@@ -196,6 +199,7 @@ proc processDidOpenQuery*(
     debug "didOpen: file is known by a running nimsuggest instance.  Add file to the correct slot", uri = uri
     let slotThatKnows = fileIsKnown.get()
     ls.addFileToOpenFiles(slotThatKnows, q.didOpen.textDocument)
+
     slotThatKnows.queryMailbox.addLastNoWait(NimsuggestQuery[LspFilePosition](
       kind: NimsuggestQueryKind.CHECK_FILE,
       uri: uri,
@@ -269,7 +273,7 @@ proc processDidOpenQuery*(
     let needToEvict = ls.pool.maxSlots > 0 and ls.pool.slots.len > ls.pool.maxSlots      
     debug "didOpen: Should slot be evicted?", maxSlots = ls.pool.maxSlots, filledSlots = ls.pool.slots.len, needToEvict = needToEvict
     if needToEvict:
-      let slotToEvict = nimsuggestSlotToEvict(ls.pool)
+      let slotToEvict = nimsuggestSlotToEvict(ls.pool, ls.files.openFiles)
       debug "didOpen: Evicting a slot.", slotToEvict = slotToEvict.spawnInfo.entryPoint
       while slotToEvict.queryMailbox.len > 0:
         let pendingQ = slotToEvict.queryMailbox.popFirstNoWait()

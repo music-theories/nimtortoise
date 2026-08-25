@@ -93,7 +93,6 @@ proc attemptCrashRespawn*(
       slot.ns.complete(ns)
       slot.state = SlotState.READY
       slot.crashCount = 0
-      slot.lastCmdTime = now()
 
       if pool.statusChangedProc != nil:
         pool.statusChangedProc()
@@ -252,7 +251,6 @@ proc spawnNewNimsuggestSlot*(
     crashedUris: initHashSet[FileUri](),
     ns: newFuture[NimSuggest]("spawnNewNimsuggestSlot"),
     queryMailbox: newAsyncQueue[NimsuggestQuery[LspFilePosition]](),
-    lastCmdTime: now(),
     crashCount: 0
   )
 
@@ -279,7 +277,6 @@ proc spawnNewNimsuggestSlot*(
 
     newSlot.ns.complete(ns)
     newSlot.state = SlotState.READY
-    newSlot.lastCmdTime = now()
 
     if pool.statusChangedProc != nil:
       pool.statusChangedProc()

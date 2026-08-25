@@ -90,32 +90,59 @@ proc addFileToOpenFiles*(
   nimsuggestSlot.ownedUris.incl(params.uri)
   ls.files.openFiles[params.uri] = fileInfo
 
-proc sortNimsuggestByDate(a, b: NimsuggestSlot): int = 
-  if a.lastCmdTime == b.lastCmdTime:
+proc getDateOfLatestUserInteractionInSlot*(
+  slot: NimsuggestSlot, 
+  openFiles: TableRef[FileUri, NlsFileInfo],
+): DateTime =
+  result = dateTime(2020, mJan, 1)
+  for uri in slot.ownedUris:
+    if uri in openFiles:
+      let lastDate = openFiles[uri].lastUserInteraction
+      if lastDate > result:
+        result = lastDate
+
+proc getDateOfLatestSaveInSlot*(
+  slot: NimsuggestSlot, 
+  openFiles: TableRef[FileUri, NlsFileInfo],
+): DateTime =
+  result = dateTime(2020, mJan, 1)
+  for uri in slot.ownedUris:
+    if uri in openFiles:
+      let lastSave = openFiles[uri].lastSaved
+      if lastSave > result:
+        result = lastSave
+
+proc getAllSlotSaveTimes*(
+  slots: seq[NimsuggestSlot],
+  openFiles: TableRef[FileUri, NlsFileInfo],
+): seq[tuple[slot: NimsuggestSlot, time: DateTime]] = 
+  result = @[]
+  for slot in slots:
+    result.add((
+      slot: slot, 
+      time: getDateOfLatestSaveInSlot(slot, openFiles)
+    ))
+
+proc sortSlotsByTime(a, b: tuple[slot: NimsuggestSlot, time: DateTime]): int = 
+  if a.time == b.time:
     return 0
-  elif a.lastCmdTime < b.lastCmdTime:
+  elif a.time < b.time:
     return -1
   else:
     return 1
 
-proc getLeastRecentlyUsedNimsuggestSlotInFullPool*(pool: NimsuggestPool): NimsuggestSlot =
-  ## Returns the active slot with the oldest lastCmdTime.
-  ## Returns nil if no active slots exist.
-  let currentTime = now()
-  # var nimsuggestInstances = sorted(sortNimsuggestByDate)
-  var allSlots: seq[NimsuggestSlot] = @[]
-  for slot in pool.slots.values.toSeq:
-    allSlots.add(slot)
-  let sortedSlots = sorted(allSlots, sortNimsuggestByDate)
-  return sortedSlots[0]
+proc getLeastRecentlySavedSlot*(
+  slots: seq[NimsuggestSlot],
+  openFiles: TableRef[FileUri, NlsFileInfo],
+): NimsuggestSlot = 
+  let saveTimes: seq[tuple[slot: NimsuggestSlot, time: DateTime]] = getAllSlotSaveTimes(slots, openFiles)
+  let sortedSlotsByTime: seq[tuple[slot: NimsuggestSlot, time: DateTime]] = sorted(saveTimes, sortSlotsByTime)
+  return sortedSlotsByTime[0].slot
 
-proc lruAmong(slots: seq[NimsuggestSlot]): NimsuggestSlot =
-  result = slots[0]
-  for slot in slots[1..^1]:
-    if slot.lastCmdTime < result.lastCmdTime:
-      result = slot
-
-proc nimsuggestSlotToEvict*(pool: NimsuggestPool): NimsuggestSlot =
+proc nimsuggestSlotToEvict*(
+  pool: NimsuggestPool, 
+  openFiles: TableRef[FileUri, NlsFileInfo],
+): NimsuggestSlot =
   ## Selects the slot to evict from a full pool.
   ## Priority: CRASHED → STOPPING → READY → SPAWNING.
   ## Within each tier, the least recently used slot is chosen.
@@ -131,7 +158,7 @@ proc nimsuggestSlotToEvict*(pool: NimsuggestPool): NimsuggestSlot =
       allCandidates.add(slot)
 
   if stoppedCandidates.len > 0:
-    return lruAmong(stoppedCandidates)
+    return getLeastRecentlySavedSlot(stoppedCandidates, openFiles)
   
   # Then check CRASHED
   var crashedCandidates: seq[NimsuggestSlot] = @[]
@@ -141,7 +168,7 @@ proc nimsuggestSlotToEvict*(pool: NimsuggestPool): NimsuggestSlot =
       allCandidates.add(slot)
 
   if crashedCandidates.len > 0:
-    return lruAmong(crashedCandidates)
+    return getLeastRecentlySavedSlot(crashedCandidates, openFiles)
 
   # Then check READY slots 
   var readyButEmptyCandidates: seq[NimsuggestSlot] = @[]
@@ -156,11 +183,11 @@ proc nimsuggestSlotToEvict*(pool: NimsuggestPool): NimsuggestSlot =
   
   # Prefer READY slots with no owned URIs...
   if readyButEmptyCandidates.len > 0:
-    return lruAmong(readyButEmptyCandidates)
+    return getLeastRecentlySavedSlot(readyButEmptyCandidates, openFiles)
 
   # ... then those that do own URIs...
   if readyButFullCandidates.len > 0:
-    return lruAmong(readyButFullCandidates)
+    return getLeastRecentlySavedSlot(readyButFullCandidates, openFiles)
 
   # Then finally, SPAWNING slots (we gotta give them a chance!!!)
   var spawningCandidates: seq[NimsuggestSlot] = @[]
@@ -170,8 +197,8 @@ proc nimsuggestSlotToEvict*(pool: NimsuggestPool): NimsuggestSlot =
       allCandidates.add(slot)
 
   if spawningCandidates.len > 0:
-    return lruAmong(spawningCandidates)
+    return getLeastRecentlySavedSlot(spawningCandidates, openFiles)
   
-  return lruAmong(allCandidates)
+  return getLeastRecentlySavedSlot(allCandidates, openFiles)
   # Unreachable if precondition holds, but satisfies the compiler.
   # raiseAssert "nimsuggestSlotToEvict: pool has slots but none matched any state"

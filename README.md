@@ -222,6 +222,15 @@ In the previous release, diagnostics (errors, warnings, hints) were silently dro
 - **Formalised extension protocol** — extension capabilities (`RestartSuggest`, `NimbleTask`, `RunTests`) and nimsuggest capabilities (`con`, `exceptionInlayHints`, `unknownFile`) are now defined in `protocol/extensions.nim` rather than scattered as magic strings.
 - **`.vscode/settings.json` namespace** — all settings entries have been switched from the `nim.` prefix to `nimTortoise.` to prevent conflicts when `nimlangserver` or `vscode-nim` are also installed.
 - Internal refactoring (81 files changed).  Including splitting the single 1,198-line `protocol/types.nim` into seven focused modules, extracting LSP handlers into per-domain modules and creating separate dispatcher files for `textDocument/didOpen` and `textDocument/didChange`.
+- **Warning errors when nimsuggest thinks the same types are different** 
+
+```
+Error: type mismatch
+Expression: newCodeLensProvider(
+✗  [1] `seq[VscodeCodeLens]` should be `seq[VscodeCodeLens]`
+)
+Note: nimsuggest may be registering the same type as two distinct types due to an internal module graph inconsistency. Consider restarting nimsuggest.nim(nimsuggest chk)
+```
 
 ### Removal of Exception Inlay Hints
 

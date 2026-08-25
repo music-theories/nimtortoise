@@ -3,13 +3,11 @@
 ##      have specific status vs progress indicator guidance and we're spamming
 ##      the api, this should get reworked.
 
-import platform/vscodeApi
 import std/jsconsole
-
+import ../platform/vscodeApi
 
 var statusBarEntry: VscodeStatusBarItem
 var progressBarEntry: VscodeStatusBarItem
-
 
 proc showHideStatus*(): void =
   if statusBarEntry.isNil():
@@ -52,3 +50,13 @@ proc showNimProgress*(msg: cstring): void =
 
 proc updateNimProgress*(msg: cstring): void =
   progressBarEntry.text = msg
+
+# --- TERMINAL ---
+var terminal {.threadvar.}: VscodeTerminal
+
+proc initTerminalHandlers*() =
+  vscode.window.onDidCloseTerminal(
+    proc(e: VscodeTerminal) =
+      if terminal.toJs().to(bool) and e.processId == terminal.processId:
+        terminal = nil
+  )

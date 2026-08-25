@@ -3,6 +3,7 @@ import chronos
 import chronos/asyncproc
 import stew/byteutils
 import chronicles
+import api
 import ../protocol/[enums, types]
 import ../langserver/[langserver_types, langserver_messaging]
 
@@ -33,7 +34,7 @@ proc format*(
   if res != 0:
     let err = string.fromBytes(process.stderrStream.read().await)
     error "There was an error trying to format the document. ", err = err
-    ls.showMessage(&"Error formating {uri}:{err}", MessageType.Error)
+    ls.showMessage(&"Error formating {uri}:{err}", MessageType.Error) 
     return none(TextEdit)
 
   #if enough time has passed since last modification, we skip the formatting:

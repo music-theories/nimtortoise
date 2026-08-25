@@ -3,6 +3,7 @@ import chronos
 import chronos/asyncproc
 import chronicles
 import json_serialization
+import api
 
 import ../nim_compiler/nim_expand
 import ../nimsuggest/nimsuggest

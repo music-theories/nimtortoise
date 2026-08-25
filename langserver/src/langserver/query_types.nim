@@ -39,16 +39,14 @@ type
       formatting*: DocumentFormattingParams
       formattingResponse*: Future[seq[TextEdit]]
 
-# === EXTENSION COMMANDS ===
-# See protocol/extensions.nim
-
-
 # === LANGUAGE SERVER QUERIES ===
 type
   LangserverQueryKind* {.pure.} = enum
     NIMSUGGEST    ## Route to a per-slot queryMailbox via routeQuery.
     FILE_ACCESS   ## Execute a file operation (open/change/save/close/rename/delete).
+    RESTART
     SHUTDOWN
+
 
   LangserverQuery* = object
     case kind*: LangserverQueryKind
@@ -58,3 +56,5 @@ type
       fileAccess*: FileAccessQuery
     of LangserverQueryKind.SHUTDOWN:
       shutdown*: Future[bool]
+    of LangserverQueryKind.RESTART:
+      restart*: Future[bool]

@@ -40,28 +40,28 @@ proc onStartDebugSession*(session: VscodeDebugSession) =
   let arg = VscodeDebugExpression(expression: cmd, context: "repl")
   discard session.customRequest("evaluate", arg)
 
-proc setNimDir*(state: ExtensionState) =
-  #TODO allow the user specify a path in the settings
-  #Exec nimble dump and extract the nimDir if it exists
-  if not vscode.workspace.workspaceFolders.toJs().to(bool):
-    return
+# proc setNimDir*(state: ExtensionState) =
+#   #TODO allow the user specify a path in the settings
+#   #Exec nimble dump and extract the nimDir if it exists
+#   if not vscode.workspace.workspaceFolders.toJs().to(bool):
+#     return
 
-  let path = vscode.workspace.workspaceFolders[0].uri.fsPath
-  var process = cp.spawn(
-    getNimbleExecPath(), @["dump".cstring], SpawnOptions(shell: true, cwd: path)
-  )
+#   let path = vscode.workspace.workspaceFolders[0].uri.fsPath
+#   var process = cp.spawn(
+#     getNimbleExecPath(), @["dump".cstring], SpawnOptions(shell: true, cwd: path)
+#   )
 
-  process.stdout.onData(
-    proc(data: Buffer) =
-      for line in splitLines($data.toString):
-        if line.startsWith("nimDir"):
-          state.nimDir = line[(1 + line.find '"') ..^ 2]
-          outputLine(
-            fmt"[info] Using NimDir from nimble dump. NimDir: {state.nimDir}".cstring
-          )
-        if line.startsWith("testEntryPoint"):
-          state.dumpTestEntryPoint = line[(1 + line.find '"') ..^ 2]
-          outputLine(
-            fmt"[info] Using testEntryPoint from nimble dump. testEntryPoint: {state.dumpTestEntryPoint}".cstring
-          )
-  )
+#   process.stdout.onData(
+#     proc(data: Buffer) =
+#       for line in splitLines($data.toString):
+#         if line.startsWith("nimDir"):
+#           state.nimDir = line[(1 + line.find '"') ..^ 2]
+#           outputLine(
+#             fmt"[info] Using NimDir from nimble dump. NimDir: {state.nimDir}".cstring
+#           )
+#         if line.startsWith("testEntryPoint"):
+#           state.dumpTestEntryPoint = line[(1 + line.find '"') ..^ 2]
+#           outputLine(
+#             fmt"[info] Using testEntryPoint from nimble dump. testEntryPoint: {state.dumpTestEntryPoint}".cstring
+#           )
+#   )

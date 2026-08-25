@@ -1,6 +1,6 @@
 import std/[json, options, tables, streams, times]
 import chronos
-import chronos/[asyncproc, threadsync]
+import chronos/[threadsync]
 import json_rpc/servers/socketserver
 
 import forest
@@ -38,7 +38,7 @@ type
     id*: uint
     name*: string
     request*: Future[JsonString]
-    projectFile*: Option[string]
+    entryPoint*: Option[FilePathAbs]
     startTime*: DateTime
     endTime*: DateTime
     state*: PendingRequestState
@@ -66,12 +66,9 @@ type
 
   LanguageServerMessaging* = object
     pendingRequests*: Table[uint, PendingRequest]
+    projectErrors*: seq[ProjectError]
     responseMap*: TableRef[string, Future[JsonNode]]
     responseNames*: TableRef[string, string]
-    ## Parallel to responseMap: maps request-id → RPC method name.
-    ## Used to include the method name in "id not found" error logs.
-    inlayHintsRefreshRequest*: Future[JsonNode]
-    projectErrors*: seq[ProjectError]
     lastStatusSent*: JsonNode
 
 type
@@ -85,8 +82,7 @@ type
     #To be called when the server is shutting down
   NotifyAction* = proc(name: string, params: JsonNode) {.gcsafe, raises: [].}
     #Send a notification to the client
-  CallAction* =
-    proc(name: string, params: JsonNode): Future[JsonNode] {.gcsafe, raises: [].}
+  CallAction* = proc(name: string, params: JsonNode): Future[JsonNode] {.gcsafe, raises: [].}
     #Send a request to the client
 
 type
@@ -104,7 +100,7 @@ type
     notify*: NotifyAction
     call*: CallAction
     onExit*: OnExitCallback
-    testRunProcess*: Option[AsyncProcessRef]
+
     cmdLineClientProcessId*: Option[int]
 
     isShutdown*: bool

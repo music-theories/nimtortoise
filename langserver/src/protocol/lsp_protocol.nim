@@ -1,4 +1,4 @@
-import json, options
+import options
 import ./lsp_diagnostics
 export lsp_diagnostics
 

@@ -182,10 +182,12 @@ proc initNlsFileInfo*(
 
   # Register in the file table (sync, atomic)
   return NlsFileInfo(
-    fingerTable: fingerTable,
     textDocument: params,
+    fingerTable: fingerTable,
     lastChanged: times.now(),
     lastChecked: times.now(),
+    lastUserInteraction: times.now(),
+    lastSaved: times.now()
   )
 
 proc getSlotThatOwnsUri*(

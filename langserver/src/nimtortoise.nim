@@ -82,23 +82,7 @@ proc registerLspRoutes(srv: RpcSocketServer, ls: LanguageServer) =
     "textDocument/documentHighlight",
     ls.addRpcToCancellable(wrapRpc(partial(lsp.documentHighlight, ls))),
   )
-  srv.register("shutdown", wrapRpc(partial(lsp.shutdown, ls)))
-  srv.register("exit", wrapRpc(partial(lsp.exit, (ls: ls, onExit: ls.onExit))))
-  #Extension
-  srv.register("extension/macroExpand", wrapRpc(partial(lsp.expand, ls)))
-  srv.register("extension/status", wrapRpc(partial(lsp.status, ls)))
-  srv.register(
-    "extension/capabilities", wrapRpc(partial(lsp.extensionCapabilities, ls))
-  )
-  srv.register("extension/suggest", wrapRpc(partial(lsp.extensionSuggest, ls)))
-  srv.register("extension/listTasks", wrapRpc(partial(lsp.listTasks, ls)))
-  srv.register("extension/tasks", wrapRpc(partial(lsp.tasks, ls)))
-  srv.register("extension/runTask", wrapRpc(partial(lsp.runTask, ls)))
-  # TESTS REMOVED
-  # srv.register("extension/listTests", wrapRpc(partial(lsp.listTests, ls)))
-  # srv.register("extension/runTests", wrapRpc(partial(lsp.runTests, ls)))
-  # srv.register("extension/cancelTest", wrapRpc(partial(lsp.cancelTest, ls)))
-  #Notifications
+
   srv.register("$/cancelRequest", wrapRpc(partial(lsp.cancelRequest, ls)))
   srv.register("initialized", wrapRpc(partial(initialized, ls)))
   srv.register("textDocument/didOpen", wrapRpc(partial(lsp.didOpen, ls)))
@@ -114,6 +98,21 @@ proc registerLspRoutes(srv: RpcSocketServer, ls: LanguageServer) =
     "textDocument/willSaveWaitUntil", wrapRpc(partial(lsp.willSaveWaitUntil, ls))
   )
   srv.register("$/setTrace", wrapRpc(partial(lsp.setTrace, ls)))
+
+  srv.register("shutdown", wrapRpc(partial(lsp.shutdown, ls)))
+  srv.register("exit", wrapRpc(partial(lsp.exit, (ls: ls, onExit: ls.onExit))))
+  
+  # Extension server
+  srv.register("extension/status", wrapRpc(partial(lsp.extensionStatus, ls)))
+  srv.register("extension/capabilities", wrapRpc(partial(lsp.extensionCapabilities, ls)))
+  srv.register("extension/restart", wrapRpc(partial(lsp.extensionRestart, ls)))
+
+  # Tasks
+  srv.register("extension/listTasks", wrapRpc(partial(lsp.listTasks, ls)))
+  srv.register("extension/runTask", wrapRpc(partial(lsp.runTask, ls)))
+
+  # Macro TODO
+  srv.register("extension/macroExpand", wrapRpc(partial(lsp.expand, ls)))
 
 proc showHelp() =
   echo "nimtortoise: The Nim Language Server"

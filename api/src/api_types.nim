@@ -2,6 +2,14 @@ import std/[json, options]
 import forest
 
 type
+  MessageType* {.pure.} = enum
+    Error = 1
+    Warning = 2
+    Info = 3
+    Log = 4
+    Debug = 5
+
+type
   ExecuteCommandRequestParams* = ref object of RootObj
     command*: string
     arguments*: JsonNode
@@ -12,7 +20,6 @@ type
     SERVER_STATUS             = "ServerStatus",
     SERVER_CAPABILITIES       = "ServerCapabilities",
     SERVER_RESTART            = "ServerRestart",
-    NIMSUGGEST_RESTART_ALL    = "NimsuggestRestartAll",
     NIMSUGGEST_RESTART        = "NimsuggestRestart",
     NIMSUGGEST_RECOMPILE      = "NimsuggestRecompile",
     NIMSUGGEST_CHECK_PROJECT  = "NimsuggestCheckProject",
@@ -22,42 +29,48 @@ type
     NIM_MACRO_EXPAND          = "NimMacro"
 
 type
-  NimSuggestCapability* = enum
+  NimTortoiseExeStatus* = object
+    path*: FilePathAbs
+    version*: string
+
+type
+  PendingRequestStatus* = object
+    name*: string
+    entryPoint*: FilePathAbs
+    time*: string
+    state*: string
+
+  ProjectError* = object
+    entryPoint*: FilePathAbs
+    errorMessage*: string
+    lastKnownCmd*: string
+
+type
+  NimsuggestCapability* = enum
     nsCon = "con"
     nsExceptionInlayHints = "exceptionInlayHints"
     nsUnknownFile = "unknownFile"
 
-  NimSuggestStatus* = object
-    projectFile*: string
-    capabilities*: seq[NimSuggestCapability]
+type
+  NimsuggestStatus* = object
+    state*: string 
+    entryPoint*: FilePathAbs
     protocol*: string
     version*: string
     path*: string
     port*: int
     openFiles*: seq[string]
-    unknownFiles*: seq[string]
 
-  PendingRequestStatus* = object
-    name*: string
-    projectFile*: string
-    time*: string
-    state*: string
-
-  ProjectError* = object
-    projectFile*: string
-    errorMessage*: string
-    lastKnownCmd*: string
-
-  NimLangServerStatus* = object
-    lspPath*: string
-    version*: string
-    nimsuggestInstances*: seq[NimSuggestStatus]
-    openFiles*: seq[string]
+type
+  NimTortoiseServerStatus* = object
     extensionCapabilities*: seq[LspExtensionCapability]
+    exe*: NimTortoiseExeStatus
+    openFiles*: seq[FilePathAbs]
     pendingRequests*: seq[PendingRequestStatus]
     projectErrors*: seq[ProjectError]
+    pool*: seq[NimsuggestStatus]
 
-  NimLangServerStatusParams* = object of RootObj
+  NimTortoiseServerStatusParams* = object of RootObj
 
 type
   NimbleRunTaskRequest* = object
@@ -72,6 +85,7 @@ type
     name*: string
     description*: string
     projectDir*: DirPathAbs ## absolute directory where nimble was run
+    isRunning*: bool ## client-side state; never set by the server
 
 type 
   ExtensionCommandRequest* = object
@@ -80,8 +94,7 @@ type
       SERVER_STATUS, 
       SERVER_CAPABILITIES, 
       SERVER_RESTART: 
-      discard      
-    of NIMSUGGEST_RESTART_ALL: discard
+      discard
     of 
       NIMSUGGEST_RESTART,
       NIMSUGGEST_RECOMPILE, 
@@ -96,13 +109,12 @@ type
   ExtensionCommandResponse* = object
     case kind*: LspExtensionCapability
     of SERVER_STATUS:
-      serverStatus*: NimLangServerStatus
+      serverStatus*: NimTortoiseServerStatus
     of SERVER_CAPABILITIES:
       serverCapabilities*: seq[LspExtensionCapability]
     of SERVER_RESTART: discard      
 
     of 
-      NIMSUGGEST_RESTART_ALL,
       NIMSUGGEST_RESTART,
       NIMSUGGEST_RECOMPILE, 
       NIMSUGGEST_CHECK_PROJECT, 

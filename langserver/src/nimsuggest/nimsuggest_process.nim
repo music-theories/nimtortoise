@@ -269,7 +269,7 @@ proc processNimsuggestQueries*(
           # debug "processNimsuggestQueries: response ", response = $(%*queryResponse), elapsedMs  = elapsedMs
 
           q.responseFuture.complete(queryResponse)
-          slot.lastCmdTime = now()
+          
 
           case q.kind
           of NimsuggestQueryKind.CHANGED:
@@ -380,7 +380,10 @@ proc restartSlot*(
   let successfulSpawn = await pool.spawnNewNimsuggestSlot(
     spawningInfo, pool.nimsuggest, dependencies, config
   )
-  if successfulSpawn.isSome:
+  if successfulSpawn.isSome():
+    if spawningInfo.entryPoint in pool.crashedSlots:
+      pool.crashedSlots.excl(spawningInfo.entryPoint)
+
     asyncSpawn slot.processNimsuggestQueries(
       pool, openFiles, dependencies, storageDir, config, pool.notifyProc
     )

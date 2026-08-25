@@ -10,6 +10,7 @@ import ../nimsuggest/nimsuggest
 import ../nimble/[nimble]
 import ../utils/utils
 
+
 # === workspace/executeCommand ===
 proc processExtensionCommandRequest(
   ls: LanguageServer, 
@@ -27,23 +28,14 @@ proc processExtensionCommandRequest(
       serverCapabilities: getAllServerCapabilities()
     )
   of SERVER_RESTART:
+    ls.langserverQueue.addLastNoWait(LangserverQuery(
+      kind: LangserverQueryKind.RESTART,
+      restart: newFuture[bool]("restart")
+    ))
     return ExtensionCommandResponse(
       kind: SERVER_RESTART
     )
 
-  of NIMSUGGEST_RESTART_ALL:
-    debug "Restart all Nimsuggest Instances"
-    restartAllNimsuggestInstances(
-      ls.pool, 
-      ls.files.openFiles, 
-      ls.dependencies, 
-      ls.files.storageDir,
-      ls.configurations.currentConfig, 
-    )
-
-    return ExtensionCommandResponse(
-      kind: NIMSUGGEST_RESTART_ALL
-    )
   of NIMSUGGEST_RECOMPILE:
     let slotName = request.slot
     debug "Recompile Nimsuggest instance ", slot = slotName
@@ -80,6 +72,20 @@ proc processExtensionCommandRequest(
       kind: NIMSUGGEST_RESTART
     )
   of NIMSUGGEST_STOP:
+    let slotName = request.slot
+    debug "Recompile Nimsuggest instance ", slot = slotName
+    if slotName in ls.pool.slots:
+      let slot = ls.pool.slots[slotName]
+      ls.langserverQueue.addLastNoWait(LangserverQuery(
+        kind: LangserverQueryKind.NIMSUGGEST,
+        nimsuggest: NimsuggestQuery[LspFilePosition](
+          id: 0,
+          kind: NimsuggestQueryKind.SHUTDOWN,
+          uri: toUri(slot.spawnInfo.entryPoint),
+          dirtyFile: FilePathAbs(""),
+          responseFuture: newFuture[seq[Suggest]]("stopSlot"),
+        )
+      ))
     return ExtensionCommandResponse(
       kind: NIMSUGGEST_STOP
     )
@@ -132,17 +138,17 @@ proc executeCommand*(
 ): Future[JsonNode] {.async.} =
   let asExtensionCommand = toExtensionCommandRequest(params)
   await ls.lsInitialized
-  let processedCommands = ls.processExtensionCommandRequest(asExtensionCommand)
+  let processedCommands = await ls.processExtensionCommandRequest(asExtensionCommand)
   try:
-    let asJson = %* processedCommands
+    let asJson = toJsonHook(processedCommands)
     return asJson
   except:
     return newJNull()
 
 # === extension/status ===
-proc status*(
-  ls: LanguageServer, params: NimLangServerStatusParams
-): Future[NimLangServerStatus] {.async.} =
+proc extensionStatus*(
+  ls: LanguageServer, params: NimTortoiseServerStatusParams
+): Future[NimTortoiseServerStatus] {.async.} =
   let processedCommands = await ls.processExtensionCommandRequest(ExtensionCommandRequest(kind: SERVER_STATUS))
   return processedCommands.serverStatus
 
@@ -152,6 +158,12 @@ proc extensionCapabilities*(
 ): Future[seq[LspExtensionCapability]] {.async.} =
   let processedCommands = await ls.processExtensionCommandRequest(ExtensionCommandRequest(kind: SERVER_CAPABILITIES))
   return processedCommands.serverCapabilities
+
+proc extensionRestart*(
+  ls: LanguageServer, params: JsonNode
+): Future[void] {.async.} =
+  let processedCommands = await ls.processExtensionCommandRequest(ExtensionCommandRequest(kind: SERVER_RESTART))
+  return 
   
 # === extension/listTasks ===
 proc listTasks*(ls: LanguageServer, conf: JsonNode): Future[seq[NimbleTask]] {.async.} =  

@@ -1,4 +1,4 @@
-import std/[options, sets, tables, strutils, json]
+import std/[options, sets, tables, strutils, json, times]
 import chronos
 import chronicles
 import ../nimsuggest/nimsuggest
@@ -7,17 +7,31 @@ import ../protocol/types
 import ../utils/utils
 import ./[langserver_types, query_types]
 
-
 proc processDidSaveQuery*(
   ls: LanguageServer, q: FileAccessQuery
 ) {.async.} = 
-  let uri = q.didSave.textDocument.uri
+  let params: TextDocumentIdentifier = q.didSave.textDocument
+  let uri = params.uri
   debug "didSave: file", uri = uri
   if uri in ls.files.openFiles:
     let fileInfo = ls.files.openFiles[uri]
+
+    ls.files.openFiles[uri].lastSaved = times.now()
+    ls.files.openFiles[uri].lastUserInteraction = times.now()
+
     let slotCheck = getSlotThatOwnsUri(ls.pool, uri)
     if slotCheck.isNone():
       debug "processDidSaveQuery: Open file does not have a slot", uri = uri
+      # TODO - I think this is a place in which you need to check whether this file is owned by a slot, and if not, add it, or create a new slot.  Saving is a clear indication that this file is being worked on.
+      ls.langserverQueue.addFirstNoWait(LangserverQuery(
+        kind: LangserverQueryKind.FILE_ACCESS,
+        fileAccess: FileAccessQuery(
+          kind: FileAccessQueryKind.DID_OPEN,
+          didOpen: DidOpenTextDocumentParams(
+            textDocument: fileInfo.textDocument
+          )
+        )
+      ))
 
     else:
       let slotThatOwnsUri = slotCheck.get()
@@ -37,8 +51,6 @@ proc processDidSaveQuery*(
       case slotThatOwnsUri.state
       of SlotState.READY, SlotState.SPAWNING:
         debug "didSave: sending CHANGED query", uri = uri
-
-        # TODO - I think this is a place in which you need to check whether this file is owned by a slot, and if not, add it, or create a new slot.  Saving is a clear indication that this file is being worked on.
 
         let changedQuery = NimsuggestQuery[LspFilePosition](
           id: 0,
