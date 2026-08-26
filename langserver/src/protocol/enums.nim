@@ -85,12 +85,12 @@ type
     Full = 1
     Incremental = 2
 
-  MessageType* {.pure.} = enum
-    Error = 1
-    Warning = 2
-    Info = 3
-    Log = 4
-    Debug = 5
+  # MessageType* {.pure.} = enum
+  #   Error = 1
+  #   Warning = 2
+  #   Info = 3
+  #   Log = 4
+  #   Debug = 5
 
   FileChangeType* {.pure.} = enum
     Created = 1

@@ -1,4 +1,4 @@
-import json, options
+import options
 import ./lsp_diagnostics
 export lsp_diagnostics
 
@@ -60,13 +60,6 @@ type
 
   WorkspaceSymbolParams* = ref object of RootObj
     query*: string
-
-  ExecuteCommandParams* = ref object of RootObj
-    command*: string
-    arguments*: seq[JsonNode]
-
-  ExecuteCommandRegistrationOptions* = ref object of RootObj
-    commands*: OptionalSeq[string]
 
   ApplyWorkspaceEditParams* = ref object of RootObj
     label*: Option[string]

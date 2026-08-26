@@ -1,4 +1,4 @@
-import std/[options, sets, tables, strutils, json]
+import std/[options, sets, tables, strutils, json, times]
 import chronos
 import chronicles
 import ../nimsuggest/nimsuggest
@@ -7,17 +7,33 @@ import ../protocol/types
 import ../utils/utils
 import ./[langserver_types, query_types]
 
-
 proc processDidSaveQuery*(
   ls: LanguageServer, q: FileAccessQuery
 ) {.async.} = 
-  let uri = q.didSave.textDocument.uri
+  let params: TextDocumentIdentifier = q.didSave.textDocument
+  let uri = params.uri
   debug "didSave: file", uri = uri
-  if uri in ls.files.openFiles:
+  if uri notin ls.files.openFiles:
+    debug "didSave: file is not in open files (should not be possible)", uri = uri
+  else:
     let fileInfo = ls.files.openFiles[uri]
+
+    ls.files.openFiles[uri].lastSaved = times.now()
+    ls.files.openFiles[uri].lastUserInteraction = times.now()
+
     let slotCheck = getSlotThatOwnsUri(ls.pool, uri)
     if slotCheck.isNone():
       debug "processDidSaveQuery: Open file does not have a slot", uri = uri
+      # TODO - I think this is a place in which you need to check whether this file is owned by a slot, and if not, add it, or create a new slot.  Saving is a clear indication that this file is being worked on.
+      ls.langserverQueue.addFirstNoWait(LangserverQuery(
+        kind: LangserverQueryKind.FILE_ACCESS,
+        fileAccess: FileAccessQuery(
+          kind: FileAccessQueryKind.DID_OPEN,
+          didOpen: DidOpenTextDocumentParams(
+            textDocument: fileInfo.textDocument
+          )
+        )
+      ))
 
     else:
       let slotThatOwnsUri = slotCheck.get()
@@ -52,17 +68,15 @@ proc processDidSaveQuery*(
       of SlotState.STOPPING, SlotState.STOPPED, SlotState.CRASHED:
         discard
 
-      # Clear this file's module entry point from crashedSlots — the user
-      # may have fixed the underlying compiler issue (e.g. removed a
-      # problematic import), so give the background spawn another chance.
+      # Clear this file's module entry point from crashedSlots.
       let savedFilePath = toFilePathAbs(uri)
       let savedSpawnInfo = getNimsuggestSpawnInfo(
-        savedFilePath, ls.files.rootPath, ls.dependencies)
+        savedFilePath, ls.files.rootPath, ls.dependencies
+      )
 
-      if savedSpawnInfo.entryPoint != savedFilePath and
-          savedSpawnInfo.entryPoint in ls.pool.crashedSlots:
-            
-        debug "didSave: clearing crashedSlots for module entry point",
-          entryPoint = savedSpawnInfo.entryPoint
+      debug "didSave: clearing crashedSlots for module entry point",
+        entryPoint = savedSpawnInfo.entryPoint,
+        savedFile = savedFilePath
 
-        ls.pool.crashedSlots.excl(savedSpawnInfo.entryPoint)
+      ls.pool.crashedSlots.excl(savedSpawnInfo.entryPoint)
+      ls.pool.crashedSlots.excl(savedFilePath)

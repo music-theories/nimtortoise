@@ -1,4 +1,4 @@
-import std/[tables, sequtils, times, strutils, options]
+import std/[tables, sequtils, times, strutils, options, json]
 import chronos
 import chronicles
 import ../nimsuggest/nimsuggest
@@ -36,8 +36,16 @@ proc processDidChangeQuery*(
   let contentChanges: seq[TextDocumentContentChangeEvent] = didChangeParams.contentChanges
   let textDocument: VersionedTextDocumentIdentifier = didChangeParams.textDocument
 
-  let languageId = ""
-  let version = 0
+  var languageID = ""
+  var version = 0
+
+  if textDocument.languageId.isSome():
+    languageID = textDocument.languageId.get()
+  if textDocument.version.isSome():
+    let versionJson: JsonNode = textDocument.version.get()
+    if versionJson.kind == JInt:
+      version = versionJson.getInt()
+
   let savedContent: string = if contentChanges.len > 0: contentChanges[0].text else: ""
 
   let openFiles = ls.files.openFiles.keys.toSeq()
@@ -48,7 +56,8 @@ proc processDidChangeQuery*(
     ls.files.openFiles[uri].fingerTable = ls.saveFileChangesToStash(
       uri, contentChanges
     )
-    ls.files.openFiles[uri].lastChanged = times.now()
+    ls.files.openFiles[uri].lastUserInteraction = times.now()
+
     let slotCheck = getSlotThatOwnsUri(ls.pool, uri)
     if slotCheck.isSome():
       let slotThatOwnsUri = slotCheck.get()
@@ -89,12 +98,13 @@ proc processDidChangeQuery*(
           fileAccess: FileAccessQuery(
             kind: FileAccessQueryKind.DID_OPEN,
             didOpen: DidOpenTextDocumentParams(
-              textDocument: TextDocumentItem(
-                uri: uri,
-                languageId: languageID,
-                version: version,
-                text: savedContent
-              ) 
+              textDocument: ls.files.openFiles[uri].textDocument
+              # textDocument: TextDocumentItem(
+              #   uri: uri,
+              #   languageId: languageID,
+              #   version: version,
+              #   text: savedContent
+              # ) 
             )
           )
         ))

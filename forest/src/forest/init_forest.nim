@@ -16,7 +16,10 @@ proc initForest*(
   result = Forest(
     root: rootPath,
     nim:    NimInfo(version: "", nimExe: FilePathAbs("")),
-    nimble: initTable[FilePathAbs, NimbleDumpInfo](),
+    nimble: NimbleInfo(
+      dump: initTable[FilePathAbs, NimbleDumpInfo](),
+      entryPoints: @[]
+    ),
     paths: initTable[FilePathAbs, seq[DirPathAbs]](),
     trees: initTable[FilePathAbs, seq[FilePathAbs]]()
   )
@@ -26,7 +29,7 @@ proc initForest*(
     let nimDumpInfo = getNimDumpInfoForEntryPoints(
       nimbleInfo.entryPoints, rootPath
     )
-    result.nimble = nimbleInfo.dump
+    result.nimble = nimbleInfo
 
     var nimInfoSet = false
     for entryPoint, nimDump in nimDumpInfo:

@@ -1,6 +1,7 @@
 import std/[times]
 import chronos
 import forest
+import api
 
 type
   NlsNimsuggestConfig* = ref object of RootObj
@@ -33,18 +34,6 @@ type
     nvWarning = "warning"
     nvInfo = "info"
 
-type
-  PerformanceSetting* = object
-    kind*: PerformanceSettingKind
-    fileCheckThrottling*: times.Duration # File 
-    updateOnChange*: bool
-    description*: string
-
-  PerformanceSettingKind* {.pure.} = enum
-    HIGHEST = "HIGHEST",
-    HIGH = "HIGH",
-    LOW = "LOW",
-    LOWEST = "LOWEST"
 
 type
   NlsConfig* = ref object of RootObj

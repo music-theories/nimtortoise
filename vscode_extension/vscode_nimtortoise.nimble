@@ -1,14 +1,14 @@
 import std/strformat
 # Package
 
-version = "0.2.0"
+version = "0.3.0"
 author = "David Pocknee"
 description = "The VS Code extension for the Nim Tortoise Language Server, a Language Server for nim that prioritises correctness over speed."
 license = "MIT"
 backend = "js"
 srcDir = "src"
 binDir = "out"
-bin = @["vscode_nim_tortoise"]
+bin = @["vscode_nimtortoise"]
 
 # Deps
 
@@ -22,21 +22,21 @@ proc initialNpmInstall() =
 
 # Tasks
 task main, "This compiles the vscode Nim extension":
-  exec "nim js --outdir:out --checks:on --sourceMap src/vscode_nim_tortoise.nim"
+  exec "nim js --outdir:out --checks:on --sourceMap src/vscode_nimtortoise.nim"
 
 task release, "This compiles a release version":
-  exec "nim js -d:release -d:danger --outdir:out --checks:off --sourceMap src/vscode_nim_tortoise.nim"
+  exec "nim js -d:release -d:danger --outdir:out --checks:off --sourceMap src/vscode_nimtortoise.nim"
 
 task vsix, "Build VSIX package":
   initialNpmInstall()
-  var cmd = "npm exec -c 'vsce package --out out/vscode_nim_tortoise-" & version & ".vsix'"
+  var cmd = "npm exec -c 'vsce package --out out/vscode_nimtortoise-" & version & ".vsix'"
   when defined(windows):
     cmd = "powershell.exe " & cmd
   exec cmd
 
 task install_vsix, "Install the VSIX package":
   initialNpmInstall()
-  exec "code --install-extension out/vscode_nim_tortoise-" & version & ".vsix"
+  exec "code --install-extension out/vscode_nimtortoise-" & version & ".vsix"
 
 # Tasks for maintenance
 # task audit_node_deps, "Audit Node.js dependencies":

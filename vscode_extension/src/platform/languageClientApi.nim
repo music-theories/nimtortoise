@@ -39,10 +39,14 @@ type
     language*: cstring
     scheme*: cstring
 
+  WorkspaceSynchronizeOptions* {.importc.} = ref object of JsObject
+    configurationSection*: cstring
+
   LanguageClientOptions* {.importc.} = ref LanguageClientOptionsObj
   LanguageClientOptionsObj* {.importc.} = object of JsObject
     documentSelector*: seq[DocumentFilter]
     outputChannel*: VscodeOutputChannel
+    synchronize*: WorkspaceSynchronizeOptions
   
   InlayHint* = ref object of JsRoot
     position*: VscodePosition

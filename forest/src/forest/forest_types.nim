@@ -16,14 +16,6 @@ type
     dependentFile*: FilePathAbs
 
 type
-  NimbleDumpInfo* = object
-    name*:    string
-    srcDir*:  DirPathRel
-    bin*:     seq[FilePathRel]
-    entryPoints*:    seq[FilePathRel]  ## relative to nimble file dir
-    testEntryPoint*: FilePathRel       ## relative to nimble file dir
-
-type
   NimDumpInfo* = object
     version*:        string
     nimExe*:         FilePathAbs
@@ -43,9 +35,17 @@ type
     version*:        string
     nimExe*:         FilePathAbs
 
+
 type
+  NimbleDumpInfo* = object
+    name*:    string
+    srcDir*:  DirPathRel
+    bin*:     seq[FilePathRel]
+    entryPoints*:    seq[FilePathRel]  ## relative to nimble file dir
+    testEntryPoint*: FilePathRel       ## relative to nimble file dir
+
   NimbleInfo* = object
-    files*: seq[FilePathAbs]
+    # files*: seq[FilePathAbs]
     dump*: Table[FilePathAbs, NimbleDumpInfo]
     entryPoints*: seq[FilePathAbs]
 
@@ -53,7 +53,7 @@ type
   Forest* = object
     root*:   DirPathAbs
     nim*:    NimInfo
-    nimble*: Table[FilePathAbs, NimbleDumpInfo]
+    nimble*: NimbleInfo # Table[FilePathAbs, NimbleDumpInfo]
     paths*:  Table[FilePathAbs, seq[DirPathAbs]]
     trees*:  Table[FilePathAbs, seq[FilePathAbs]]
   

@@ -2,7 +2,9 @@ import std/[options, deques]
 
 import chronos
 import chronos/asyncproc
+
 import forest
+import api
 
 import ../protocol/types
 
@@ -94,6 +96,7 @@ type
   NimsuggestSettings* = object
     exePath*: FilePathAbs # Path to nimsuggest binary.
     protocol*: int # The version of the nimsuggest protocol
+    version*: string
     capabilities*: set[NimSuggestCapability] # Capabilities
 
   NimsuggestSpawnInfo* = object

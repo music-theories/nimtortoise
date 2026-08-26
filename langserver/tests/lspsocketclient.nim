@@ -309,7 +309,7 @@ proc waitForInstanceCount*(client: LspSocketClient, n: int, timeoutMs = 30000): 
   waitFor client.waitForNotification(
     "extension/statusUpdate",
     proc(j: JsonNode): bool =
-      let ports = j["nimsuggestInstances"].elems.mapIt(it["port"].getInt)
+      let ports = j["pool"].elems.mapIt(it["port"].getInt).filterIt(it != 0)
       ports.deduplicate.len == n,
     0
   )

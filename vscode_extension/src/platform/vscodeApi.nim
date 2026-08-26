@@ -774,6 +774,10 @@ proc registerCommand*(
   cmds: VscodeCommands, name: cstring, fn: proc(): Future[void]
 ): void {.importcpp.}
 
+proc registerCommand*(
+  cmds: VscodeCommands, name: cstring, fn: proc(args: JsObject): void
+): void {.importcpp.}
+
 # Uri
 proc with*(uri: VscodeUri, change: VscodeUriChange): VscodeUri {.importcpp.}
 

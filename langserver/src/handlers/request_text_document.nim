@@ -3,6 +3,7 @@ import chronos
 import chronos/asyncproc
 import chronicles
 import json_serialization
+import api
 
 import ../nim_compiler/nim_expand
 import ../nimsuggest/nimsuggest
@@ -246,15 +247,15 @@ proc documentHighlight*(
     params.position.character
   )
   let response = await ls.addQueryToQueue(query)
-  debug "documentHighlight: RESPONSES START"
-  for r in response:
-    debug "documentHighlight: suggest response", jsonOutput = $(%*r)
+  # debug "documentHighlight: RESPONSES START"
+  # for r in response:
+    # debug "documentHighlight: suggest response", jsonOutput = $(%*r)
 
   let processedResponses = processDocumentHighlightResponses(response, ls)
 
-  for r in processedResponses:
-    debug "documentHighlight: json response", jsonOutput = $(%*r)
-  debug "documentHighlight: RESPONSES END"
+  # for r in processedResponses:
+    # debug "documentHighlight: json response", jsonOutput = $(%*r)
+  # debug "documentHighlight: RESPONSES END"
   return processedResponses
 
 # === textDocument/signatureHelp ===
@@ -491,7 +492,7 @@ proc inlayHint*(
   params: InlayHintParams, 
   id: int
 ): Future[seq[InlayHint]] {.async.} =
-  debug "inlayHint received..."
+  # debug "inlayHint received..."
   let configuration = ls.configurations.currentConfig
   if not inlayHintsEnabled(configuration):
     return @[]

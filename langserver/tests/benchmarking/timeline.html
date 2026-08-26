@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Nimsuggest Timeline</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: monospace;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      padding: 24px;
+      min-height: 100vh;
+    }
+
+    h1 { font-size: 1.1em; color: #a0c4ff; margin-bottom: 20px; letter-spacing: 0.05em; }
+
+    #drop-zone {
+      border: 2px dashed #3a3a6a;
+      border-radius: 8px;
+      padding: 36px;
+      text-align: center;
+      color: #888;
+      cursor: pointer;
+      margin-bottom: 24px;
+      transition: border-color 0.15s, color 0.15s;
+      user-select: none;
+    }
+    #drop-zone.drag-over { border-color: #a0c4ff; color: #a0c4ff; }
+    #drop-zone input[type=file] { display: none; }
+    #drop-zone label { cursor: pointer; color: #a0c4ff; text-decoration: underline; }
+
+    #output { display: none; }
+
+    #stats {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .stat {
+      background: #0f3460;
+      border-radius: 6px;
+      padding: 10px 16px;
+      min-width: 120px;
+    }
+    .stat-label { font-size: 0.7em; color: #888; margin-bottom: 2px; text-transform: uppercase; }
+    .stat-value { font-size: 1.15em; color: #e0e0e0; }
+
+    #legend {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+      align-items: center;
+    }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.8em; }
+    .legend-swatch { width: 12px; height: 12px; border-radius: 2px; flex-shrink: 0; }
+
+    #canvas-wrap {
+      overflow-x: auto;
+      background: #16213e;
+      border-radius: 8px;
+      margin-bottom: 24px;
+    }
+    canvas { display: block; cursor: crosshair; }
+
+    #tooltip {
+      position: fixed;
+      background: #0f3460;
+      border: 1px solid #3a3a8a;
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 0.8em;
+      pointer-events: none;
+      display: none;
+      max-width: 480px;
+      z-index: 999;
+      line-height: 1.8;
+      word-break: break-all;
+    }
+
+    #breakdown {
+      background: #16213e;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82em; }
+    th {
+      background: #0f3460;
+      padding: 8px 14px;
+      text-align: left;
+      color: #a0c4ff;
+      font-weight: normal;
+      letter-spacing: 0.04em;
+    }
+    td { padding: 6px 14px; border-top: 1px solid #1a1a3e; }
+    tr:hover td { background: #1e2a50; }
+    .kind-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+  <h1>Nimsuggest Timeline</h1>
+
+  <div id="drop-zone">
+    Drop a trace file here &nbsp;or&nbsp; <label>browse<input type="file" id="file-input" accept=".txt,.log"></label>
+  </div>
+
+  <div id="output">
+    <div id="stats"></div>
+    <div id="legend"></div>
+    <div id="canvas-wrap"><canvas id="canvas"></canvas></div>
+    <div id="breakdown"></div>
+  </div>
+
+  <div id="tooltip"></div>
+
+  <script>
+    // ── Colour palette ────────────────────────────────────────────────────────
+    const KIND_COLORS = {
+      outline:   '#4ecdc4',
+      highlight: '#ffe66d',
+      known:     '#a8e6cf',
+      chk:       '#ff6b6b',
+      def:       '#c3b1e1',
+      con:       '#ffa07a',
+      sug:       '#87ceeb',
+      use:       '#f4a261',
+      dus:       '#e76f51',
+      changed:   '#90e0ef',
+    };
+    function colorFor(kind) { return KIND_COLORS[kind] ?? '#8888aa'; }
+
+    // ── Parsing ───────────────────────────────────────────────────────────────
+    // Matches both quoted and unquoted values for robustness.
+    function parseField(line, name) {
+      const re = new RegExp(`\\b${name}=("(?:[^"\\\\]|\\\\.)*"|[^\\s]+)`);
+      const m = line.match(re);
+      if (!m) return null;
+      let v = m[1];
+      if (v.startsWith('"') && v.endsWith('"'))
+        v = v.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+      return v;
+    }
+
+    function parseLine(line) {
+      if (!line.includes('Nimsuggest CPU Time')) return null;
+      const startStr    = parseField(line, 'start');
+      const durationStr = parseField(line, 'duration');
+      const benchmark   = parseField(line, 'benchmark');
+      if (!startStr || !durationStr || !benchmark) return null;
+
+      const start    = parseFloat(startStr);
+      const duration = parseFloat(durationStr);
+      if (isNaN(start) || isNaN(duration)) return null;
+
+      // Command kind is the first word of the benchmark string
+      const kind = benchmark.split(/\s+/)[0].toLowerCase();
+
+      // First .nim path in the benchmark string (the source file, not the stash)
+      const fileMatch = benchmark.match(/"([^"]*\.nim)"/);
+      const filePath  = fileMatch ? fileMatch[1] : '';
+      const fileName  = filePath.split('/').pop() || benchmark.slice(0, 40);
+
+      return { start, duration, kind, fileName, filePath, benchmark };
+    }
+
+    function parseText(text) {
+      return text.split('\n').map(parseLine).filter(Boolean);
+    }
+
+    // ── Rendering ─────────────────────────────────────────────────────────────
+    const PAD   = { top: 20, right: 24, bottom: 36, left: 24 };
+    const TRACK = 36;  // height per kind row
+    const BAR   = 22;  // height of each bar
+    const BAR_Y = (TRACK - BAR) / 2;
+
+    let currentQueries = [];
+    let currentKinds   = [];
+    let sessionStart   = 0;
+    let totalDuration  = 0;
+    let plotWidth      = 0;
+
+    function toX(t) {
+      return PAD.left + (t - sessionStart) / totalDuration * plotWidth;
+    }
+
+    function render(queries) {
+      currentQueries = queries;
+      if (queries.length === 0) {
+        document.getElementById('output').style.display = 'none';
+        alert('No "Nimsuggest CPU Time" lines found in this file.\n\nMake sure the server is built with the updated benchmark template that emits start= and duration= fields.');
+        return;
+      }
+
+      document.getElementById('output').style.display = 'block';
+
+      sessionStart  = Math.min(...queries.map(q => q.start));
+      const end     = Math.max(...queries.map(q => q.start + q.duration));
+      totalDuration = end - sessionStart;
+      currentKinds  = [...new Set(queries.map(q => q.kind))].sort();
+
+      // Stats
+      const totalBusy = queries.reduce((s, q) => s + q.duration, 0);
+      const maxQ      = queries.reduce((a, b) => b.duration > a.duration ? b : a);
+      renderStats([
+        { label: 'Queries',              value: queries.length },
+        { label: 'Session span',         value: totalDuration.toFixed(1) + ' s' },
+        { label: 'Total nimsuggest time',value: totalBusy.toFixed(2) + ' s' },
+        { label: 'Utilisation',          value: (totalBusy / totalDuration * 100).toFixed(1) + ' %' },
+        { label: 'Slowest query',        value: maxQ.duration.toFixed(3) + ' s (' + maxQ.kind + ')' },
+      ]);
+
+      // Legend
+      renderLegend(currentKinds);
+
+      // Canvas — one horizontal swimlane per command kind
+      const canvasWidth  = Math.max(900, window.innerWidth - 80);
+      plotWidth          = canvasWidth - PAD.left - PAD.right;
+      const canvasHeight = PAD.top + currentKinds.length * TRACK + PAD.bottom;
+
+      const dpr    = window.devicePixelRatio || 1;
+      const canvas = document.getElementById('canvas');
+      canvas.width        = canvasWidth * dpr;
+      canvas.height       = canvasHeight * dpr;
+      canvas.style.width  = canvasWidth + 'px';
+      canvas.style.height = canvasHeight + 'px';
+
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+
+      drawTimeline(ctx, queries, canvasWidth, canvasHeight);
+      setupTooltip(canvas, queries, canvasHeight);
+
+      // Breakdown table
+      renderBreakdown(queries);
+    }
+
+    function drawTimeline(ctx, queries, W, H) {
+      // Background
+      ctx.fillStyle = '#16213e';
+      ctx.fillRect(0, 0, W, H);
+
+      // X-axis grid + labels
+      const tickCount = 10;
+      ctx.font        = '10px monospace';
+      ctx.textAlign   = 'center';
+      for (let i = 0; i <= tickCount; i++) {
+        const t = i / tickCount * totalDuration;
+        const x = PAD.left + i / tickCount * plotWidth;
+        ctx.strokeStyle   = '#2a2a5a';
+        ctx.lineWidth     = 1;
+        ctx.beginPath();
+        ctx.moveTo(x, PAD.top);
+        ctx.lineTo(x, H - PAD.bottom);
+        ctx.stroke();
+        ctx.fillStyle = '#666';
+        ctx.fillText(t.toFixed(1) + 's', x, H - PAD.bottom + 14);
+      }
+
+      // Axis baseline
+      ctx.strokeStyle = '#3a3a6a';
+      ctx.lineWidth   = 1;
+      ctx.beginPath();
+      ctx.moveTo(PAD.left, H - PAD.bottom);
+      ctx.lineTo(W - PAD.right, H - PAD.bottom);
+      ctx.stroke();
+
+      // One swimlane per kind
+      currentKinds.forEach((kind, ki) => {
+        const trackTop = PAD.top + ki * TRACK;
+
+        // Subtle track background (alternating)
+        ctx.fillStyle = ki % 2 === 0 ? '#1a2340' : '#16213e';
+        ctx.fillRect(PAD.left, trackTop, plotWidth, TRACK);
+
+        // Kind label on left
+        ctx.fillStyle   = '#aaa';
+        ctx.font        = '10px monospace';
+        ctx.textAlign   = 'right';
+        ctx.fillText(kind, PAD.left - 4, trackTop + TRACK / 2 + 4);
+
+        // Bars
+        const color = colorFor(kind);
+        queries.filter(q => q.kind === kind).forEach(q => {
+          const x = toX(q.start);
+          const w = Math.max(2, (q.duration / totalDuration) * plotWidth);
+          const y = trackTop + BAR_Y;
+
+          ctx.fillStyle   = color;
+          ctx.globalAlpha = 0.82;
+          ctx.fillRect(x, y, w, BAR);
+          ctx.globalAlpha = 1;
+
+          // Inline label if there's room
+          if (w > 36) {
+            ctx.fillStyle = '#000';
+            ctx.font      = '9px monospace';
+            ctx.textAlign = 'left';
+            const label = q.duration.toFixed(3) + 's';
+            ctx.fillText(label, x + 3, y + BAR - 6);
+          }
+        });
+      });
+    }
+
+    function setupTooltip(canvas, queries, canvasHeight) {
+      const tooltip = document.getElementById('tooltip');
+
+      canvas.addEventListener('mousemove', e => {
+        const rect = canvas.getBoundingClientRect();
+        const mx   = e.clientX - rect.left;
+        const my   = e.clientY - rect.top;
+
+        // Which kind row?
+        const ki = Math.floor((my - PAD.top) / TRACK);
+        if (ki < 0 || ki >= currentKinds.length) { tooltip.style.display = 'none'; return; }
+        const kind = currentKinds[ki];
+
+        // Which query? (first that contains mx)
+        const t    = sessionStart + (mx - PAD.left) / plotWidth * totalDuration;
+        const hit  = queries.filter(q => q.kind === kind)
+                            .find(q => t >= q.start && t <= q.start + q.duration)
+                  ?? queries.filter(q => q.kind === kind)  // nearest if between gaps
+                            .reduce((best, q) => {
+                               if (!best) return q;
+                               const dq = Math.abs((q.start + q.duration / 2) - t);
+                               const db = Math.abs((best.start + best.duration / 2) - t);
+                               return dq < db ? q : best;
+                             }, null);
+
+        if (!hit) { tooltip.style.display = 'none'; return; }
+
+        tooltip.style.display = 'block';
+        tooltip.style.left    = (e.clientX + 16) + 'px';
+        tooltip.style.top     = (e.clientY - 10) + 'px';
+        const rel = (hit.start - sessionStart).toFixed(3);
+        const end = (hit.start - sessionStart + hit.duration).toFixed(3);
+        tooltip.innerHTML = [
+          `<b style="color:${colorFor(hit.kind)}">${hit.kind}</b>`,
+          `File: <span style="color:#a0c4ff">${hit.fileName}</span>`,
+          `Duration: <b>${hit.duration.toFixed(3)} s</b>`,
+          `Window: +${rel}s → +${end}s`,
+          `<span style="color:#666">${truncate(hit.benchmark, 100)}</span>`,
+        ].join('<br>');
+      });
+
+      canvas.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+    }
+
+    // ── Helper renderers ──────────────────────────────────────────────────────
+    function renderStats(items) {
+      document.getElementById('stats').innerHTML = items.map(s =>
+        `<div class="stat">
+           <div class="stat-label">${s.label}</div>
+           <div class="stat-value">${s.value}</div>
+         </div>`
+      ).join('');
+    }
+
+    function renderLegend(kinds) {
+      document.getElementById('legend').innerHTML = kinds.map(k =>
+        `<div class="legend-item">
+           <div class="legend-swatch" style="background:${colorFor(k)}"></div>${k}
+         </div>`
+      ).join('');
+    }
+
+    function renderBreakdown(queries) {
+      const byKind = {};
+      for (const q of queries) {
+        if (!byKind[q.kind]) byKind[q.kind] = { count: 0, total: 0, max: 0 };
+        byKind[q.kind].count++;
+        byKind[q.kind].total += q.duration;
+        byKind[q.kind].max    = Math.max(byKind[q.kind].max, q.duration);
+      }
+      const rows = Object.entries(byKind)
+        .sort((a, b) => b[1].total - a[1].total)
+        .map(([kind, s]) =>
+          `<tr>
+             <td><span class="kind-dot" style="background:${colorFor(kind)}"></span>${kind}</td>
+             <td>${s.count}</td>
+             <td>${s.total.toFixed(3)} s</td>
+             <td>${(s.total / s.count).toFixed(3)} s</td>
+             <td>${s.max.toFixed(3)} s</td>
+           </tr>`
+        ).join('');
+      document.getElementById('breakdown').innerHTML =
+        `<table>
+           <tr><th>Kind</th><th>Count</th><th>Total</th><th>Mean</th><th>Max</th></tr>
+           ${rows}
+         </table>`;
+    }
+
+    function truncate(s, n) { return s.length > n ? s.slice(0, n) + '…' : s; }
+
+    // ── File input ────────────────────────────────────────────────────────────
+    function loadFile(file) {
+      const reader = new FileReader();
+      reader.onload  = e => render(parseText(e.target.result));
+      reader.onerror = () => alert('Could not read file.');
+      reader.readAsText(file);
+    }
+
+    const dropZone  = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+
+    dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+  </script>
+</body>
+</html>

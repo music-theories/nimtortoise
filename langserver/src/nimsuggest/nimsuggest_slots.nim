@@ -1,4 +1,4 @@
-import std/[options, tables, sets, strformat, times, json, sequtils]
+import std/[options, tables, sets, strformat, times, json, sequtils, strutils]
 import chronos
 import chronos/asyncproc
 import chronicles
@@ -56,78 +56,157 @@ proc attemptCrashRespawn*(
 ): Future[bool] {.async.} =
   slot.state = SlotState.CRASHED
   slot.ns = newFuture[NimSuggest]("attemptCrashRespawn")
-  inc slot.crashCount
-  if slot.crashCount <= config.maxNimsuggestCrashRetries:
-    let backoffMs = if slot.crashCount > 0:
-      min(1_000 * (1 shl min(slot.crashCount - 1, 14)), 30_000)
-    else: 0
-    if backoffMs > 0:
-      await sleepAsync(backoffMs)
-    # Do NOT call execStop here: execStop adds a CLOSE_MAILBOX sentinel to the
-    # slot's mailbox, which would cause the processNimsuggestQueries drain loop
-    # (our caller) to exit after respawn, leaving the newly-live slot without a
-    # consumer. The nimsuggest process is already dead (project.failed was true),
-    # so we just reset state directly — no sentinel needed.
-    slot.state = SlotState.STOPPED
+
+  let currentCrashedUris = slot.crashedUris
+
+  let spawnTimeoutMs = int(inMilliseconds(config.nimsuggestSpawnTimeout))
+
+  try:
     slot.crashedUris.clear() # explicit restart = clean slate
-    debug "attemptCrashRespawn: calling createNimsuggest",
-      projectFile = slot.spawnInfo.entryPoint, 
-      attempt = slot.crashCount + 1
+    let ns = await createNimsuggest(
+      slot.spawninfo,
+      pool.nimsuggest,
+      spawnTimeoutMs,
+      config.logNimsuggest,
+    )
 
-    # Use a longer timeout for spawn than for queries: cold compilation of large
-    # projects (chronos, chronicles, etc.) can legitimately take > 30s.
-    # NimsuggestSpawnTimeoutError still breaks the loop immediately so infinite-
-    # loop bugs (e.g. flatty/fieldPairs on recursive types) escape in ≤ spawnMs.
-    let spawnTimeoutMs = int(inMilliseconds(config.nimsuggestSpawnTimeout))
-    try:
-      let ns = await createNimsuggest(
-        slot.spawninfo,
-        pool.nimsuggest,
-        spawnTimeoutMs,
-        config.logNimsuggest,
-      )
+    debug "attemptCrashRespawn: createNimsuggest succeeded", 
+      entryPoint = slot.spawnInfo.entryPoint, port = ns.port
 
-      debug "attemptCrashRespawn: createNimsuggest succeeded", 
-        entryPoint = slot.spawnInfo.entryPoint, port = ns.port
+    slot.ns.complete(ns)
+    slot.state = SlotState.READY
 
-      slot.ns.complete(ns)
-      slot.state = SlotState.READY
-      slot.crashCount = 0
-      slot.lastCmdTime = now()
+    if pool.statusChangedProc != nil:
+      pool.statusChangedProc()
 
-      if pool.statusChangedProc != nil:
-        pool.statusChangedProc()
-      if pool.notifyProc != nil:
-        pool.notifyProc("window/logMessage",
-          %*{"type": 3, "message": fmt"Nimsuggest restarted from crasged for {slot.spawnInfo.entryPoint}"})
-      return true
-
-    except CatchableError as ex:
-      inc slot.crashCount
-      slot.state = SlotState.CRASHED
-      error "attemptCrashRespawn: spawn attempt failed",
-        entryPoint = slot.spawnInfo.entryPoint, attempt = slot.crashCount, msg = ex.msg
-    
-  else:
-    error "attemptCrashRespawn: crash limit reached, slot permanently failed",
-      entryPoint = slot.spawnInfo.entryPoint, crashCount = slot.crashCount
     if pool.notifyProc != nil:
-      pool.notifyProc(
-        "window/logMessage",
-        %*{
-          "type": 1,
-          "message": fmt"Nimsuggest for {slot.spawnInfo.entryPoint} failed after {config.maxNimsuggestCrashRetries} attempts.",
-        },
+      pool.notifyProc("window/logMessage",
+        %*{"type": 3, "message": fmt"Nimsuggest restarted from crashed for {slot.spawnInfo.entryPoint}"}
       )
-    pool.removeSlot(slot.spawnInfo.entryPoint)
+    return true
+
+  except CatchableError as ex:
+    slot.state = SlotState.CRASHED
+    slot.crashedUris = currentCrashedUris
+    error "attemptCrashRespawn: spawn attempt failed",
+      entryPoint = slot.spawnInfo.entryPoint, msg = ex.msg
     return false
 
 # === EXECS ===
+
+proc publishNimCheckDiagnostics*(
+  output: string,
+  notifyProc: proc(name: string, params: JsonNode) {.gcsafe, raises: [].},
+) =
+  ## Parses raw `nim check` output and publishes errors as LSP diagnostics.
+  ## Skips stdlib/nimble-cache paths, instantiation context lines, and warnings.
+  if notifyProc == nil or output.len == 0:
+    return
+
+  type Entry = tuple[filePath: string, line, col: int, message: string]
+  var entries: seq[Entry] = @[]
+  var cur: Option[Entry] = none(Entry)
+
+  proc flush() =
+    if cur.isSome:
+      entries.add(cur.get())
+      cur = none(Entry)
+
+  for rawLine in output.splitLines():
+    let nimIdx = rawLine.find(".nim(")
+    if nimIdx > 0:
+      let filePath = rawLine[0 .. nimIdx + 3]          # up to and including ".nim"
+      let afterPath = rawLine[nimIdx + 4 .. ^1]        # "(line, col) Error: msg"
+      let closeParen = afterPath.find(')')
+      if closeParen < 0: flush(); continue
+
+      let coordStr = afterPath[1 ..< closeParen]       # "line, col"
+      let afterCoord = afterPath[closeParen + 1 .. ^1] # " Error: msg"
+
+      let coords = coordStr.split(", ")
+      if coords.len != 2: flush(); continue
+      var lineNum, colNum: int
+      try:
+        lineNum = coords[0].parseInt
+        colNum  = coords[1].parseInt
+      except ValueError:
+        flush(); continue
+
+      flush()
+
+      if ".choosenim" in filePath or "/.nimble/pkgs" in filePath:
+        continue
+      if "template/generic instantiation" in afterCoord:
+        continue
+      let errIdx = afterCoord.find(" Error: ")
+      if errIdx < 0:
+        continue
+
+      cur = some((filePath, lineNum, colNum, afterCoord[errIdx + 8 .. ^1]))
+
+    else:
+      # Continuation line (type mismatch details, spell candidates, etc.)
+      if cur.isSome and rawLine.len > 0 and not rawLine.startsWith("SIGSEGV"):
+        var e = cur.get()
+        e.message &= "\n" & rawLine
+        cur = some(e)
+
+  flush()
+
+  # Group by file and publish one notification per file
+  var byFile = initTable[string, seq[Entry]]()
+  for e in entries:
+    byFile.mgetOrPut(e.filePath, @[]).add(e)
+
+  for filePath, fileDiags in byFile:
+    var diagArray = newJArray()
+    for d in fileDiags:
+      diagArray.add(%*{
+        "range": {
+          "start": {"line": max(0, d.line - 1), "character": max(0, d.col - 1)},
+          "end":   {"line": max(0, d.line - 1), "character": max(0, d.col)},
+        },
+        "severity": 1,
+        "source": "nim check",
+        "message": d.message.strip(),
+      })
+    notifyProc("textDocument/publishDiagnostics",
+      %*{"uri": string(toUri(FilePathAbs(filePath))), "diagnostics": diagArray})
+
+proc runNimCheckAfterCrash(
+  nimExe: FilePathAbs,
+  entryPoint: FilePathAbs,
+  paths: seq[DirPathAbs],
+): Future[string] {.async.} =
+  if not string(entryPoint).endsWith(".nim"):
+    return
+  var args = @["check", "--hints:off"]
+  # for p in paths:
+  #   args.add("--path:" & string(p))
+  args.add(string(entryPoint))
+  try:
+    debug "runNimCheckAfterCrash: running..."
+    let process = await startProcess(
+      string(nimExe),
+      string(parentDir(entryPoint)),
+      arguments = args,
+      options = {UsePath},
+      stdoutHandle = AsyncProcess.Pipe,
+      stderrHandle = AsyncProcess.Pipe,
+    )
+    let (output, errOutput, _) = await readOutputUntilExit(process, chronos.seconds(30))
+    await process.closeWait()
+    let combined = (output & errOutput).strip()
+    return combined
+  except CatchableError as e:
+    debug "runNimCheckAfterCrash: failed", msg = e.msg
+    return "nim check failed."
 
 proc spawnNewNimsuggestSlot*(
   pool: NimsuggestPool,
   spawningInfo: NimsuggestSpawnInfo,
   nimsuggestSettings: NimsuggestSettings,
+  dependencies: Forest,
   config: NlsConfig,
 ): Future[Option[NimsuggestSlot]] {.async.} =
   ## Returns a NimsuggestSlot if successfully spawned.
@@ -143,8 +222,6 @@ proc spawnNewNimsuggestSlot*(
     crashedUris: initHashSet[FileUri](),
     ns: newFuture[NimSuggest]("spawnNewNimsuggestSlot"),
     queryMailbox: newAsyncQueue[NimsuggestQuery[LspFilePosition]](),
-    lastCmdTime: now(),
-    crashCount: 0
   )
 
   pool.slots[newSlot.spawnInfo.entryPoint] = newSlot
@@ -165,11 +242,11 @@ proc spawnNewNimsuggestSlot*(
         newSlot.spawnProcess = some(p),
     )
     debug "spawnNewNimsuggestSlot: createNimsuggest succeeded",
-      projectFile = newSlot.spawnInfo.entryPoint, port = ns.port
+      projectFile = newSlot.spawnInfo.entryPoint, 
+      port = ns.port
 
     newSlot.ns.complete(ns)
     newSlot.state = SlotState.READY
-    newSlot.lastCmdTime = now()
 
     if pool.statusChangedProc != nil:
       pool.statusChangedProc()
@@ -181,25 +258,47 @@ proc spawnNewNimsuggestSlot*(
   except NimsuggestSpawnTimeoutError as ex:
     newSlot.state = SlotState.CRASHED
     let timeoutSecs = int(inSeconds(config.nimsuggestSpawnTimeout))
+
     error "spawnNewNimsuggestSlot: timed out",
-      projectFile = newSlot.spawnInfo.entryPoint, timeoutSecs = timeoutSecs, msg = ex.msg
+      projectFile = newSlot.spawnInfo.entryPoint, timeoutSecs = timeoutSecs, 
+      msg = ex.msg
+
     if pool.notifyProc != nil:
       pool.notifyProc("window/logMessage", %*{
         "type": 2,
         "message": fmt"Nimsuggest for {newSlot.spawnInfo.entryPoint} timed out after {timeoutSecs}s. " &
-                   "If this is a large project, try increasing nimTortoise.nimsuggestSpawnTimeout.",
+        "If this is a large project, try increasing nimTortoise.nimsuggestSpawnTimeout.",
       })
+
   except CatchableError as ex:
     newSlot.state = SlotState.CRASHED
     error "spawnNewNimsuggestSlot: spawn failed",
-      projectFile = newSlot.spawnInfo.entryPoint, msg = ex.msg
+      projectFile = newSlot.spawnInfo.entryPoint, 
+      msg = ex.msg
+
+    if pool.notifyProc != nil and ex.msg.len > 0:
+      debug "SHOW MESSAGE RUNNING"
+      let crashDetail = "Project: " & string(newSlot.spawnInfo.entryPoint) &
+        "\nError: " & ex.msg &
+        "\n\nNimsuggest crashed catastrophically while spawning. This is probably due to your code generating a SIGSEGV or similar error, meaning nimsuggest is unable to compile it. As a fall-back, the language server will now try to run `nim check` to generate diagnostics while you fix this error."
+
+      pool.notifyProc("window/showMessage",
+        %*{"type": 1, "message": "Nimsuggest crashed.", "detail": crashDetail}
+      )
+
+    let nimCheckResponse = await runNimCheckAfterCrash(
+      dependencies.nim.nimExe,
+      newSlot.spawnInfo.entryPoint,
+      paths = @[],
+    )
+    debug "nimCheckResponse", response = nimCheckResponse
+    publishNimCheckDiagnostics(nimCheckResponse, pool.notifyProc)
 
   newSlot.ns.fail(newException(CatchableError,
     fmt"Nimsuggest for {newSlot.spawnInfo.entryPoint} failed to spawn"))
 
   pool.slots.del(newSlot.spawnInfo.entryPoint)
   return none(NimsuggestSlot)
-
 
 proc spawnNewNimsuggestSlot*(
   pool: NimsuggestPool,
@@ -215,7 +314,7 @@ proc spawnNewNimsuggestSlot*(
   )
   return await spawnNewNimsuggestSlot(
     pool, spawningInfo, 
-    nimsuggestSettings, config
+    nimsuggestSettings, dependencies, config
   )
 
 proc stopNimsuggestSlot*(
@@ -246,7 +345,7 @@ proc stopNimsuggestSlot*(
       projectFile = slot.spawnInfo.entryPoint
     slot.state = SlotState.STOPPED
     when defined(posix):
-      if slot.spawnProcess.isSome:
+      if slot.spawnProcess.isSome():
         let pid = slot.spawnProcess.get().processID()
         debug "stopNimsuggestSlot: sending SIGKILL to process group", pid = pid
         killProcessGroup(pid)
@@ -272,13 +371,10 @@ proc stopNimsuggestSlot*(
 
 proc stopNimsuggestSlotAndRemoveFromPool*(
   pool: NimsuggestPool, slot: NimsuggestSlot
-): Future[bool] {.async.} =
+) {.async.} =
   let slotEntryPoint = slot.spawnInfo.entryPoint
-  let stoppedSlot = await stopNimsuggestSlot(
-    pool, slot
-  )
+  discard await stopNimsuggestSlot(pool, slot)
   pool.slots.del(slotEntryPoint)
-  return stoppedSlot
 
 proc stopAllNimsuggestSlotsInPool*(pool: NimsuggestPool) {.async.} =
   debug "stopping child nimsuggest processes"

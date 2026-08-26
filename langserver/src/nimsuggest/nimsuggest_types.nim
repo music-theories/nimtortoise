@@ -1,7 +1,6 @@
 import std/[json, sets, tables, times, options]
 import chronos
 import chronos/asyncproc
-import regex
 import ./suggestapi_types
 import ../protocol/types
 import ../utils/utils as globalUtils
@@ -91,21 +90,6 @@ type
     STOPPING  ## STOP running; queries return @[].
     CRASHED   ## Process exited unexpectedly; RESTART queued by processor.
 
-##[
-Realize that there are three types of file:
-- the entry point file
-- the working directory nimsuggest is running from
-- The base nimble project.
-
-e.g.
-in `langserver`:
-if I have opened a file in the `tests` folder:
-- file I'm working on: langserver/tests/textensions.nim
-- entry point: langserver/tests/all.nim
-- workingDirectory: langserver/tests
-- base nimble project folder: langserver (langserver/nimtortoise.nimble)
-]##
-
 type
   NimsuggestSlot* = ref object
     state*: SlotState
@@ -131,15 +115,6 @@ type
       ## process group before the 120 s port-read timeout expires.
     queryMailbox*: AsyncQueue[NimsuggestQuery[LspFilePosition]]
       ## IDE query commands. processQueries dequeues and dispatches to TCP.
-    lastCmdTime*: DateTime
-      ## Updated after each successful query. Drives LRU eviction policy.
-    crashCount*: int
-      ## Incremented on unhandled exit. Reset to 0 on successful init.
-
-type
-  ProjectMapping* = object
-    projectFile*: FilePathAbs
-    fileRegex: Regex2
 
 # === NIMSUGGEST POOL TYPES ===
 type
@@ -163,13 +138,17 @@ type
 
 type
   NlsFileInfo* = ref object of RootObj
+    textDocument*: TextDocumentItem
     fingerTable*: seq[seq[tuple[u16pos, offset: int]]]
     lastChanged*: DateTime
-      ## Updated on every DID_CHANGE.
+      # Updated on every DID_CHANGE.
     lastChecked*: DateTime
-      ## Set to now() when a chkFile or checkProject completes for this URI.
-      ## Prevents duplicate checks within FILE_CHECK_DELAY of each other.
-    textDocument*: TextDocumentItem
+      # Set to now() when a chkFile or checkProject completes for this URI.
+      # Prevents duplicate checks within FILE_CHECK_DELAY of each other.
+    lastUserInteraction*: DateTime
+    lastSaved*: DateTime
+      # While lastChanged and lastChecked record the last time a particular command was run on a file, this records the last time the user interacted with it - lastUserInteraction and lastSaved are used as a metric for working out which files can be evicted and which are being worked on.
+      
 
 type
   LanguageServerFiles* = object

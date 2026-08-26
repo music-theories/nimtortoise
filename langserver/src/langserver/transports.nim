@@ -245,7 +245,7 @@ proc processMessage(ls: LanguageServer, message: string) {.raises: [].} =
       #OPT oportunity reuse the same JSON already parsed
     let isReq = "method" in contentJson
     if isReq:
-      debug "[Processing Message]", request = contentJson["method"]
+      # debug "[Processing Message]", request = contentJson["method"]
       var fut = Future[JsonString]()
       var req = JrpcSys.decode(message, RequestRx)
       if req.params.kind == rpNamed and req.id.kind == riNumber:

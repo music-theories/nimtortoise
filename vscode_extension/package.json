@@ -2,7 +2,7 @@
     "name": "vscode-nim-tortoise",
     "displayName": "Nim Tortoise",
     "description": "Fork and rewrite of nimlangserver.",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "publisher": "YOUR_PUBLISHER_ID",
     "author": {
         "name": "David Pocknee"
@@ -54,7 +54,7 @@
         "onCommand:nimTortoise.runTest",
         "onCommand:nimTortoise.execSelectionInTerminal"
     ],
-    "main": "./out/vscode_nim_tortoise.js",
+    "main": "./out/vscode_nimtortoise.js",
     "contributes": {
         "languages": [
             {
@@ -189,26 +189,41 @@
                 "category": "Nim Tortoise"
             },
             {
-                "command": "nimTortoise.restartNimsuggest",
-                "title": "Restarts nimsuggest",
+                "command": "nimTortoise.serverRestart",
+                "title": "Restart Language Server",
                 "category": "Nim Tortoise"
             },
             {
-                "command": "nimTortoise.checkProject",
+                "command": "nimTortoise.nimsuggestRestart",
+                "title": "Restart Nimsuggest",
+                "category": "Nim Tortoise"
+            },
+            {
+                "command": "nimTortoise.nimsuggestStop",
+                "title": "Stop Nimsuggest Slot",
+                "category": "Nim Tortoise"
+            },
+            {
+                "command": "nimTortoise.nimsuggestCheckProject",
                 "title": "Check Project",
                 "category": "Nim Tortoise",
                 "icon": "$(refresh)"
+            },
+            {
+                "command": "nimTortoise.nimbleListTasks",
+                "title": "List Nimble Tasks",
+                "category": "Nim Tortoise"
+            },
+            {
+                "command": "nimTortoise.nimbleRunTask",
+                "title": "Run Nimble Task",
+                "category": "Nim Tortoise"
             },
             {
                 "command": "nimTortoise.openGeneratedFile",
                 "title": "Open Generated File",
                 "category": "Nim Tortoise",
                 "icon": "$(go-to-file)"
-            },
-            {
-                "command": "nimTortoise.refreshTests",
-                "title": "Refresh Tests",
-                "category": "Nim Tortoise"
             }
         ],
         "menus": {
@@ -227,6 +242,16 @@
                     "when": "editorLangId == 'nim'",
                     "command": "nimTortoise.openGeneratedFile",
                     "group": "run@3"
+                },
+                {
+                    "when": "editorLangId == 'nim' && nimTortoise:NimsuggestRestart",
+                    "command": "nimTortoise.nimsuggestRestart",
+                    "group": "nim@1"
+                },
+                {
+                    "when": "editorLangId == 'nim' && nimTortoise:NimsuggestCheckProject",
+                    "command": "nimTortoise.nimsuggestCheckProject",
+                    "group": "nim@2"
                 }
             ],
             "editor/title/run": [

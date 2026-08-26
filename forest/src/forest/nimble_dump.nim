@@ -53,6 +53,10 @@ proc parseNimbleFile*(nimbleFile: FilePathAbs): NimbleDumpInfo =
   let content = readFile(string(nimbleFile))
   result.srcDir         = DirPathRel(string(extractSingleString(content, "srcDir")))
   result.bin            = extractStringSeq(content, "bin")
+  if result.bin.len == 0:
+    let singleBin = extractSingleString(content, "bin")
+    if string(singleBin).len > 0:
+      result.bin = @[singleBin]
   result.entryPoints    = extractStringSeq(content, "entryPoints")
   result.testEntryPoint = extractSingleString(content, "testEntryPoint")
   # Synthesise entry points from srcDir + bin (mirrors what Nimble itself does)
@@ -90,7 +94,7 @@ proc initNimbleInfo*(
     nimbleDumpTable[nimbleFile] = parseNimbleFile(nimbleFile)
   let allEntryPoints = getEntryPoints(nimbleDumpTable)
   return NimbleInfo(
-    files: allNimbleFiles,
+    # files: allNimbleFiles,
     dump: nimbleDumpTable,
     entryPoints: allEntryPoints
   )

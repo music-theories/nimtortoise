@@ -2,6 +2,7 @@ import std/[json, options, times, tables]
 import chronos
 import chronicles
 import forest
+import api
 import ./[configuration_types]
 
 func inlayHintsEnabled*(cnf: NlsConfig): bool =

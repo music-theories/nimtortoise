@@ -15,8 +15,8 @@ The extension is written in **Nim** and compiled to JavaScript using the `js` ba
 | Package as VSIX | `nimble vsix` |
 | Install VSIX locally | `nimble install_vsix` |
 
-- Source entry point: `src/vscode_nim_tortoise.nim`
-- Output: `out/vscode_nim_tortoise.js` (this is the file VSCode loads as `main`)
+- Source entry point: `src/vscode_nimtortoise.nim`
+- Output: `out/vscode_nimtortoise.js` (this is the file VSCode loads as `main`)
 - Nim requirement: `>= 2.0.0 & <= 2.1`
 
 To debug the extension in VSCode: press **F5** in the dev workspace — the `.vscode/launch.json` runs `nimble build` then launches an Extension Development Host.

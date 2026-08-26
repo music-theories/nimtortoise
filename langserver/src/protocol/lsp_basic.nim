@@ -40,7 +40,7 @@ type
     text*: string
 
   VersionedTextDocumentIdentifier* = ref object of TextDocumentIdentifier
-    version*: OptionalNode # int or float
+    version*: OptionalNode # int 
     languageId*: Option[string]
 
   TextDocumentPositionParams* = ref object of RootObj

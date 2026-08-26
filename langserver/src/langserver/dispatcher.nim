@@ -12,7 +12,7 @@ import ../protocol/types
 
 import ../utils/utils
 import ./[langserver_types, query_types, capability_configs]
-import ./[dispatcher_did_open, dispatcher_did_change, dispatcher_did_save, dispatcher_did_close, dispatcher_did_rename]
+import ./[dispatcher_did_open, dispatcher_did_change, dispatcher_did_save, dispatcher_did_close, dispatcher_did_rename, dispatcher_did_delete]
 
 proc waitForLsInitialized*(ls: LanguageServer): Future[void] {.async.} =
   ## Waits until initNimsuggestInstances has completed (config received, nimble dump
@@ -57,6 +57,14 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
       query.shutdown.complete(true)
       ls.isShutdown = true
       return 
+
+    of LangserverQueryKind.RESTART:
+      await ls.pool.stopAllNimsuggestSlotsInPool()
+      ls.pool.crashedSlots.clear()
+      query.restart.complete(true)
+      # ls.isShutdown = true
+      return 
+
     of LangserverQueryKind.NIMSUGGEST:
       let q = query.nimsuggest
       # Refresh dirtyFile at dispatch time. The query was constructed in the LSP
@@ -129,27 +137,7 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
         await ls.processDidRenameQuery(q)
        
       of FileAccessQueryKind.DID_DELETE_FILES:
-        for f in q.deleteFiles.files:
-          let uri = f.uri
-          debug "File deleted", uri = uri
-          let path = toFilePathAbs(uri)
-
-          if uri in ls.files.openFiles:
-            ls.files.openFiles.del(uri)
-
-            let slotCheck = getSlotThatOwnsUri(ls.pool, uri)
-            if slotCheck.isSome():
-              let slotThatOwnsUri = slotCheck.get()
-              slotThatOwnsUri.ownedUris.excl(uri)
-            
-              if string(path).endsWith(".nim"):
-                let recompileQuery = NimsuggestQuery[LspFilePosition](
-                  kind: NimsuggestQueryKind.RECOMPILE,
-                  uri: toUri(slotThatOwnsUri.spawnInfo.entryPoint),
-                  dirtyFile: FilePathAbs(""),
-                  responseFuture: newFuture[seq[Suggest]]("recompile"),
-                )
-                slotThatOwnsUri.queryMailbox.addLastNoWait(recompileQuery)
+        await ls.processDidDeleteQuery(q)
 
       of FileAccessQueryKind.DID_CHANGE_CONFIGURATION:
         debug "Changed configuration: "
