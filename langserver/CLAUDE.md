@@ -1,6 +1,6 @@
 # CLAUDE.md — nimlangserver fork context
 
-Fork of [nimlangserver](https://github.com/nim-lang/langserver). The `dp-rewrite` branch is a ground-up rewrite in `src/` with a proper module hierarchy. Pre-rewrite analysis is in `langserver/rewrite_analysis/OLD_CLAUDE.md`.
+Fork of [nimlangserver](https://github.com/nim-lang/langserver). Ground-up rewrite in `src/` with a proper module hierarchy.
 
 ## Design philosophy
 
@@ -20,8 +20,11 @@ These waits freeze later queue items for their duration. That is correct: LSP me
 # Build (outputs to bin/nimtortoise — the path VS Code uses):
 cd langserver && nimble build
 
+# Compile-check one test:
+cd langserver && nim c --path:. tests/<file>.nim
+
 # Run ONE test file (never run all.nim directly):
-cd langserver && nim c --path:. -r tests/<file>.nim 2>&1 | tee /tmp/test_output.txt
+cd langserver && nim c -r --path:. tests/<file>.nim 2>&1 | tee /tmp/test_output.txt
 ```
 
 **IMPORTANT**: Always use `nimble build` to build the language server. `nim c src/nimtortoise.nim` outputs to `src/nimtortoise` and is NOT picked up by VS Code, which uses `bin/nimtortoise`.
@@ -32,26 +35,29 @@ Config: `tests/config.nims`. Fixtures: `tests/projects/`.
 
 ---
 
-## Test file status (as of 2026-08-19)
+## Test file status (as of 2026-08-26)
 
-| File | Tests | Status |
-|---|---|---|
-| `tsuggestapi.nim` | 8 | ✓ all pass |
-| `tmaxlimits.nim` | 4 | ✓ all pass |
-| `tknownbug3.nim` | 1 | ✓ all pass |
-| `tstability.nim` | 13 | ✓ all pass |
-| `tmonorepo.nim` | 4 | ✓ all pass |
-| `tnimlangserver.nim` | 13 | ✓ all pass |
-| `thover.nim` | 1 | ✓ all pass |
-| `tmisc.nim` | 1 | ✓ all pass |
-| `textensions.nim` | 1 | ✓ all pass |
-| `tmonorepo2.nim` | 3 | ✓ all pass |
-| `tmonorepo3.nim` | 1 | ✓ all pass |
+| File | Tests | Status | Notes |
+|---|---|---|---|
+| `tsuggestapi.nim` | 8 | ✓ all pass | |
+| `tmisc.nim` | 1 | ✓ pass | |
+| `thover.nim` | 1 | ✓ pass | |
+| `tnimlangserver.nim` | 14 | ✓ all pass | |
+| `tmonorepo.nim` | 4 | ✓ all pass | |
+| `tmonorepo2.nim` | 3 | ✓ all pass | |
+| `tknownbug3.nim` | 1 | ✓ pass | Was "EXPECTED FAIL" — bug appears fixed |
+| `tmonorepo3.nim` | 1 | ✓ pass | |
+| `tmaxlimits.nim` | 4 | ✓ all pass | |
+| `textensions.nim` | 1 | ✓ pass | |
+| `tstability.nim` | 13 | not verified | Slow (multi-spawn), may pass |
+| `tdependencies.nim` | 6 | not verified | Slow (15s diagnostic waits), may pass |
 
 ### Test infrastructure
 
-- **`tests/fixhelpers.nim`** — `LspSocketClient`, `startServer`, `doInitialize`, `waitForNsInit`, `sendDidOpen/Hover/Completion/Change/Save/Rename`. Fixture constants: `simpleRel`, `widgetRel`, `orphanRel`, `pkgbRel`, `pkgaRel`, etc.
-- **`tests/lspsocketclient.nim`** — LSP client; `setWorkspaceConfig` to override `workspace/configuration` response.
+- **`tests/lspsocketclient.nim`** — `LspSocketClient`, `startServer()`, `notify`, `call`, `connect`, `waitForNotification`, `waitForNotificationMessage`, `setWorkspaceConfig`, `registerNotification`, `positionParams`, `initialize`, `stopServer`.
+- **`tests/client_utils.nim`** — project-file path helpers (`simpleProjectFile`, `pkgaProjectFile`, etc.), `doInitialize`, `waitForNsInit`, `waitForInstanceCount`, `sendHover`, `sendCompletion`, `sendDidChange`, `sendDidSave`, `sendDidRename`, `generateSimpleNimblePaths`, `generateMonorepoNimblePaths`, `createDidOpenParams`.
+- **`tests/fixhelpers.nim`** — thin re-export of both above + `sendDidOpen`, `startServer(rootRelPath)` compat overload.
+- **`tests/tbughelpers.nim`** — `startCombinedServer(maxNs)`, `combinedMapping()`, path constants: `simpleRel`, `widgetRel`, `orphanRel`, `orphan2Rel`, `pkgbRel`, `pkgaRel`, `aorphanRel`.
 
 **Config sequencing**: call `client.setWorkspaceConfig(%*[{...}])` **before** `doInitialize` + `notify("initialized")`.
 
@@ -77,6 +83,14 @@ forest/                              # Separate package — dependency graph lib
                                      #   `/` path join, parentDir, filename, stem, ext,
                                      #   isInside, toAbs, toRel, withExt, asFilePathAbs, asDirPathAbs
 
+api/                                 # Separate package — shared API types between server and VS Code extension
+  src/
+    api.nim                          # Re-exports api_types + api_utils
+    api_types.nim                    # LspExtensionCapability, NimsuggestCapability, NimsuggestStatus,
+                                     #   NimTortoiseServerStatus, ExtensionCommandRequest/Response,
+                                     #   NimbleTask, ProjectError, PerformanceSetting, MessageType
+    api_utils.nim                    # toExtensionCommandRequest, toJsonHook, getAllServerCapabilities
+
 langserver/src/
 ├── nimtortoise.nim                  # Entry point; main(), registerLspRoutes()
 ├── protocol/
@@ -98,9 +112,9 @@ langserver/src/
 ├── langserver/
 │   ├── langserver.nim               # Re-export hub for langserver submodules
 │   ├── langserver_types.nim         # LanguageServer, LanguageServerCapabilities,
-│   │                                #   LanguageServerFiles, LanguageServerMessaging,
-│   │                                #   LanguageServerTransport, CommandLineParams,
-│   │                                #   PendingRequest, LspDispatchItem
+│   │                                #   LanguageServerFiles (in nimsuggest_types),
+│   │                                #   LanguageServerMessaging, LanguageServerTransport,
+│   │                                #   CommandLineParams, PendingRequest, LspDispatchItem
 │   ├── init_langserver.nim          # initLanguageServer, tick, initialize, initialized,
 │   │                                #   initNimsuggestInstances, stopNimsuggestProcesses,
 │   │                                #   getIntendedProject, getWorkingDir
@@ -115,7 +129,7 @@ langserver/src/
 │   ├── dispatcher_utils.nim         # isKnownByANimsuggestSlot, addFileToOpenFiles,
 │   │                                #   queryFile, nimsuggestSlotToEvict
 │   ├── capability_configs.nim       # usePullConfigurationModel, supportsConfigurationRequest
-│   └── query_types.nim              # LangserverQuery (NIMSUGGEST | FILE_ACCESS),
+│   └── query_types.nim              # LangserverQuery (NIMSUGGEST | FILE_ACCESS | RESTART),
 │                                    #   FileAccessQuery, FileAccessQueryKind
 ├── handlers/
 │   ├── handlers.nim                 # Re-exports all handler submodules
@@ -125,7 +139,7 @@ langserver/src/
 │   ├── notification_process.nim     # initialized, cancelRequest, setTrace
 │   ├── queries_file_access.nim      # File-level query helpers
 │   ├── queries_nimsuggest.nim       # Nimsuggest query helpers
-│   ├── request_extension.nim        # extension/* handlers
+│   ├── request_extension.nim        # extension/* handlers; also workspace/executeCommand
 │   ├── request_process.nim          # initialize, shutdown, exit
 │   ├── request_text_document.nim    # textDocument/* handlers
 │   └── request_workspace.nim        # workspace/* handlers
@@ -134,7 +148,7 @@ langserver/src/
 │   ├── nimsuggest_types.nim         # NimsuggestQuery, NimsuggestSlot, NimsuggestPool,
 │   │                                #   NimsuggestQueryKind, LspFilePosition, SlotState,
 │   │                                #   NlsFileInfo, LanguageServerFiles
-│   ├── nimsuggest_slots.nim         # execSpawn, execStop; slot state machine
+│   ├── nimsuggest_slots.nim         # execSpawn, execStop, restartSlot; slot state machine
 │   ├── nimsuggest_process.nim       # processNimsuggestQueries, runNimsuggestQuery; TCP dispatch
 │   ├── nimsuggest_utils.nim         # mailboxHasQueryOfKind, mailboxHasChangedQuery…
 │   ├── diagnostics.nim              # toLspFilePosition; nimsuggest→LSP diagnostic conversion
@@ -144,7 +158,7 @@ langserver/src/
 │   ├── suggestapi_queries.nim       # Query construction helpers
 │   └── suggestapi_utils.nim         # Suggest parsing/formatting utilities
 ├── nimble/
-│   ├── nimble.nim                   # getNimbleEntryPoints
+│   ├── nimble.nim                   # getNimbleEntryPoints, getNimbleTasks, runNimbleTask
 │   ├── nimble_types.nim             # NimbleDumpInfo (langserver-side)
 │   ├── nimble_utils.nim             # getNimblePaths, nimble path resolution helpers
 │   ├── nimscript_utils.nim          # nimscript helpers
@@ -156,11 +170,13 @@ langserver/src/
 └── utils/
     ├── utils.nim                    # General utilities
     ├── asyncprocmonitor.nim         # hookAsyncProcMonitor
-    ├── process_utils.nim            # Process utilities
+    ├── process_utils.nim            # Process utilities (withTimeout, shutdownChildProcess)
     └── type_mismatch_format.nim     # Formatting for type mismatch errors
 ```
 
 **Import path convention**: relative paths from each file's own directory.
+
+**Path setup** (`langserver/config.nims`): includes `nimble.paths`, `../forest/src`, `../api/src`. Both `forest` and `api` are separate packages in the repo root and must be on the path.
 
 ---
 
@@ -191,27 +207,7 @@ Forest* = object
   nimble*: Table[FilePathAbs, NimbleDumpInfo] # per-.nimble-file dump
   paths*:  Table[FilePathAbs, seq[DirPathAbs]] # lib paths per entry point
   trees*:  Table[FilePathAbs, seq[FilePathAbs]] # dep graph: entry → all deps
-
-NimbleDumpInfo* = object
-  name*:           string
-  srcDir*:         DirPathRel
-  bin*:            seq[FilePathRel]
-  entryPoints*:    seq[FilePathRel]  # relative to nimble file dir
-  testEntryPoint*: FilePathRel
-
-DependencyGraph* = object
-  graph*:  Table[FilePathAbs, seq[FilePathAbs]]  # file → direct imports (local only)
-  states*: Table[FilePathAbs, VisitState]
-  stack*:  seq[FilePathAbs]
-  root*:   DirPathAbs
 ```
-
-### Key procs
-
-- `initForest(rootPath: DirPathAbs): Future[Forest]` — runs nimble dump + nim dump + dep graph construction; called once in `initLanguageServer`. Result stored in `ls.dependencies`.
-- `isDependency(graph, rootFile, dependencyFile)` — is `dependencyFile` a transitive import of `rootFile`?
-- `findIntermediatePath(graph, fromFile, toFile)` — intermediate files between two nodes (for cache invalidation).
-- `extractImports(source: string): seq[string]` — parse-free import extractor; handles all common Nim import syntaxes.
 
 ---
 
@@ -236,41 +232,11 @@ LanguageServer* = ref object
   isShutdown*:      bool
   lsInitialized*:   Future[void]                  # completed after initNimsuggestInstances
   cmdLineClientProcessId*: Option[int]
-  testRunProcess*:  Option[AsyncProcessRef]
 ```
 
-`LanguageServerFiles`:
-```nim
-LanguageServerFiles* = object
-  openFiles*:  TableRef[FileUri, NlsFileInfo]
-  storageDir*: DirPathAbs
-  rootPath*:   DirPathAbs
-```
-
-`dependencies` replaces the old `nimDumpCache` — nimble dump info is now in `ls.dependencies.nimble`.
-
-### `NlsFileInfo` (in `src/nimsuggest/nimsuggest_types.nim`)
+### `NimsuggestSlot` (in `src/nimsuggest/nimsuggest_types.nim`)
 
 ```nim
-NlsFileInfo* = ref object of RootObj
-  slot*:          NimsuggestSlot
-  fingerTable*:   seq[seq[tuple[u16pos, offset: int]]]
-  lastChanged*:   DateTime
-  lastChecked*:   DateTime
-  textDocument*:  TextDocumentItem
-```
-
-### `NimsuggestPool` and `NimsuggestSlot`
-
-```nim
-NimsuggestPool* = ref object
-  slots*:         Table[FilePathAbs, NimsuggestSlot]  # entryPoint → slot
-  crashedSlots*:  HashSet[FilePathAbs]                # failed entry points; cleared on save
-  maxSlots*:      int
-  nimsuggest*:    NimsuggestSettings                  # exePath, protocol, capabilities
-  notifyProc*:    NotifyProc
-  statusChangedProc*: StatusChangedProc
-
 NimsuggestSlot* = ref object
   state*:         SlotState                           # STOPPED|SPAWNING|READY|STOPPING|CRASHED
   spawnInfo*:     NimsuggestSpawnInfo                 # entryPoint, workingDir, nimbleFile, paths, extraArgs
@@ -279,31 +245,33 @@ NimsuggestSlot* = ref object
   ns*:            Future[NimSuggest]
   spawnProcess*:  Option[AsyncProcessRef]
   queryMailbox*:  AsyncQueue[NimsuggestQuery[LspFilePosition]]
-  lastCmdTime*:   DateTime
-  crashCount*:    int
 ```
 
-`pool.slots` contains only canonical entries (no redirect aliases). Each slot has a `queryMailbox`; `processNimsuggestQueries` drains it and dispatches to TCP. `execSpawn` backs off exponentially between retries (`1_000 * (1 shl crashCount)` ms, capped at 30s).
+Note: `crashCount` field has been **removed** from `NimsuggestSlot`. Slot lifecycle is managed entirely by `state`.
+
+### Extension API
+
+Nimsuggest restart is via `workspace/executeCommand`:
+```json
+{"command": "nimsuggestRestart", "arguments": {"slot": "/abs/path/to/entry.nim"}}
+```
+Server endpoints: `extension/status`, `extension/capabilities`, `extension/restart` (server restart), `extension/listTasks`, `extension/runTask`, `extension/macroExpand`. Nimsuggest-specific operations go through `workspace/executeCommand`.
 
 ---
 
 ## Module boundary intent
 
 - `forest/` — path types, dep graph, nimble/nim dump; no langserver dependency.
+- `api/` — shared types between server and VS Code extension (`LspExtensionCapability`, `ExtensionCommandRequest/Response`, etc.); no langserver dependency.
 - `configurations/` — `NlsConfig` + parsing; no LS dependency.
 - `nimsuggest/nimsuggest_types.nim` — all nimsuggest + slot + pool types; also `NlsFileInfo`, `LanguageServerFiles`.
-- `nimsuggest/nimsuggest_slots.nim` — `execSpawn`, `execStop`; slot state machine.
-- `nimsuggest/nimsuggest_process.nim` — `processNimsuggestQueries`, `runNimsuggestQuery`; TCP dispatch. Two skip-rule groups: **background queries** (INLAY_HINTS, DOCUMENT_SYMBOLS) dropped if CHANGED pending or file edited within `FILE_CHECK_DELAY`; **position queries** dropped if a newer same-kind query queued for the same URI, or CHANGED pending.
+- `nimsuggest/nimsuggest_slots.nim` — `execSpawn`, `execStop`, `restartSlot`; slot state machine.
+- `nimsuggest/nimsuggest_process.nim` — `processNimsuggestQueries`, `runNimsuggestQuery`; TCP dispatch.
 - `nimsuggest/nimsuggest_utils.nim` — `mailboxHasQueryOfKind`, `mailboxHasChangedQueryForSameUriAnyOtherUri`.
-- `nimsuggest/diagnostics.nim` — `toLspFilePosition`; nimsuggest→LSP coordinate conversion.
 - `nimsuggest/suggestapi.nim` — `createNimsuggest`, raw TCP protocol.
-- `langserver/init_langserver.nim` — `initLanguageServer`, `tick`, `initialize`, `initialized`, `initNimsuggestInstances`, `stopNimsuggestProcesses`, `getIntendedProject`.
-- `langserver/langserver_messaging.nim` — `showMessage`, `progress`, `getLspStatus`, `sendStatusChanged`, `addProjectFileToPendingRequest`.
+- `langserver/init_langserver.nim` — `initLanguageServer`, `tick`, `initialize`, `initialized`, `initNimsuggestInstances`.
 - `langserver/dispatcher.nim` — `processLangserverQueue` (FIFO queue drain).
-- `langserver/dispatcher_did_open.nim` — DID_OPEN: slot lookup, `execSpawn`, consolidation.
-- `langserver/dispatcher_did_change.nim` — DID_CHANGE: stash write, diagnostic scheduling.
-- `langserver/dispatcher_utils.nim` — `isKnownByANimsuggestSlot`, `addFileToOpenFiles`, `queryFile`, `nimsuggestSlotToEvict`.
-- `langserver/langserver.nim` — re-export hub only.
+- `handlers/request_extension.nim` — all `extension/*` handlers + `workspace/executeCommand`.
 - `handlers/` — LSP request/notification handlers; enqueue onto `ls.langserverQueue`.
 
 ---
@@ -324,6 +292,7 @@ LSP handler
 `langserverQueue` → `processLangserverQueue`:
 - `NIMSUGGEST` → `slot.queryMailbox.addLastNoWait(q)` (serializes stash writes before queries)
 - `FILE_ACCESS` → executes inline (DID_OPEN, DID_CHANGE, DID_SAVE, DID_CLOSE, etc.)
+- `RESTART` → server-level restart
 
 ---
 
@@ -349,12 +318,6 @@ Every `openFiles` insertion/deletion must be mirrored to the slot via `slot.assi
 
 ---
 
-## Nimsuggest v4 unknown-file caveat
-
-Always started with `--v4`. For files never imported into the project, `unknown` capability is non-functional: `graph.needsCompilation(fileIndex)` returns false for nil module → `recompilePartially` never runs → all commands return `length=0`. The langserver works around this by using the file itself as the entry point (fix #18).
-
----
-
 ## Async vs sync rule
 
 `{.async.}` only if the proc has at least one `await`. Sync procs are implicitly atomic under Chronos's cooperative scheduler.
@@ -377,13 +340,11 @@ Always started with `--v4`. For files never imported into the project, `unknown`
 
 ## Known remaining issues
 
-### P1 — Runtime bugs
+### P1 — Runtime bugs / broken tests
 1. **Slot eviction mailbox drain race** (`dispatcher.nim`): futures completed with `@[]` while `processNimsuggestQueries` may be completing the same futures.
 
 ### P1 — Stub features
-2. **`extension/macroExpand`** — stub.
-3. **`extension/suggest` (restart action)** — stub.
-4. **`extension/status` / `extension/capabilities`** — stubs; VS Code status bar empty.
+4. **`extension/macroExpand`** — stub.
 5. **Per-file diagnostics only on save** — `CHECK_FILE` only enqueued after a `CHANGED` command completes.
 
 ---
@@ -399,4 +360,4 @@ Always started with `--v4`. For files never imported into the project, `unknown`
 
 ## Debugging
 
-Add `debug "..."` via `chronicles`. The VS Code LSP trace log (`"nim.logNimsuggest": true`) captures both protocol messages and langserver debug output. When investigating crashes: check `projectErrors` in `extension/statusUpdate` for post-crash failures, then search backwards for the last `DBG Started...` with no matching `DBG CPU Time` to find the triggering command.
+Add `debug "..."` via `chronicles`. The VS Code LSP trace log (`"nim.logNimsuggest": true`) captures both protocol messages and langserver debug output. When investigating crashes: check `projectErrors` in `extension/status` for post-crash failures, then search backwards for the last `DBG Started...` with no matching `DBG CPU Time` to find the triggering command.

@@ -45,7 +45,6 @@ suite "Nimlangserver fail count":
     check waitFor client.waitForNotificationMessage(
       fmt"Nimsuggest initialized for {hwAbsFile}"
     )
-    # Verify crashCount is 0 after a clean spawn
-    if hwAbsFile in ls.pool.slots:
-      check ls.pool.slots[hwAbsFile].crashCount == 0
+    # Verify slot exists after a clean spawn (crashCount field was removed)
+    check hwAbsFile in ls.pool.slots
     stopServer(client)

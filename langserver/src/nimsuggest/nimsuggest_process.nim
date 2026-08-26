@@ -381,7 +381,11 @@ proc restartSlot*(
     if spawningInfo.entryPoint in pool.crashedSlots:
       pool.crashedSlots.excl(spawningInfo.entryPoint)
 
-    asyncSpawn slot.processNimsuggestQueries(
+    let newSlot = successfulSpawn.get()
+    if pool.notifyProc != nil:
+      pool.notifyProc("window/logMessage",
+        %*{"type": 3, "message": fmt"Nimsuggest initialized for {spawningInfo.entryPoint}"})
+    asyncSpawn newSlot.processNimsuggestQueries(
       pool, openFiles, dependencies, storageDir, config, pool.notifyProc
     )
 

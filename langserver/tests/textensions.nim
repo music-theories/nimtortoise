@@ -35,11 +35,13 @@ suite "Nimlangserver extensions":
       timeoutMs = 30000,
     )
 
-    # Clear showMessage history so we can detect the post-restart notification.
-    client.calls["window/showMessage"] = @[]
+    # Clear logMessage history so we can detect the post-restart notification.
+    client.calls["window/logMessage"] = @[]
 
-    let suggestParams = SuggestParams(action: saRestart, projectFile: $hwAbsFile)
-    discard client.call("extension/suggest", %suggestParams).waitFor
+    discard client.call("workspace/executeCommand", %* {
+      "command": "nimsuggestRestart",
+      "arguments": {"slot": $hwAbsFile}
+    }).waitFor
 
     # After the restart the server sends another "Nimsuggest initialized" message.
     # A fresh nimsuggest process must have started; that is the only meaningful
