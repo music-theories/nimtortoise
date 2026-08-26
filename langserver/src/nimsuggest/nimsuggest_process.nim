@@ -298,8 +298,17 @@ proc processNimsuggestQueries*(
     if continueProcessing == false:
       continue
       
+    # If the underlying NimSuggest marked itself failed (e.g. after a timeout)
+    # without raising an exception, the slot state won't have transitioned to
+    # CRASHED yet. Force the transition here so the CRASHED branch below
+    # triggers crash-recovery rather than silently returning empty forever.
+    if slot.state == SlotState.READY and
+        slot.ns.finished and not slot.ns.failed and
+        slot.ns.read().failed:
+      slot.state = SlotState.CRASHED
+
     # State
-    case slot.state 
+    case slot.state
     of SlotState.STOPPING, SlotState.STOPPED:
       debug "processNimsuggestQueries: Could not process query, slot was STOPPING, OR STOPPED.", state = slot.state
       if not originalQuery.responseFuture.finished:
