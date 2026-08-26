@@ -1,5 +1,8 @@
-import std/[json, hashes, sha1, os, strutils, uri]
+import std/[json, hashes]
 import ./resource_types
+
+when not defined(js):
+  import std/[sha1, os, strutils, uri]
 
 func `$`*(x: FileUri):     string = string(x)
 func `$`*(x: FilePathAbs): string = string(x)
@@ -45,157 +48,151 @@ proc toJsonHook*(x: DirPathAbs):  JsonNode = newJString(string(x))
 proc toJsonHook*(x: DirPathRel):  JsonNode = newJString(string(x))
 
 
-# ── path joining (/  operator) ─────────────────────────────────────────────────
-## Joining an absolute dir with a relative child yields an absolute result.
-## The file/dir distinction of the right-hand side is preserved.
-func `/`*(dir: DirPathAbs, rel: FilePathRel): FilePathAbs =
-  FilePathAbs(string(dir) / string(rel))
+when not defined(js):
+  # ── path joining (/  operator) ─────────────────────────────────────────────────
+  ## Joining an absolute dir with a relative child yields an absolute result.
+  ## The file/dir distinction of the right-hand side is preserved.
+  func `/`*(dir: DirPathAbs, rel: FilePathRel): FilePathAbs =
+    FilePathAbs(string(dir) / string(rel))
 
-func `/`*(dir: DirPathAbs, rel: DirPathRel): DirPathAbs =
-  DirPathAbs(string(dir) / string(rel))
+  func `/`*(dir: DirPathAbs, rel: DirPathRel): DirPathAbs =
+    DirPathAbs(string(dir) / string(rel))
 
-## Joining a relative dir with a relative child stays relative.
-func `/`*(dir: DirPathRel, rel: FilePathRel): FilePathRel =
-  FilePathRel(string(dir) / string(rel))
+  ## Joining a relative dir with a relative child stays relative.
+  func `/`*(dir: DirPathRel, rel: FilePathRel): FilePathRel =
+    FilePathRel(string(dir) / string(rel))
 
-func `/`*(dir: DirPathRel, rel: DirPathRel): DirPathRel =
-  DirPathRel(string(dir) / string(rel))
+  func `/`*(dir: DirPathRel, rel: DirPathRel): DirPathRel =
+    DirPathRel(string(dir) / string(rel))
 
-# ── parent directory ───────────────────────────────────────────────────────────
-func parentDir*(p: FilePathAbs): DirPathAbs =
-  DirPathAbs(parentDir(string(p)))
+  # ── parent directory ───────────────────────────────────────────────────────────
+  func parentDir*(p: FilePathAbs): DirPathAbs =
+    DirPathAbs(parentDir(string(p)))
 
-func parentDir*(p: DirPathAbs): DirPathAbs =
-  DirPathAbs(parentDir(string(p).strip(chars = {'/'}, leading = false)))
+  func parentDir*(p: DirPathAbs): DirPathAbs =
+    DirPathAbs(parentDir(string(p).strip(chars = {'/'}, leading = false)))
 
-# ── filename / basename ────────────────────────────────────────────────────────
-func filename*(p: FilePathAbs): string = lastPathPart(string(p))
-func filename*(p: FilePathRel): string = lastPathPart(string(p))
+  # ── filename / basename ────────────────────────────────────────────────────────
+  func filename*(p: FilePathAbs): string = lastPathPart(string(p))
+  func filename*(p: FilePathRel): string = lastPathPart(string(p))
 
-func stem*(p: FilePathAbs): string = splitFile(string(p)).name
-func stem*(p: FilePathRel): string = splitFile(string(p)).name
+  func stem*(p: FilePathAbs): string = splitFile(string(p)).name
+  func stem*(p: FilePathRel): string = splitFile(string(p)).name
 
-func ext*(p: FilePathAbs): string = splitFile(string(p)).ext
-func ext*(p: FilePathRel): string = splitFile(string(p)).ext
+  func ext*(p: FilePathAbs): string = splitFile(string(p)).ext
+  func ext*(p: FilePathRel): string = splitFile(string(p)).ext
 
-# ── FileUri <-> FilePathAbs / DirPathAbs conversions ──────────────────────────
-type
-  UriParseError* = object of Defect
-    uri*: FileUri
+  # ── FileUri <-> FilePathAbs / DirPathAbs conversions ──────────────────────────
+  type
+    UriParseError* = object of Defect
+      uri*: FileUri
 
-proc toUri*(p: FilePathAbs): FileUri =
-  ## Encode an absolute file path as an RFC 8089 file:// URI.
-  ## Special characters are percent-encoded; on Windows a leading '/' is inserted.
-  let s = string(p)
-  var output = "file://" & newStringOfCap(s.len + s.len shr 2)
-  when defined(windows):
-    output.add('/')
-  for c in s:
-    case c
-    of 'a'..'z', 'A'..'Z', '0'..'9', '-', '.', '_', '~', '/':
-      output.add(c)
-    of '\\':
-      when defined(windows):
-        output.add('/')
+  proc toUri*(p: FilePathAbs): FileUri =
+    ## Encode an absolute file path as an RFC 8089 file:// URI.
+    ## Special characters are percent-encoded; on Windows a leading '/' is inserted.
+    let s = string(p)
+    var output = "file://" & newStringOfCap(s.len + s.len shr 2)
+    when defined(windows):
+      output.add('/')
+    for c in s:
+      case c
+      of 'a'..'z', 'A'..'Z', '0'..'9', '-', '.', '_', '~', '/':
+        output.add(c)
+      of '\\':
+        when defined(windows):
+          output.add('/')
+        else:
+          output.add('%')
+          output.add(toHex(ord(c), 2))
       else:
         output.add('%')
         output.add(toHex(ord(c), 2))
-    else:
-      output.add('%')
-      output.add(toHex(ord(c), 2))
-  FileUri(output)
+    FileUri(output)
 
-proc toUri*(p: DirPathAbs): FileUri = toUri(FilePathAbs(string(p)))
+  proc toUri*(p: DirPathAbs): FileUri = toUri(FilePathAbs(string(p)))
 
-proc uriToPathString(u: FileUri): string =
-  ## Convert an RFC 8089 file URI to a native absolute path string.
-  let s = string(u)
-  let parsed = parseUri(s)
-  if parsed.scheme != "file":
-    var e = newException(UriParseError,
-      "Invalid scheme in uri \"" & s & "\": " & parsed.scheme &
-      ", only \"file\" is supported")
-    e.uri = u
-    raise e
-  if parsed.hostname != "":
-    var e = newException(UriParseError,
-      "Invalid hostname in uri \"" & s & "\": " & parsed.hostname &
-      ", only empty hostname is supported")
-    e.uri = u
-    raise e
-  normalizedPath(
-    when defined(windows): parsed.path[1 ..^ 1]
-    else:                  parsed.path
-  ).decodeUrl()
+  proc uriToPathString(u: FileUri): string =
+    ## Convert an RFC 8089 file URI to a native absolute path string.
+    let s = string(u)
+    let parsed = parseUri(s)
+    if parsed.scheme != "file":
+      var e = newException(UriParseError,
+        "Invalid scheme in uri \"" & s & "\": " & parsed.scheme &
+        ", only \"file\" is supported")
+      e.uri = u
+      raise e
+    if parsed.hostname != "":
+      var e = newException(UriParseError,
+        "Invalid hostname in uri \"" & s & "\": " & parsed.hostname &
+        ", only empty hostname is supported")
+      e.uri = u
+      raise e
+    normalizedPath(
+      when defined(windows): parsed.path[1 ..^ 1]
+      else:                  parsed.path
+    ).decodeUrl()
 
-proc toFilePathAbs*(u: FileUri): FilePathAbs = FilePathAbs(uriToPathString(u))
-proc toDirPathAbs*(u: FileUri):  DirPathAbs  = DirPathAbs(uriToPathString(u))
+  proc toFilePathAbs*(u: FileUri): FilePathAbs = FilePathAbs(uriToPathString(u))
+  proc toDirPathAbs*(u: FileUri):  DirPathAbs  = DirPathAbs(uriToPathString(u))
 
-# ── absolutise a relative path against an anchor ───────────────────────────────
-func toAbs*(rel: FilePathRel; anchor: DirPathAbs): FilePathAbs =
-  FilePathAbs(absolutePath(string(rel), string(anchor)))
+  # ── absolutise a relative path against an anchor ───────────────────────────────
+  func toAbs*(rel: FilePathRel; anchor: DirPathAbs): FilePathAbs =
+    FilePathAbs(absolutePath(string(rel), string(anchor)))
 
-func toAbs*(rel: DirPathRel; anchor: DirPathAbs): DirPathAbs =
-  DirPathAbs(absolutePath(string(rel), string(anchor)))
+  func toAbs*(rel: DirPathRel; anchor: DirPathAbs): DirPathAbs =
+    DirPathAbs(absolutePath(string(rel), string(anchor)))
 
-# ── relativise an absolute path against an anchor ──────────────────────────────
-proc toRel*(p: FilePathAbs; anchor: DirPathAbs): FilePathRel =
-  FilePathRel(relativePath(string(p), string(anchor)))
+  # ── relativise an absolute path against an anchor ──────────────────────────────
+  proc toRel*(p: FilePathAbs; anchor: DirPathAbs): FilePathRel =
+    FilePathRel(relativePath(string(p), string(anchor)))
 
-proc toRel*(p: DirPathAbs; anchor: DirPathAbs): DirPathRel =
-  DirPathRel(relativePath(string(p), string(anchor)))
+  proc toRel*(p: DirPathAbs; anchor: DirPathAbs): DirPathRel =
+    DirPathRel(relativePath(string(p), string(anchor)))
 
-# ── directory name (final component of a dir path) ────────────────────────────
-func dirName*(p: DirPathAbs): string =
-  lastPathPart(string(p).strip(chars = {'/'}, leading = false))
+  # ── directory name (final component of a dir path) ────────────────────────────
+  func dirName*(p: DirPathAbs): string =
+    lastPathPart(string(p).strip(chars = {'/'}, leading = false))
 
-func dirName*(p: DirPathRel): string =
-  lastPathPart(string(p).strip(chars = {'/'}, leading = false))
+  func dirName*(p: DirPathRel): string =
+    lastPathPart(string(p).strip(chars = {'/'}, leading = false))
 
-# ── change file extension ──────────────────────────────────────────────────────
-func withExt*(p: FilePathAbs; newExt: string): FilePathAbs =
-  let (dir, name, _) = splitFile(string(p))
-  FilePathAbs(dir / (name & newExt))
+  # ── change file extension ──────────────────────────────────────────────────────
+  func withExt*(p: FilePathAbs; newExt: string): FilePathAbs =
+    let (dir, name, _) = splitFile(string(p))
+    FilePathAbs(dir / (name & newExt))
 
-func withExt*(p: FilePathRel; newExt: string): FilePathRel =
-  let (dir, name, _) = splitFile(string(p))
-  FilePathRel(dir / (name & newExt))
+  func withExt*(p: FilePathRel; newExt: string): FilePathRel =
+    let (dir, name, _) = splitFile(string(p))
+    FilePathRel(dir / (name & newExt))
 
-# ── reinterpretation casts (use when the FS has told you what a path is) ───────
-## These are intentional escape hatches — you are asserting the file/dir nature.
-func asFilePathAbs*(p: DirPathAbs):  FilePathAbs = FilePathAbs(string(p))
-func asDirPathAbs*(p: FilePathAbs):  DirPathAbs  = DirPathAbs(string(p))
-func asFilePathRel*(p: DirPathRel):  FilePathRel = FilePathRel(string(p))
-func asDirPathRel*(p: FilePathRel):  DirPathRel  = DirPathRel(string(p))
+  # ── reinterpretation casts (use when the FS has told you what a path is) ───────
+  ## These are intentional escape hatches — you are asserting the file/dir nature.
+  func asFilePathAbs*(p: DirPathAbs):  FilePathAbs = FilePathAbs(string(p))
+  func asDirPathAbs*(p: FilePathAbs):  DirPathAbs  = DirPathAbs(string(p))
+  func asFilePathRel*(p: DirPathRel):  FilePathRel = FilePathRel(string(p))
+  func asDirPathRel*(p: FilePathRel):  DirPathRel  = DirPathRel(string(p))
 
-# ── containment checks ────────────────────────────────────────────────────────
-func isInside*(file: FilePathAbs; dir: DirPathAbs): bool =
-  ## Returns true if file is inside dir (at any depth).
-  ## Normalises both sides so trailing slashes and redundant separators
-  ## do not cause false negatives.
-  let d = string(dir).normalizedPath & DirSep
-  string(file).normalizedPath.startsWith(d)
+  # ── containment checks ────────────────────────────────────────────────────────
+  func isInside*(file: FilePathAbs; dir: DirPathAbs): bool =
+    ## Returns true if file is inside dir (at any depth).
+    ## Normalises both sides so trailing slashes and redundant separators
+    ## do not cause false negatives.
+    let d = string(dir).normalizedPath & DirSep
+    string(file).normalizedPath.startsWith(d)
 
-func isInside*(sub: DirPathAbs; dir: DirPathAbs): bool =
-  ## Returns true if sub is a subdirectory of dir (at any depth).
-  let d = string(dir).normalizedPath & DirSep
-  string(sub).normalizedPath.startsWith(d)
+  func isInside*(sub: DirPathAbs; dir: DirPathAbs): bool =
+    ## Returns true if sub is a subdirectory of dir (at any depth).
+    let d = string(dir).normalizedPath & DirSep
+    string(sub).normalizedPath.startsWith(d)
 
-proc uriToStashFileName*(uri: FileUri): FilePathRel =
-  # Use SHA-1 for a collision-resistant stash filename (40 hex chars).
-  # std/hash is a 64-bit integer hash; two URIs could share it and silently
-  # overwrite each other's edit buffer. SHA-1 collision probability is ~2^-80.
-  return FilePathRel($secureHash(string(uri)) & ".nim")
+  proc uriToStashFileName*(uri: FileUri): FilePathRel =
+    # Use SHA-1 for a collision-resistant stash filename (40 hex chars).
+    # std/hash is a 64-bit integer hash; two URIs could share it and silently
+    # overwrite each other's edit buffer. SHA-1 collision probability is ~2^-80.
+    return FilePathRel($secureHash(string(uri)) & ".nim")
 
-proc uriToStashFilePath*(
-  storageDir: DirPathAbs, uri: FileUri
-): FilePathAbs =
-  ## Creates stash file path out of storage directory and uri
-  return storageDir / uriToStashFileName(uri)
-
-# Old function:
-# proc uriToStash*(ls: LanguageServer, uri: FileUri): FilePathAbs =
-#   if ls.files.openFiles.hasKey(uri):
-#     return uriStorageLocation(ls, uri)
-#   else:
-#     return FilePathAbs("")
+  proc uriToStashFilePath*(
+    storageDir: DirPathAbs, uri: FileUri
+  ): FilePathAbs =
+    ## Creates stash file path out of storage directory and uri
+    return storageDir / uriToStashFileName(uri)

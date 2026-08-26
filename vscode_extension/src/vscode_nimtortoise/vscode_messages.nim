@@ -1,20 +1,98 @@
 import
   std/[
-    jsconsole, strutils, jsfetch, asyncjs, sugar, sequtils, options, strformat, times,
-    sets, tables
+    jsconsole, strutils, sequtils, jsfetch, asyncjs, options, strformat,
+    sets, tables, times
   ]
 
+
 import api
-import forest
+import resources/resources
 
 import ../platform/[vscodeApi, languageClientApi]
 import ../platform/js/[
-  jsNodeFs, jsNodePath, jsNodeCp, jsNodeUtil, jsNodeOs, jsNodeNet, jsPromise
+  jsNodeFs, jsPromise
 ]
 
 import ./[
   vscode_state_types, vscode_state_utils,
 ]
+
+proc parseExeStatus(obj: JsObject): NimTortoiseExeStatus =
+  result.path = FilePathAbs($(obj.path.to(cstring)))
+  result.version = $(obj.version.to(cstring))
+
+proc parsePerformanceSettingJs(obj: JsObject): PerformanceSettingJs =
+  if not obj.kind.isUndefined():
+    let kindStr = $(obj.kind.to(cstring))
+    for k in PerformanceSettingKind:
+      if $k == kindStr:
+        result.kind = k
+        break
+  if not obj.fileCheckThrottling.isUndefined():
+    result.fileCheckThrottling = obj.fileCheckThrottling.to(cstring)
+  if not obj.updateOnChange.isUndefined():
+    result.updateOnChange = obj.updateOnChange.to(bool)
+  # if not obj.description.isUndefined:
+  #   result.description = $(obj.description.to(cstring))
+
+proc parsePendingRequest(obj: JsObject): PendingRequestStatus =
+  result.name = $(obj.name.to(cstring))
+  result.entryPoint = FilePathAbs($(obj.entryPoint.to(cstring)))
+  result.time = $(obj.time.to(cstring))
+  result.state = $(obj.state.to(cstring))
+
+proc parseProjectError(obj: JsObject): ProjectError =
+  result.entryPoint = FilePathAbs($(obj.entryPoint.to(cstring)))
+  result.errorMessage = $(obj.errorMessage.to(cstring))
+  result.lastKnownCmd = $(obj.lastKnownCmd.to(cstring))
+
+proc parseNimsuggestStatus(obj: JsObject): NimsuggestStatus =
+  result.state = $(obj.state.to(cstring))
+  result.entryPoint = FilePathAbs($(obj.entryPoint.to(cstring)))
+  result.protocol = $(obj.protocol.to(cstring))
+  result.version = $(obj.version.to(cstring))
+  result.path = $(obj.path.to(cstring))
+  result.port = obj.port.to(int)
+  if not obj.openFiles.isUndefined:
+    let n = obj.openFiles.length.to(int)
+    for i in 0 ..< n:
+      result.openFiles.add($(obj.openFiles[i].to(cstring)))
+
+proc parseServerStatus*(params: JsObject): NimTortoiseServerStatus =
+  if not params.exe.isUndefined:
+    result.exe = parseExeStatus(params.exe)
+
+  if not params.performance.isUndefined:
+    result.performance = parsePerformanceSettingJs(params.performance)
+
+  if not params.extensionCapabilities.isUndefined:
+    let n = params.extensionCapabilities.length.to(int)
+    for i in 0 ..< n:
+      let capStr = $(params.extensionCapabilities[i].to(cstring))
+      for cap in LspExtensionCapability:
+        if $cap == capStr:
+          result.extensionCapabilities.add(cap)
+          break
+
+  if not params.openFiles.isUndefined:
+    let n = params.openFiles.length.to(int)
+    for i in 0 ..< n:
+      result.openFiles.add(FilePathAbs($(params.openFiles[i].to(cstring))))
+
+  if not params.pendingRequests.isUndefined:
+    let n = params.pendingRequests.length.to(int)
+    for i in 0 ..< n:
+      result.pendingRequests.add(parsePendingRequest(params.pendingRequests[i]))
+
+  if not params.projectErrors.isUndefined:
+    let n = params.projectErrors.length.to(int)
+    for i in 0 ..< n:
+      result.projectErrors.add(parseProjectError(params.projectErrors[i]))
+
+  if not params.pool.isUndefined:
+    let n = params.pool.length.to(int)
+    for i in 0 ..< n:
+      result.pool.add(parseNimsuggestStatus(params.pool[i]))
 
 proc fetchLsp*[T, U](
   state: ExtensionState, name: string, params: U
@@ -33,7 +111,7 @@ proc fetchLsp*[T](state: ExtensionState, name: string): Future[T] =
 proc sendServerStatusRequest*(state: ExtensionState): Future[NimTortoiseServerStatus] {.async.} =
   let client = state.client
   let response = await client.sendRequest("extension/status", ().toJs())
-  let lspStatus = jsonStringify(response).jsonParse(NimTortoiseServerStatus)
+  let lspStatus = parseServerStatus(response)
   state.channel.appendLine(($lspStatus).cstring)
   return lspStatus
 
@@ -103,48 +181,71 @@ proc buildNimsuggestRequest*(
   params.arguments = args.toJs()
   return params
 
+# var activeEditor: VscodeTextEditor = vscode.window.activeTextEditor
+# if activeEditor.isNil():
+#   return
+# let projectFile = activeEditor.document.fileName
+
 proc sendNimsuggestExtensionRequest*(
-  state: ExtensionState, command: LspExtensionCapability
+  state: ExtensionState, 
+  command: LspExtensionCapability, 
+  slot: string
 ) {.async.} =
-  var activeEditor: VscodeTextEditor = vscode.window.activeTextEditor
-  if activeEditor.isNil():
-    return
-  let projectFile = activeEditor.document.fileName
-  state.outputLine((&"Checking project nimsuggest for {projectFile}").cstring)
-  let params = buildNimsuggestRequest(command, $projectFile)
+  state.outputLine((&"Sending nimsuggest request {command} for {slot}").cstring)
+  let params = buildNimsuggestRequest(command, slot)
   discard await state.client.sendRequest("workspace/executeCommand", params)
 
-proc sendNimsuggestCheckProjectRequest*(state: ExtensionState) {.async.} =
-  discard sendNimsuggestExtensionRequest(state, NIMSUGGEST_CHECK_PROJECT)
+proc sendNimsuggestCheckProjectRequest*(
+  state: ExtensionState, slot: string
+) {.async.} =
+  discard sendNimsuggestExtensionRequest(
+    state, NIMSUGGEST_CHECK_PROJECT, slot
+  )
 
-proc sendNimsuggestRestartRequest*(state: ExtensionState) {.async.} =
-  discard sendNimsuggestExtensionRequest(state, NIMSUGGEST_RESTART)
+proc sendNimsuggestRestartRequest*(
+  state: ExtensionState, slot: string
+) {.async.} =
+  discard sendNimsuggestExtensionRequest(
+    state, NIMSUGGEST_RESTART, slot
+  )
 
-proc sendNimsuggestRecompileRequest*(state: ExtensionState) {.async.} =
-  discard sendNimsuggestExtensionRequest(state, NIMSUGGEST_RECOMPILE)
+proc sendNimsuggestRecompileRequest*(
+  state: ExtensionState, slot: string
+) {.async.} =
+  discard sendNimsuggestExtensionRequest(
+    state, NIMSUGGEST_RECOMPILE, slot
+  )
 
-proc sendNimsuggestStopRequest*(state: ExtensionState) {.async.} =
-  discard sendNimsuggestExtensionRequest(state, NIMSUGGEST_STOP)
+proc sendNimsuggestStopRequest*(
+  state: ExtensionState, slot: string
+) {.async.} =
+  discard sendNimsuggestExtensionRequest(
+    state, NIMSUGGEST_STOP, slot
+  )
+
+# proc sendNimsuggestStopForSlot*(state: ExtensionState, entryPoint: cstring) {.async.} =
+#   state.outputLine((&"Stopping nimsuggest for {entryPoint}").cstring)
+#   let params = buildNimsuggestRequest(NIMSUGGEST_STOP, $entryPoint)
+#   discard await state.client.sendRequest("workspace/executeCommand", params)
 
 # === NIMBLE ===
 # --- LIST TASKS ---
 # extension/listTasks
-proc sendNimbleListTasksRequest*(state: ExtensionState) =
-  vscode.window.withProgress(
-    VscodeProgressOptions{
-      location: VscodeProgressLocation.notification,
-      cancellable: false,
-      title: "Nim: fetching Nimble tasks...".cstring,
-    },
-    proc(): Future[seq[NimbleTask]] =
-      fetchLsp[seq[NimbleTask]](state, "extension/listTasks")
-  ).then(
-    proc(tasks: seq[NimbleTask]) =
-      state.nimbleTasks = tasks
-  ).catch(
-    proc(reason: JsObject) =
-      console.error("refreshNimbleTasks failed".cstring, reason)
-  )
+proc sendNimbleListTasksRequest*(state: ExtensionState) {.async.} =
+  try:
+    let tasks = await vscode.window.withProgress(
+      VscodeProgressOptions{
+        location: VscodeProgressLocation.notification,
+        cancellable: false,
+        title: "Nim: fetching Nimble tasks...".cstring,
+      },
+      proc(): Future[seq[NimbleTask]] =
+        fetchLsp[seq[NimbleTask]](state, "extension/listTasks")
+    )
+    state.nimbleTasks = tasks
+    state.statusProvider.emitter.fire(nil)
+  except:
+    console.error("refreshNimbleTasks failed".cstring, getCurrentExceptionMsg().cstring)
 
 # --- RUN TASK ---
 # extension/runTask
@@ -155,8 +256,8 @@ proc sendNimbleRunTaskRequest*(state: ExtensionState, name: cstring, projectDir:
     return
   console.log("Executing nimbleRunTask", name, projectDir)
   let taskParams = NimbleRunTaskRequest(
-    command: @[name], 
-    workingDir: DirPathAbs($projectDir)
+    command: @[name],
+    workingDir: projectDir
   )
 
   vscode.window
@@ -168,11 +269,13 @@ proc sendNimbleRunTaskRequest*(state: ExtensionState, name: cstring, projectDir:
     },
     proc(): Promise[NimbleRunTaskResponse] =
       state.markTaskAsRunning(name, projectDir, true)
+      state.statusProvider.emitter.fire(nil)
       fetchLsp[NimbleRunTaskResponse, NimbleRunTaskRequest](state, "extension/runTask", taskParams),
   )
   .then(
     proc(taskResult: NimbleRunTaskResponse) =
       state.markTaskAsRunning(name, projectDir, false)
+      state.statusProvider.emitter.fire(nil)
       state.outputLine(fmt"Task {name} finished".cstring)
       for line in taskResult.output:
         state.outputLine(line)
@@ -206,9 +309,9 @@ proc sendNimbleRunTaskRequest*(state: ExtensionState, name: cstring, projectDir:
         <body>
           <h2>Task: {name}</h2>
           <h3>Command:</h3>
-          <pre>{taskResult.command.join(" ")}</pre>
+          <pre>{taskResult.command.mapIt($it).join(" ")}</pre>
           <h3>Output:</h3>
-          <pre>{taskResult.output.join("\n")}</pre>
+          <pre>{taskResult.output.mapIt($it).join("\n")}</pre>
         </body>
         </html>
       """)
@@ -216,5 +319,7 @@ proc sendNimbleRunTaskRequest*(state: ExtensionState, name: cstring, projectDir:
   )
   .catch(
     proc(reason: JsObject) =
+      state.markTaskAsRunning(name, projectDir, false)
+      state.statusProvider.emitter.fire(nil)
       console.error("nimvscode - onNimbleTask Failed", reason)
   )

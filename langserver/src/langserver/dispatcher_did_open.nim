@@ -49,7 +49,8 @@ proc consolidateNimsuggestInstances(
       # New slot knows old slot's entry point → it imported old slot entirely.
       # Transfer all owned URIs and shut the old slot down.
       let entryPointUri = toUri(oldSlot.spawnInfo.entryPoint)
-      newSlot.ownedUris.incl(entryPointUri)
+      if entryPointUri in ls.files.openFiles:
+        newSlot.ownedUris.incl(entryPointUri)
 
       for oldSlotUri in oldSlot.ownedUris.toSeq():
         debug "consolidateNimsuggestInstances: reassign owned uri ", oldSlotUri = oldSlotUri
@@ -69,9 +70,9 @@ proc consolidateNimsuggestInstances(
             responseFuture: newFuture[seq[Suggest]]("consolidateChanged"),
           ))
 
-      discard await ls.pool.stopNimsuggestSlot(oldSlot)
+      asyncSpawn ls.pool.stopNimsuggestSlotAndRemoveFromPool(oldSlot)
 
-      slotsToRemove.add(oldSlot.spawnInfo.entryPoint)
+      # slotsToRemove.add(oldSlot.spawnInfo.entryPoint)
     else:
       debug "consolidateNimsuggestInstances: new slot does not know old slot", newSlotProjectFile = newSlot.spawnInfo.entryPoint, oldSlotProjectFile = oldSlot.spawnInfo.entryPoint
 
@@ -274,12 +275,5 @@ proc processDidOpenQuery*(
     debug "didOpen: Should slot be evicted?", maxSlots = ls.pool.maxSlots, filledSlots = ls.pool.slots.len, needToEvict = needToEvict
     if needToEvict:
       let slotToEvict = nimsuggestSlotToEvict(ls.pool, ls.files.openFiles)
-      debug "didOpen: Evicting a slot.", slotToEvict = slotToEvict.spawnInfo.entryPoint
-      while slotToEvict.queryMailbox.len > 0:
-        let pendingQ = slotToEvict.queryMailbox.popFirstNoWait()
-        if not pendingQ.responseFuture.finished:
-          pendingQ.responseFuture.complete(@[])
-
       debug "didOpen: Stopping and removing from slot: ", entryPoint = slotToEvict.spawnInfo.entryPoint
-      discard await stopNimsuggestSlotAndRemoveFromPool(ls.pool, slotToEvict)
-
+      asyncSpawn ls.pool.stopNimsuggestSlotAndRemoveFromPool(slotToEvict)

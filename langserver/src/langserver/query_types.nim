@@ -47,7 +47,6 @@ type
     RESTART
     SHUTDOWN
 
-
   LangserverQuery* = object
     case kind*: LangserverQueryKind
     of LangserverQueryKind.NIMSUGGEST:

@@ -22,15 +22,14 @@ proc processDidCloseQuery*(
   let uri = q.didClose.textDocument.uri
   debug "Closed the following document:", uri = uri
   let slotCheck = getSlotThatOwnsUri(ls.pool, uri)
+  if slotCheck.isSome():
+    let slotThatOwnsUri = slotCheck.get()
+    slotThatOwnsUri.ownedUris.excl(uri)
+    debug "Check the amount of owned uris for this slot:", uri = uri, ownedUris = slotThatOwnsUri.ownedUris.len
+    # I decided to remove the setting where a nimsuggest would not stop if there was only one slot left, as this was causing too many edge cases.
+    if slotThatOwnsUri.ownedUris.len == 0:
+      debug "Stopping this slot:", uri = uri
+      asyncSpawn ls.pool.stopNimsuggestSlotAndRemoveFromPool(slotThatOwnsUri)
+  
   if uri in ls.files.openFiles:
-    if slotCheck.isSome():
-      let slotThatOwnsUri = slotCheck.get()
-      slotThatOwnsUri.ownedUris.excl(uri)
-
-      debug "Check the amount of owned uris for this slot:", uri = uri, ownedUris = slotThatOwnsUri.ownedUris.len
-      # I decided to remove the setting where a nimsuggest would not stop if there was only one slot left, as this was causing too many edge cases.
-      if slotThatOwnsUri.ownedUris.len == 0:
-        debug "Stopping this slot:", uri = uri
-        discard await stopNimsuggestSlotAndRemoveFromPool(ls.pool, slotThatOwnsUri)
-
     ls.files.openFiles.del(uri)

@@ -71,13 +71,13 @@ proc getNimbleTasks*(
     if foundBuild == false:
       result.add(NimbleTask(
         name: "build", 
-        description: "-", 
+        description: "", 
         projectDir: DirPathAbs(nimbleDirectory)
       ))
     if foundTEst == false:
       result.add(NimbleTask(
         name: "test", 
-        description: "-", 
+        description: "", 
         projectDir: DirPathAbs(nimbleDirectory)
       ))
     await process.shutdownChildProcess()

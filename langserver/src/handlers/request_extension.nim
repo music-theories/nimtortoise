@@ -73,19 +73,10 @@ proc processExtensionCommandRequest(
     )
   of NIMSUGGEST_STOP:
     let slotName = request.slot
-    debug "Recompile Nimsuggest instance ", slot = slotName
+    debug "Stopping Nimsuggest instance ", slot = slotName
     if slotName in ls.pool.slots:
       let slot = ls.pool.slots[slotName]
-      ls.langserverQueue.addLastNoWait(LangserverQuery(
-        kind: LangserverQueryKind.NIMSUGGEST,
-        nimsuggest: NimsuggestQuery[LspFilePosition](
-          id: 0,
-          kind: NimsuggestQueryKind.SHUTDOWN,
-          uri: toUri(slot.spawnInfo.entryPoint),
-          dirtyFile: FilePathAbs(""),
-          responseFuture: newFuture[seq[Suggest]]("stopSlot"),
-        )
-      ))
+      asyncSpawn ls.pool.stopNimsuggestSlotAndRemoveFromPool(slot)
     return ExtensionCommandResponse(
       kind: NIMSUGGEST_STOP
     )

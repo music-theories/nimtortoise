@@ -2,7 +2,7 @@
     "name": "vscode-nim-tortoise",
     "displayName": "Nim Tortoise",
     "description": "Fork and rewrite of nimlangserver.",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "publisher": "YOUR_PUBLISHER_ID",
     "author": {
         "name": "David Pocknee"
@@ -54,7 +54,7 @@
         "onCommand:nimTortoise.runTest",
         "onCommand:nimTortoise.execSelectionInTerminal"
     ],
-    "main": "./out/vscode_nim_tortoise.js",
+    "main": "./out/vscode_nimtortoise.js",
     "contributes": {
         "languages": [
             {
@@ -189,8 +189,18 @@
                 "category": "Nim Tortoise"
             },
             {
+                "command": "nimTortoise.serverRestart",
+                "title": "Restart Language Server",
+                "category": "Nim Tortoise"
+            },
+            {
                 "command": "nimTortoise.nimsuggestRestart",
                 "title": "Restart Nimsuggest",
+                "category": "Nim Tortoise"
+            },
+            {
+                "command": "nimTortoise.nimsuggestStop",
+                "title": "Stop Nimsuggest Slot",
                 "category": "Nim Tortoise"
             },
             {

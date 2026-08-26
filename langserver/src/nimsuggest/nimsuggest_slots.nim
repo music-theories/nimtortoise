@@ -401,13 +401,10 @@ proc stopNimsuggestSlot*(
 
 proc stopNimsuggestSlotAndRemoveFromPool*(
   pool: NimsuggestPool, slot: NimsuggestSlot
-): Future[bool] {.async.} =
+) {.async.} =
   let slotEntryPoint = slot.spawnInfo.entryPoint
-  let stoppedSlot = await stopNimsuggestSlot(
-    pool, slot
-  )
+  discard await stopNimsuggestSlot(pool, slot)
   pool.slots.del(slotEntryPoint)
-  return stoppedSlot
 
 proc stopAllNimsuggestSlotsInPool*(pool: NimsuggestPool) {.async.} =
   debug "stopping child nimsuggest processes"

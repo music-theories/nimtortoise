@@ -4,7 +4,7 @@ import ../platform/vscodeApi
 from ../platform/languageClientApi import VscodeLanguageClient
 
 import api
-import forest
+
 
 type
   Message* = object of JsObject
@@ -14,9 +14,11 @@ type
 
 type
   LspItem* = ref object of TreeItem
-    instance*: Option[NimSuggestStatus]
+    instance*: Option[NimsuggestStatus]
     notification*: Option[Notification]
-    nimbleProjectDir*: DirPathAbs # non-empty on nimble project group items in the tree
+    pendingRequest*: Option[PendingRequestStatus]
+    projectError*: Option[ProjectError]
+    nimbleProjectDir*: string # non-empty on nimble project group items in the tree
 
   Notification* = object
     message*: cstring
@@ -32,10 +34,7 @@ type
 
   LSPVersion* = tuple[major: int, minor: int, patch: int]
 
-  LSPInstallPathKind* = enum
-    lspPathSetting, lspPathLocal, lspPathGlobal, lspPathInvalid
-
-type    
+type
   ExtensionState* = ref object
     ctx*: VscodeExtensionContext
     config*: VscodeWorkspaceConfiguration
@@ -49,10 +48,3 @@ type
     propagatedDecorations*: Table[cstring, seq[VscodeTextEditorDecorationType]]
     extensionReady*: bool
     onExtensionReadyHooks*: seq[proc()] # Called when the extension has stablished the connection with the lsp server and is initialized
-    
-    
-    # dumpTestEntryPoint*: cstring #Extracted from nimble dump. 
-
-    # installPerformed*: bool
-    # nimDir*: string
-      # Nim used directory. Extracted on activation from nimble. When it's "", means nim in the PATH is used.

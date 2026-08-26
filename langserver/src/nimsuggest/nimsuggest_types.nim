@@ -1,7 +1,6 @@
 import std/[json, sets, tables, times, options]
 import chronos
 import chronos/asyncproc
-import regex
 import ./suggestapi_types
 import ../protocol/types
 import ../utils/utils as globalUtils
@@ -137,10 +136,10 @@ type
     # lastCmdTime*: DateTime
       ## Updated after each successful query. Drives LRU eviction policy.
 
-type
-  ProjectMapping* = object
-    projectFile*: FilePathAbs
-    fileRegex: Regex2
+# type
+#   ProjectMapping* = object
+#     projectFile*: FilePathAbs
+#     fileRegex: Regex2
 
 # === NIMSUGGEST POOL TYPES ===
 type

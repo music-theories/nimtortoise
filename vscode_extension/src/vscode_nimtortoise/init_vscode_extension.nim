@@ -1,10 +1,9 @@
-import std/[jsconsole, strutils, asyncjs, sugar, sequtils, strformat, times]
+import std/[jsconsole, strutils, asyncjs, sugar, sequtils, strformat, times, options]
 import api
+import resources/resources
 
 import ../platform/[vscodeApi, languageClientApi]
-import ../platform/js/[jsNodePath, jsNodeCp, jsNodeNet, jsPromise]
-
-import ../tools/lsp_paths
+import ../platform/js/[jsNodeCp, jsNodeNet, jsPromise]
 
 import ./[
   vscode_state_types, vscode_state_utils,
@@ -59,29 +58,27 @@ proc startSocket(
   )
   startClientSocket(portPromise)
 
-
 # === LSP ===
-proc startVSCodeExtension(state: ExtensionState) {.async.} =
-  let (rawPath, lspPathKind) = getLspPath(state)
-  
-  if lspPathKind == lspPathInvalid:
+proc startVSCodeExtension*(state: ExtensionState) {.async.} =
+  let lspShellPath: Option[cstring] = getLspShellCommand()
+  if lspShellPath.isNone():
     vscode.window.showInformationMessage(
-      cstring(fmt "Unable to find nimlangserver at '{rawPath}'")
+      cstring("Unable to find nimTortoise binary - please add it to the settings: `nimTortoise.lsp.path`")
     )
   else:
-    let nimlangserver = path.resolve(rawPath).quoteOnlyWin()
+    let langserverShellCommand: cstring = lspShellPath.get()
 
-    outputLine(state, fmt"nimlangserver found: {nimlangserver}".cstring)
+    outputLine(state, fmt"nimlangserver found: {langserverShellCommand}".cstring)
     outputLine(state, "Starting nimlangserver.")
 
     let serverOptions = ServerOptions{
       run: Executable{
-        command: nimlangserver,
+        command: langserverShellCommand,
         transport: TransportKind.stdio,
         options: ExecutableOptions(shell: true, env: getAugmentedEnv()),
       },
       debug: Executable{
-        command: nimlangserver,
+        command: langserverShellCommand,
         transport: TransportKind.stdio,
         options: ExecutableOptions(shell: true, env: getAugmentedEnv()),
       },
@@ -95,7 +92,7 @@ proc startVSCodeExtension(state: ExtensionState) {.async.} =
         ],
       outputChannel: state.lspChannel,
       # middleware: VscodeLanguageClientMiddleware(provideInlayHints: provideInlayHints),
-      # synchronize: WorkspaceSynchronizeOptions(configurationSection: cstring("nimTortoise")), # TODO
+      synchronize: WorkspaceSynchronizeOptions(configurationSection: cstring("nimTortoise")),
     }
     let config = vscode.workspace.getConfiguration("nimTortoise")
     let transportMode = config.getStr("transportMode")
@@ -104,7 +101,7 @@ proc startVSCodeExtension(state: ExtensionState) {.async.} =
       state.client = vscodeLanguageClient.newLanguageClient(
         cstring("nimTortoise"),
         cstring("Nim Tortoise Language Server"),
-        startSocket(nimlangserver, state),
+        startSocket(langserverShellCommand, state),
         clientOptions,
       )
     else:
@@ -126,12 +123,9 @@ proc startVSCodeExtension(state: ExtensionState) {.async.} =
           params.pendingRequests = newSeq[PendingRequestStatus]()
         if params.extensionCapabilities.isUndefined:
           params.extensionCapabilities = newSeq[cstring]()
-      
-        let lspStatus = jsonStringify(params).jsonParse(NimTortoiseServerStatus)
 
-        outputLine(state, "Received status update " & jsonStringify(params))
-
-        refreshServerStatus(state, lspStatus)
+        let parseStatus = parseServerStatus(params)
+        refreshServerStatus(state, parseStatus)
     )
 
     state.client.onNotification(
@@ -164,9 +158,5 @@ proc startVSCodeExtension(state: ExtensionState) {.async.} =
 
     outputLine(state, "Nim Tortoise Language Server started")
 
-export startVSCodeExtension
-
-proc stopVSCodeExtension(state: ExtensionState) {.async.} =
+proc stopVSCodeExtension*(state: ExtensionState) {.async.} =
   await state.client.stop()
-
-export stopVSCodeExtension

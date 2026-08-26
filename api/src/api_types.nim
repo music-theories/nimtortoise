@@ -1,5 +1,5 @@
-import std/[json, options]
-import forest
+import std/[json, times]
+import resources/resources
 
 type
   MessageType* {.pure.} = enum
@@ -17,21 +17,42 @@ type
 type
   LspExtensionCapability* = enum
     # List of extensions this server support. Useful for clients
-    SERVER_STATUS             = "ServerStatus",
-    SERVER_CAPABILITIES       = "ServerCapabilities",
-    SERVER_RESTART            = "ServerRestart",
-    NIMSUGGEST_RESTART        = "NimsuggestRestart",
-    NIMSUGGEST_RECOMPILE      = "NimsuggestRecompile",
-    NIMSUGGEST_CHECK_PROJECT  = "NimsuggestCheckProject",
-    NIMSUGGEST_STOP           = "NimsuggestStop",
-    NIMBLE_LIST_TASKS         = "NimbleListTasks",
-    NIMBLE_RUN_TASK           = "NimbleRunTask",
-    NIM_MACRO_EXPAND          = "NimMacro"
+    SERVER_STATUS             = "serverStatus",
+    SERVER_CAPABILITIES       = "serverCapabilities",
+    SERVER_RESTART            = "serverRestart",
+    NIMSUGGEST_RESTART        = "nimsuggestRestart",
+    NIMSUGGEST_RECOMPILE      = "nimsuggestRecompile",
+    NIMSUGGEST_CHECK_PROJECT  = "nimsuggestCheckProject",
+    NIMSUGGEST_STOP           = "nimsuggestStop",
+    NIMBLE_LIST_TASKS         = "nimbleListTasks",
+    NIMBLE_RUN_TASK           = "nimbleRunTask",
+    NIM_MACRO_EXPAND          = "nimMacro"
 
 type
   NimTortoiseExeStatus* = object
     path*: FilePathAbs
     version*: string
+
+type
+  PerformanceSettingKind* {.pure.} = enum
+    HIGHEST = "HIGHEST",
+    HIGH = "HIGH",
+    LOW = "LOW",
+    LOWEST = "LOWEST"
+
+  PerformanceSetting* = object
+    kind*: PerformanceSettingKind
+    fileCheckThrottling*: times.Duration
+    updateOnChange*: bool
+    description*: string
+
+  PerformanceSettingJs* = object
+    kind*: PerformanceSettingKind
+    updateOnChange*: bool
+    when defined(js):
+      fileCheckThrottling*: cstring
+    else:
+      fileCheckThrottling*: string
 
 type
   PendingRequestStatus* = object
@@ -64,6 +85,7 @@ type
 type
   NimTortoiseServerStatus* = object
     extensionCapabilities*: seq[LspExtensionCapability]
+    performance*: PerformanceSettingJs
     exe*: NimTortoiseExeStatus
     openFiles*: seq[FilePathAbs]
     pendingRequests*: seq[PendingRequestStatus]
@@ -74,17 +96,30 @@ type
 
 type
   NimbleRunTaskRequest* = object
-    command*: seq[string] # command and args
-    workingDir*: DirPathAbs # directory in which to run the 
+    when defined(js):
+      command*: seq[cstring]
+      workingDir*: cstring
+    else:
+      command*: seq[string] # command and args
+      workingDir*: DirPathAbs # directory in which to run the
 
   NimbleRunTaskResponse* = object
-    command*: seq[string] # command and args
-    output*: seq[string] # output lines
+    when defined(js):
+      command*: seq[cstring]
+      output*: seq[cstring]
+    else:
+      command*: seq[string] # command and args
+      output*: seq[string] # output lines
 
   NimbleTask* = object
-    name*: string
-    description*: string
-    projectDir*: DirPathAbs ## absolute directory where nimble was run
+    when defined(js):
+      name*: cstring
+      description*: cstring
+      projectDir*: cstring
+    else:
+      name*: string
+      description*: string
+      projectDir*: DirPathAbs ## absolute directory where nimble was run
     isRunning*: bool ## client-side state; never set by the server
 
 type 

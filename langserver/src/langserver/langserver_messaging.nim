@@ -1,9 +1,4 @@
-import std/[
-  os, macros,
-  options,
-  sequtils,
-  tables, sets,
-  json, times
+import std/[os, macros, options, sequtils, tables, sets, json, times, strformat
 ]
 
 import chronos
@@ -85,32 +80,43 @@ proc removeCompletedPendingRequests*(
 proc getLspStatus*(ls: LanguageServer): NimTortoiseServerStatus {.raises: [].} =
 
   result.extensionCapabilities = ls.capabilities.extensionCapabilities.toSeq()
+
+  let throttling = inMilliseconds(ls.configurations.currentConfig.performance.fileCheckThrottling)
+
+  result.performance = PerformanceSettingJs(
+    kind: ls.configurations.currentConfig.performance.kind,
+    fileCheckThrottling: fmt"{throttling}ms",
+    updateOnChange: ls.configurations.currentConfig.performance.updateOnChange
+  )
+  
   result.exe = NimTortoiseExeStatus(
     path: FilePathAbs(getAppFilename()),
     version: LspVersion
   )
-  var seenPorts = initHashSet[int]()
-  if ls.pool != nil:
-    for slot in ls.pool.slots.values:
-      try:
-        let nsOpt = slot.resolvedNs
-        if nsOpt.isSome:
-          let ns = nsOpt.get
-          if ns.port in seenPorts:
-            continue
-          seenPorts.incl(ns.port)
-          var nsStatus = NimSuggestStatus(
-            entryPoint: slot.spawnInfo.entryPoint,
-            version: ls.pool.nimsuggest.version,
-            protocol: $(ls.pool.nimsuggest.protocol),
-            path: $(ls.pool.nimsuggest.exePath),
-            port: ns.port,
-          )
-          for open in slot.ownedUris.toSeq():
-            nsStatus.openFiles.add(string(open))
-          result.pool.add(nsStatus)
-      except CatchableError:
-        discard
+  # debug "Number of slots ", no = ls.pool.slots.len
+  for entyPoint, slot in ls.pool.slots:
+    var slotPort = 0
+    try:
+      let nsOpt = slot.resolvedNs
+      if nsOpt.isSome:
+        let ns = nsOpt.get()
+        slotPort = ns.port
+    except CatchableError:
+      discard
+
+    var nsStatus = NimSuggestStatus(
+      state: $(slot.state), 
+      entryPoint: slot.spawnInfo.entryPoint,
+      version: ls.pool.nimsuggest.version,
+      protocol: $(ls.pool.nimsuggest.protocol),
+      path: $(ls.pool.nimsuggest.exePath),
+      port: slotPort,
+      openFiles: @[]
+    )
+    for open in slot.ownedUris.toSeq():
+      nsStatus.openFiles.add(string(open))
+    result.pool.add(nsStatus)
+
   for openFile in ls.files.openFiles.keys:
     let openFilePath = toFilePathAbs(openFile)
     result.openFiles.add(openFilePath)

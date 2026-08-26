@@ -34,33 +34,41 @@ proc activate*(ctx: VscodeExtensionContext): void {.async.} =
     "nimTortoise.onClearAllNotifications", () => onClearAllNotifications(state)
   )
 
-  # --- Extension ---
+  # --- Server
+  vscode.commands.registerCommand("nimTortoise.serverRestart",
+    proc () {.async.} = await sendServerRestartRequest(state)
+  )
   vscode.commands.registerCommand(
-    "nimTortoise.showNimLangServerStatus", () => sendServerStatusRequest(state)
+    "nimTortoise.serverStatus", () => sendServerStatusRequest(state)
   )
   vscode.commands.registerCommand("nimTortoise.setPerformance", proc () {.async.} = await sendPerformanceRequest(state))
+  
+  # --- Extension ---
   vscode.commands.registerCommand(
-    "nimTortoise.nimbleListTasks", proc() = sendNimbleListTasksRequest(state)
+    "nimTortoise.nimbleListTasks", proc() = discard sendNimbleListTasksRequest(state)
   )
   vscode.commands.registerCommand(
     "nimTortoise.nimbleRunTask",
-    proc(args: JsObject) =
-      let name = args[0].to(cstring)
-      let dir = args[1].to(cstring)
+    proc (name: cstring, dir: cstring) =
       discard sendNimbleRunTaskRequest(state, name, dir)
   )
+
   # --- Nimsuggest
   vscode.commands.registerCommand("nimTortoise.nimsuggestRestart",
-    proc() {.async.} = await sendNimsuggestRestartRequest(state)
+    proc (entryPoint: cstring) {.async.} =
+      await sendNimsuggestRestartRequest(state, $entryPoint)
   )
   vscode.commands.registerCommand("nimTortoise.nimsuggestCheckProject",
-    proc() {.async.} = await sendNimsuggestCheckProjectRequest(state)
+    proc (entryPoint: cstring) {.async.} =
+      await sendNimsuggestCheckProjectRequest(state, $entryPoint)
   )
   vscode.commands.registerCommand("nimTortoise.nimsuggestRecompile",
-    proc() {.async.} = await sendNimsuggestRecompileRequest(state)
+    proc (entryPoint: cstring) {.async.} =
+      await sendNimsuggestRecompileRequest(state, $entryPoint)
   )
   vscode.commands.registerCommand("nimTortoise.nimsuggestStop",
-    proc() {.async.} = await sendNimsuggestStopRequest(state)
+    proc (entryPoint: cstring) {.async.} =
+      await sendNimsuggestStopRequest(state, $entryPoint)
   )
 
   # --- Pre-rewrite commands TODO ---

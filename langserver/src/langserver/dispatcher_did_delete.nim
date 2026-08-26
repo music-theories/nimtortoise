@@ -28,7 +28,7 @@ proc processDidDeleteQuery*(
         let slotThatOwnsUri = slotCheck.get()
         slotThatOwnsUri.ownedUris.excl(uri)
         if slotThatOwnsUri.ownedUris.len == 0:
-          discard await ls.pool.stopNimsuggestSlot(slotThatOwnsUri)
+          asyncSpawn ls.pool.stopNimsuggestSlotAndRemoveFromPool(slotThatOwnsUri)
 
         else:
           if string(path).endsWith(".nim"):

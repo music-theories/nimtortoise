@@ -13,7 +13,9 @@ proc processDidSaveQuery*(
   let params: TextDocumentIdentifier = q.didSave.textDocument
   let uri = params.uri
   debug "didSave: file", uri = uri
-  if uri in ls.files.openFiles:
+  if uri notin ls.files.openFiles:
+    debug "didSave: file is not in open files (should not be possible)", uri = uri
+  else:
     let fileInfo = ls.files.openFiles[uri]
 
     ls.files.openFiles[uri].lastSaved = times.now()
