@@ -106,6 +106,16 @@ This is done by having a strict First-In-First-Out queuing system for any reques
 I am now using this tool daily and I hope it is helpful for other `nim` users. 
 
 ---
+## v0.3.0
+
+### nim check as fallback
+
+If your code contains a critical error, like `SIGSEGV`, it is impossible to get `nimsuggest` to run on that code.  This is due to how `nimsuggest` uses the `nim` compiler internally, and anything with a critical compilation error causes a critical failure in `nimsuggest`.  However, you probably want some type of diagnostics _especially_ if you have errors in your project, so if `nimsuggest` encounters these types of errors, `Nim Tortoise` will temporarily use `nim check` to get diagnostics for your project, until the problem is fixed.
+
+- **Status panel**: New tree-view panel in the VS Code sidebar showing live server status — nimsuggest pool health, open files, pending requests, and performance metrics
+- **Nimsuggest crash diagnostics**: When nimsuggest crashes, the extension now automatically runs `nim check` on the affected file and surfaces compiler errors as standard LSP diagnostics
+- **File deletion handling**: Deleting a tracked `.nim` file is now handled gracefully without leaving stale nimsuggest instances
+
 
 ## v0.2.0
 

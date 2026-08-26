@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.1.0"
+version       = "0.3.0"
 author        = "David Pocknee"
 description   = "Just a shared package that contains the necessary components both the language server and VS Code extension need."
 license       = "MIT"
