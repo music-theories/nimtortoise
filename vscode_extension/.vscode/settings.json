@@ -12,5 +12,5 @@
 
     "nimTortoise.buildCommand": "js",
     "nimTortoise.runOutputDirectory": "out",
-    "nimTortoise.project": ["src/vscode_nim_tortoise.nim"]
+    "nimTortoise.project": ["src/vscode_nimtortoise.nim"]
 }

@@ -90,21 +90,6 @@ type
     STOPPING  ## STOP running; queries return @[].
     CRASHED   ## Process exited unexpectedly; RESTART queued by processor.
 
-##[
-Realize that there are three types of file:
-- the entry point file
-- the working directory nimsuggest is running from
-- The base nimble project.
-
-e.g.
-in `langserver`:
-if I have opened a file in the `tests` folder:
-- file I'm working on: langserver/tests/textensions.nim
-- entry point: langserver/tests/all.nim
-- workingDirectory: langserver/tests
-- base nimble project folder: langserver (langserver/nimtortoise.nimble)
-]##
-
 type
   NimsuggestSlot* = ref object
     state*: SlotState
@@ -130,16 +115,6 @@ type
       ## process group before the 120 s port-read timeout expires.
     queryMailbox*: AsyncQueue[NimsuggestQuery[LspFilePosition]]
       ## IDE query commands. processQueries dequeues and dispatches to TCP.
-    crashCount*: int
-      ## Incremented on unhandled exit. Reset to 0 on successful init.
-    
-    # lastCmdTime*: DateTime
-      ## Updated after each successful query. Drives LRU eviction policy.
-
-# type
-#   ProjectMapping* = object
-#     projectFile*: FilePathAbs
-#     fileRegex: Regex2
 
 # === NIMSUGGEST POOL TYPES ===
 type

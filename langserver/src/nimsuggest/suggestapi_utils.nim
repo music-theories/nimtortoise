@@ -16,12 +16,11 @@ func canHandleUnknown*(ns: Nimsuggest): bool =
 
 template benchmark*(benchmarkName: string, code: untyped) =
   block:
-    debug "Started...", benchmark = benchmarkName
     let t0 = epochTime()
     code
     let elapsed = epochTime() - t0
     let elapsedStr = elapsed.formatFloat(format = ffDecimal, precision = 3)
-    debug "CPU Time", benchmark = benchmarkName, time = elapsedStr
+    debug "Nimsuggest CPU Time", start = t0, duration = elapsedStr, benchmark = benchmarkName
 
 func nimSymToLSPKind*(suggest: Suggest): CompletionItemKind =
   case suggest.symKind

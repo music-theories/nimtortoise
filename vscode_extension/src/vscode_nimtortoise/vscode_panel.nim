@@ -93,7 +93,7 @@ proc getChildrenImpl(
     return initRootItems(state, element)
 
   # --- Notifications (no status needed) ---
-  elif element.label == "LSP Notifications":
+  elif element.label == "Notifications":
     return globalNotificationActionItems(state) &
       self.notifications.mapIt(newNotificationItem(it))
   elif element.isNotificationItem():

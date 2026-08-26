@@ -8,14 +8,12 @@ proc refreshNotifications*(
   self.notifications = notifications
   self.emitter.fire(nil)
 
-proc onShowNotification*(args: JsObject) =
-  ## args is [message, detail] — detail may be empty/undefined, falls back to message.
-  let arr = args.to(seq[cstring])
-  let title = arr[0]
-  let detail = if arr.len > 1 and arr[1] != "".cstring: arr[1] else: arr[0]
+proc onShowNotification*(message: cstring, detail: cstring) =
+  ## VS Code spreads command.arguments, so handler receives (message, detail) as separate params.
+  let detailStr = if not detail.isUndefined and detail != "".cstring: detail else: message
   vscode.window.showInformationMessage(
-    title, VscodeMessageOptions(
-      detail: detail, modal: true
+    message, VscodeMessageOptions(
+      detail: detailStr, modal: true
     )
   )
 

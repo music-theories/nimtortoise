@@ -56,69 +56,40 @@ proc attemptCrashRespawn*(
 ): Future[bool] {.async.} =
   slot.state = SlotState.CRASHED
   slot.ns = newFuture[NimSuggest]("attemptCrashRespawn")
-  inc slot.crashCount
-  if slot.crashCount <= config.maxNimsuggestCrashRetries:
-    let backoffMs = if slot.crashCount > 0:
-      min(1_000 * (1 shl min(slot.crashCount - 1, 14)), 30_000)
-    else: 0
-    if backoffMs > 0:
-      await sleepAsync(backoffMs)
-    # Do NOT call execStop here: execStop adds a CLOSE_MAILBOX sentinel to the
-    # slot's mailbox, which would cause the processNimsuggestQueries drain loop
-    # (our caller) to exit after respawn, leaving the newly-live slot without a
-    # consumer. The nimsuggest process is already dead (project.failed was true),
-    # so we just reset state directly — no sentinel needed.
-    slot.state = SlotState.STOPPED
+
+  let currentCrashedUris = slot.crashedUris
+
+  let spawnTimeoutMs = int(inMilliseconds(config.nimsuggestSpawnTimeout))
+
+  try:
     slot.crashedUris.clear() # explicit restart = clean slate
-    debug "attemptCrashRespawn: calling createNimsuggest",
-      projectFile = slot.spawnInfo.entryPoint, 
-      attempt = slot.crashCount + 1
+    let ns = await createNimsuggest(
+      slot.spawninfo,
+      pool.nimsuggest,
+      spawnTimeoutMs,
+      config.logNimsuggest,
+    )
 
-    # Use a longer timeout for spawn than for queries: cold compilation of large
-    # projects (chronos, chronicles, etc.) can legitimately take > 30s.
-    # NimsuggestSpawnTimeoutError still breaks the loop immediately so infinite-
-    # loop bugs (e.g. flatty/fieldPairs on recursive types) escape in ≤ spawnMs.
-    let spawnTimeoutMs = int(inMilliseconds(config.nimsuggestSpawnTimeout))
-    try:
-      let ns = await createNimsuggest(
-        slot.spawninfo,
-        pool.nimsuggest,
-        spawnTimeoutMs,
-        config.logNimsuggest,
-      )
+    debug "attemptCrashRespawn: createNimsuggest succeeded", 
+      entryPoint = slot.spawnInfo.entryPoint, port = ns.port
 
-      debug "attemptCrashRespawn: createNimsuggest succeeded", 
-        entryPoint = slot.spawnInfo.entryPoint, port = ns.port
+    slot.ns.complete(ns)
+    slot.state = SlotState.READY
 
-      slot.ns.complete(ns)
-      slot.state = SlotState.READY
-      slot.crashCount = 0
+    if pool.statusChangedProc != nil:
+      pool.statusChangedProc()
 
-      if pool.statusChangedProc != nil:
-        pool.statusChangedProc()
-      if pool.notifyProc != nil:
-        pool.notifyProc("window/logMessage",
-          %*{"type": 3, "message": fmt"Nimsuggest restarted from crashed for {slot.spawnInfo.entryPoint}"})
-      return true
-
-    except CatchableError as ex:
-      inc slot.crashCount
-      slot.state = SlotState.CRASHED
-      error "attemptCrashRespawn: spawn attempt failed",
-        entryPoint = slot.spawnInfo.entryPoint, attempt = slot.crashCount, msg = ex.msg
-    
-  else:
-    error "attemptCrashRespawn: crash limit reached, slot permanently failed",
-      entryPoint = slot.spawnInfo.entryPoint, crashCount = slot.crashCount
     if pool.notifyProc != nil:
-      pool.notifyProc(
-        "window/logMessage",
-        %*{
-          "type": 1,
-          "message": fmt"Nimsuggest for {slot.spawnInfo.entryPoint} failed after {config.maxNimsuggestCrashRetries} attempts.",
-        },
+      pool.notifyProc("window/logMessage",
+        %*{"type": 3, "message": fmt"Nimsuggest restarted from crashed for {slot.spawnInfo.entryPoint}"}
       )
-    pool.removeSlot(slot.spawnInfo.entryPoint)
+    return true
+
+  except CatchableError as ex:
+    slot.state = SlotState.CRASHED
+    slot.crashedUris = currentCrashedUris
+    error "attemptCrashRespawn: spawn attempt failed",
+      entryPoint = slot.spawnInfo.entryPoint, msg = ex.msg
     return false
 
 # === EXECS ===
@@ -251,7 +222,6 @@ proc spawnNewNimsuggestSlot*(
     crashedUris: initHashSet[FileUri](),
     ns: newFuture[NimSuggest]("spawnNewNimsuggestSlot"),
     queryMailbox: newAsyncQueue[NimsuggestQuery[LspFilePosition]](),
-    crashCount: 0
   )
 
   pool.slots[newSlot.spawnInfo.entryPoint] = newSlot
@@ -375,7 +345,7 @@ proc stopNimsuggestSlot*(
       projectFile = slot.spawnInfo.entryPoint
     slot.state = SlotState.STOPPED
     when defined(posix):
-      if slot.spawnProcess.isSome:
+      if slot.spawnProcess.isSome():
         let pid = slot.spawnProcess.get().processID()
         debug "stopNimsuggestSlot: sending SIGKILL to process group", pid = pid
         killProcessGroup(pid)
