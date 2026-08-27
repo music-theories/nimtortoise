@@ -232,13 +232,13 @@ proc spawnNewNimsuggestSlot*(
       projectFile = newSlot.spawnInfo.entryPoint, 
       msg = ex.msg
 
-    if pool.notifyProc != nil and ex.msg.len > 0:
+    if pool.notifyProc != nil:
       let crashDetail = "Project: " & string(newSlot.spawnInfo.entryPoint) &
         "\nError: " & ex.msg &
         "\n\nNimsuggest crashed catastrophically while spawning. This is probably due to your code generating a SIGSEGV or similar error, meaning nimsuggest is unable to compile it. As a fall-back, the language server will now try to run `nim check` to generate diagnostics while you fix this error."
 
       pool.notifyProc("window/showMessage",
-        %*{"type": 1, "message": "Nimsuggest crashed", "detail": crashDetail}
+        %*{ "type": 1, "message": "Nimsuggest crashed", "detail": crashDetail }
       )
 
     let nimCheckResponse = await runNimCheckAfterCrash(
@@ -321,7 +321,7 @@ proc attemptCrashRespawn*(
         "\n\nNimsuggest crashed catastrophically while spawning. This is probably due to your code generating a SIGSEGV or similar error, meaning nimsuggest is unable to compile it. As a fall-back, the language server will now try to run `nim check` to generate diagnostics while you fix this error."
 
       pool.notifyProc("window/showMessage",
-        %*{"type": 1, "message": "Nimsuggest crashed", "detail": crashDetail}
+        %*{ "type": 1, "message": "Nimsuggest crashed", "detail": crashDetail }
       )
 
     let nimCheckResponse = await runNimCheckAfterCrash(

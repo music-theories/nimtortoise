@@ -38,6 +38,29 @@ proc showMessage*(
   except CatchableError:
     discard
 
+proc showMessage*(
+  ls: LanguageServer, message: string, detail: string, typ: MessageType
+) {.raises: [].} =
+  try:
+    proc notify() =
+      ls.notify("window/showMessage", %*{"type": typ.int, "message": message, "detail": detail })
+
+    let verbosity = ls.configurations.currentConfig.notificationVerbosity
+    debug "ShowMessage", message = message
+    case verbosity
+    of nvInfo:
+      notify()
+    of nvWarning:
+      if typ.int <= MessageType.Warning.int:
+        notify()
+    of nvError:
+      if typ == MessageType.Error:
+        notify()
+    else:
+      discard
+  except CatchableError:
+    discard
+
 proc toPendingRequestStatus(pr: PendingRequest): PendingRequestStatus =
   result.time =
     case pr.state

@@ -48,6 +48,7 @@ type
     # files*: seq[FilePathAbs]
     dump*: Table[FilePathAbs, NimbleDumpInfo]
     entryPoints*: seq[FilePathAbs]
+    missingEntryPoints*: seq[FilePathAbs]  ## declared in .nimble but not found on disk
 
 type 
   Forest* = object
