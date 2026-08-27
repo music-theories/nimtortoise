@@ -1,4 +1,4 @@
-import std/[options, deques]
+import std/[options, deques, tables]
 
 import chronos
 import chronos/asyncproc
@@ -105,10 +105,3 @@ type
     nimbleFile*: Option[FilePathAbs]
     paths*:      seq[DirPathAbs]
     extraArgs*:  seq[string]
-
-type 
-  SpecialKind* = enum
-    HELLO, 
-    GOODBYE,
-    SOMETHING_ELSE
-    

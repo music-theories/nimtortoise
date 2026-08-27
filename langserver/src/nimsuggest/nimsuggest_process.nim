@@ -271,6 +271,8 @@ proc processNimsuggestQueries*(
   # the same symbol position. Invalidated on any CHANGED for that URI.
   var hoverCache = initTable[FileUri, tuple[pos: LspFilePosition, response: seq[Suggest]]]()
   var docHighlightCache = initTable[FileUri, tuple[pos: LspFilePosition, response: seq[Suggest]]]()
+  var documentSymbolCache = initTable[FileUri, seq[Suggest]]()
+  
   while true:
     debug "processNimsuggestQueries: waiting for query", projectFile = slot.spawnInfo.entryPoint, mailboxLen = slot.queryMailbox.len
 
