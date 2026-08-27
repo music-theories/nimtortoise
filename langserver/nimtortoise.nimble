@@ -17,19 +17,14 @@ requires "nim >= 2.0.8",
 --path:
   "."
 
+import std/os
+
 task test, "run tests":
-  exec "nim c -r -o:bin/tests_all tests/all.nim"
-  
-  # # --silent
-  # --run
-  # setCommand "c", "tests/all.nim"
-
-# task book, "Generate book":
-#   exec "mdbook build book -d ../docs"
-
-# task apidocs, "Generate API docs":
-#   exec "nimble doc --outdir:docs/apidocs --project --index:on --git.url:https://github.com/nim-lang/langserver--git.commit:master --git.devel:master nimtortoise.nim"
-
-# task docs, "Generate docs":
-#   exec "nimble book"
-#   exec "nimble apidocs"
+  let helpers = [
+    "all.nim", "testhelpers.nim", "tbughelpers.nim",
+    "fixhelpers.nim", "client_utils.nim", "lspsocketclient.nim"
+  ]
+  for f in listFiles(thisDir() / "tests"):
+    let name = f.lastPathPart
+    if name.endsWith(".nim") and name notin helpers:
+      exec "nim c -d:chronicles_log_level=ERROR -r -w:off --path:. -o:bin/" & name[0 ..< name.len - 4] & " " & f

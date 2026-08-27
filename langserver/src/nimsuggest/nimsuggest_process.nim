@@ -232,12 +232,6 @@ proc filterMailbox(
       slot, NimsuggestQueryKind.CHANGED, originalQuery.uri
     ):
       debug "processNimsuggestQueries: skipping stale query (CHANGED pending)", kind = $originalQuery.kind, uri = originalQuery.uri
-
-      # if originalQuery.kind == NimsuggestQueryKind.DOCUMENT_SYMBOLS and
-      #     originalQuery.uri in documentSymbolCache:
-      #   debug "processNimsuggestQueries: DOCUMENT_SYMBOLS stale-skip, serving cache", uri = originalQuery.uri
-      #   originalQuery.responseFuture.complete(documentSymbolCache[originalQuery.uri])
-      # else:
       originalQuery.responseFuture.cancel()
       return false
 
@@ -245,11 +239,6 @@ proc filterMailbox(
       slot, originalQuery.kind, originalQuery.uri
     ):
       debug "processNimsuggestQueries: skipping stale query (a newer request is later in the queue)", kind = $originalQuery.kind, uri = originalQuery.uri
-      # if originalQuery.kind == NimsuggestQueryKind.DOCUMENT_SYMBOLS and
-      #     originalQuery.uri in documentSymbolCache:
-      #   debug "processNimsuggestQueries: DOCUMENT_SYMBOLS stale-skip, serving cache", uri = originalQuery.uri
-      #   originalQuery.responseFuture.complete(documentSymbolCache[originalQuery.uri])
-      # else:
       originalQuery.responseFuture.cancel()
       return false
 

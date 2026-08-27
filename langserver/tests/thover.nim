@@ -6,7 +6,7 @@ import unittest2
 
 import fixhelpers
 
-suite "LSP features (failing)":
+suite "LSP features":
   let helloWorldUri = fixtureUri("tests/projects/hw/hw.nim")
   let (cmdParams, ls, client) = startServer()
   doInitialize(client, "tests/projects/hw")
