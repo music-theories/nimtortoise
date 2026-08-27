@@ -55,7 +55,6 @@ proc createNimsuggest*(
     onProcessStart(result.process)
 
   asyncSpawn logNsError(result)
-  # let portLine = await result.process.stdoutStream.readLine(sep = "\n")
 
   let portLineFut = result.process.stdoutStream.readLine(sep = "\n")
   let portLineOpt = await process_utils.withTimeout(portLineFut, timeout)
@@ -232,16 +231,3 @@ createFileOnlyCommand(known)
 createFileOnlyCommand(globalSymbols)
 createGlobalCommand(recompile)
 createRangeCommand(inlayHints)
-
-proc isKnown*(nimsuggest: Nimsuggest, filePath: FilePathAbs): Future[bool] {.async.} =
-  let fut = nimsuggest.known(filePath)
-  let res = await process_utils.withTimeout(fut, REQUEST_TIMEOUT)
-  if res.isNone:
-    debug "Timeout reached running [isKnown], assuming the file is known (nimsuggest busy)",
-      file = $filePath
-    return true
-  let sug = res.get()
-  if sug.len == 0:
-    return false
-  debug "isKnown", filePath = $filePath, sug = sug[0].forth
-  return sug.len > 0 and sug[0].forth == "true"

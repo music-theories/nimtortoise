@@ -67,6 +67,7 @@ proc isKnownByANimsuggestSlot*(pool: NimsuggestPool, uri: FileUri): Future[Optio
   await allFutures(futures)
   var possibleNimsuggestSlots: seq[NimsuggestSlot] = @[]
   for f in futures:
+    if f.cancelled: continue
     let res = f.read()
     if res.isSome:
       possibleNimsuggestSlots.add(res.get())

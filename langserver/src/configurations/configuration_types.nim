@@ -48,7 +48,6 @@ type
     # -- Nimsuggest Settings ---
     nimsuggestPath*: FilePathAbs
     maxNimsuggestProcesses*: int
-    maxNimsuggestCrashRetries*: int
     nimsuggestSpawnTimeout*: times.Duration # in seconds
     nimsuggestIdleTimeout*: times.Duration # In seconds
     nimsuggestRequestTimeout*: times.Duration # In seconds
@@ -58,6 +57,7 @@ type
     nimExpandArc*: bool
     nimExpandMacro*: bool
       
+    # maxNimsuggestCrashRetries*: int
 type
   LanguageServerConfigurations* = object
     currentConfig*: NlsConfig

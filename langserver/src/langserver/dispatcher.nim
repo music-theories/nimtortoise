@@ -95,14 +95,14 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
           of SlotState.STOPPING, SlotState.STOPPED, SlotState.CRASHED:
             debug "processLangserverQueue: slot is inactive", uri = q.uri, state = slotThatOwnsUri.state
             if not q.responseFuture.finished:
-              q.responseFuture.complete(@[])
+              q.responseFuture.cancel()
             continue
 
         else:
           # File is open but no slot owns it (e.g. the slot was evicted from the pool).
           debug "processLangserverQueue: file is open but no slot owns it", uri = q.uri
           if not q.responseFuture.finished:
-            q.responseFuture.complete(@[])
+            q.responseFuture.cancel()
 
       elif path in ls.pool.slots:
         let slot = ls.pool.slots[path]
@@ -112,11 +112,11 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
           ls.pool.slots[path].queryMailbox.addLastNoWait(q)
         else:
           debug "processLangserverQueue: Could not add path-level message to mailbox. Slot is not live.", uri = q.uri, kind = $q.kind
-          q.responseFuture.complete(@[])
+          q.responseFuture.cancel()
 
       else:
         debug "processLangserverQueue: Could not add message to mailbox", uri = q.uri, kind = $q.kind
-        q.responseFuture.complete(@[])
+        q.responseFuture.cancel()
 
     of LangserverQueryKind.FILE_ACCESS:
       let q = query.fileAccess

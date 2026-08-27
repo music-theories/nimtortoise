@@ -6,9 +6,10 @@ description: Bump the version number across all nim_tortoise files (langserver n
 You are bumping the version number for the nim_tortoise project. There are exactly four files that must stay in sync:
 
 1. `langserver/nimtortoise.nimble` — line with `version = "X.Y.Z"`
-2. `vscode_extension/vscode_nim_tortoise.nimble` — line with `version = "X.Y.Z"`
+2. `vscode_extension/vscode_nimtortoise.nimble` — line with `version = "X.Y.Z"`
 3. `vscode_extension/package.json` — the `"version": "X.Y.Z"` field (near the top)
 4. `forest/forest.nimble` — line with `version = "X.Y.Z"`
+5. `api/api.nimble` — line with `version = "X.Y.Z"`
 
 **Step 1 — Discover current versions.**
 Read all three files and report the current version in each. Flag any mismatches.
@@ -25,8 +26,9 @@ After editing, read back the relevant line from each file and confirm all three 
 | File | Old | New | Status |
 |------|-----|-----|--------|
 | langserver/nimtortoise.nimble | … | … | ✓ |
-| vscode_extension/vscode_nim_tortoise.nimble | … | … | ✓ |
+| vscode_extension/vscode_nimtortoise.nimble | … | … | ✓ |
 | vscode_extension/package.json | … | … | ✓ |
 | forest/forest.nimble | … | … | ✓ |
+| api/api.nimble | … | … | ✓ |
 
 Do not touch CHANGELOG.md, package-lock.json, .vscode/tasks.json, or any other file — those are not part of the version declaration.

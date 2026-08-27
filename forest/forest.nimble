@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.3.0"
+version       = "0.3.1"
 author        = "David Pocknee"
 description   = "A library to map and traverse the dependency trees of nim files."
 license       = "MIT"

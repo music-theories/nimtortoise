@@ -8,7 +8,7 @@ import api
 
 import ../protocol/types
 
-const REQUEST_TIMEOUT* = 120000
+# const REQUEST_TIMEOUT* = 120000
 const HighestSupportedNimSuggestProtocolVersion* = 4
 
 # copied from Nim repo
