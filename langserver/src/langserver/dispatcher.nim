@@ -51,6 +51,7 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
     await ls.waitForLsInitialized()
     # TODO: Check all paths through the dispatcher result in any pending futures being completed.
     debug "processLangserverQueue: dequeued item", kind = $query.kind
+    
     case query.kind
     of LangserverQueryKind.SHUTDOWN:
       await ls.pool.stopAllNimsuggestSlotsInPool()
@@ -74,7 +75,7 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
       #   q.dirtyFile = FilePathAbs("")
       # else:
       q.dirtyFile = uriToStashFilePath(ls.files.storageDir, q.uri)
-
+      debug "processLangserverQueue: in nimsuggest loop", kind = $q.kind
       # First, check if the current file is owned by a nimsuggest instance
       let path = toFilePathAbs(q.uri)
       if q.uri in ls.files.openFiles:
@@ -120,6 +121,7 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
 
     of LangserverQueryKind.FILE_ACCESS:
       let q = query.fileAccess
+      debug "processLangserverQueue: in file access loop", kind = $q.kind
       case q.kind
       of FileAccessQueryKind.DID_OPEN:
         await ls.processDidOpenQuery(q)

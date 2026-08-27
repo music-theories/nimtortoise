@@ -30,6 +30,7 @@ proc processDidRenameQuery*(
 
     if oldUri in ls.files.openFiles:
       let fileInfo = ls.files.openFiles[oldUri]
+      
       let slotCheck = getSlotThatOwnsUri(ls.pool, oldUri)
       if slotCheck.isSome():
         let slotThatOwnsUri = slotCheck.get()
@@ -47,13 +48,9 @@ proc processDidRenameQuery*(
             text: fileInfo.textDocument.text,
           ),
         )
-        ls.files.openFiles.del(oldUri)
-
         if string(newPath).endsWith(".nim"):
-          debug "processCommands: update dependecy tree", entryPoints = slotThatOwnsUri.spawnInfo.entryPoint
-          ls.dependencies = await initForest(ls.files.rootPath)
 
-          debug "processCommands: sending recompile", entryPoints = slotThatOwnsUri.spawnInfo.entryPoint
+          debug "processDidRenameQuery: sending recompile", entryPoints = slotThatOwnsUri.spawnInfo.entryPoint
           # RECOMPILE The Nimsuggest Instance
           let recompileQuery = NimsuggestQuery[LspFilePosition](
             kind: NimsuggestQueryKind.RECOMPILE,
@@ -62,3 +59,9 @@ proc processDidRenameQuery*(
             responseFuture: newFuture[seq[Suggest]]("recompile"),
           )
           slotThatOwnsUri.queryMailbox.addLastNoWait(recompileQuery)
+
+      debug "processDidRenameQuery: update dependecy tree"
+      ls.files.openFiles.del(oldUri)
+  
+  if q.renameFiles.files.len > 0:
+    ls.dependencies = await initForest(ls.files.rootPath)

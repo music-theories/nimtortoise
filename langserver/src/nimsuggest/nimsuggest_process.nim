@@ -232,24 +232,25 @@ proc filterMailbox(
       slot, NimsuggestQueryKind.CHANGED, originalQuery.uri
     ):
       debug "processNimsuggestQueries: skipping stale query (CHANGED pending)", kind = $originalQuery.kind, uri = originalQuery.uri
-      if originalQuery.kind == NimsuggestQueryKind.DOCUMENT_SYMBOLS and
-          originalQuery.uri in documentSymbolCache:
-        debug "processNimsuggestQueries: DOCUMENT_SYMBOLS stale-skip, serving cache", uri = originalQuery.uri
-        originalQuery.responseFuture.complete(documentSymbolCache[originalQuery.uri])
-      else:
-        originalQuery.responseFuture.cancel()
+
+      # if originalQuery.kind == NimsuggestQueryKind.DOCUMENT_SYMBOLS and
+      #     originalQuery.uri in documentSymbolCache:
+      #   debug "processNimsuggestQueries: DOCUMENT_SYMBOLS stale-skip, serving cache", uri = originalQuery.uri
+      #   originalQuery.responseFuture.complete(documentSymbolCache[originalQuery.uri])
+      # else:
+      originalQuery.responseFuture.cancel()
       return false
 
     elif mailboxHasQueryOfKind(
       slot, originalQuery.kind, originalQuery.uri
     ):
       debug "processNimsuggestQueries: skipping stale query (a newer request is later in the queue)", kind = $originalQuery.kind, uri = originalQuery.uri
-      if originalQuery.kind == NimsuggestQueryKind.DOCUMENT_SYMBOLS and
-          originalQuery.uri in documentSymbolCache:
-        debug "processNimsuggestQueries: DOCUMENT_SYMBOLS stale-skip, serving cache", uri = originalQuery.uri
-        originalQuery.responseFuture.complete(documentSymbolCache[originalQuery.uri])
-      else:
-        originalQuery.responseFuture.cancel()
+      # if originalQuery.kind == NimsuggestQueryKind.DOCUMENT_SYMBOLS and
+      #     originalQuery.uri in documentSymbolCache:
+      #   debug "processNimsuggestQueries: DOCUMENT_SYMBOLS stale-skip, serving cache", uri = originalQuery.uri
+      #   originalQuery.responseFuture.complete(documentSymbolCache[originalQuery.uri])
+      # else:
+      originalQuery.responseFuture.cancel()
       return false
 
   of
@@ -287,6 +288,7 @@ proc processNimsuggestQueries*(
     debug "processNimsuggestQueries: waiting for query", projectFile = slot.spawnInfo.entryPoint, mailboxLen = slot.queryMailbox.len
 
     let originalQuery = await slot.queryMailbox.popFirst()
+    debug "processNimsuggestQueries: got query", projectFile = slot.spawnInfo.entryPoint, kind = $(originalQuery.kind)
 
     if originalQuery.kind == NimsuggestQueryKind.SHUTDOWN:
       debug "processNimsuggestQueries: received SHUTDOWN, exiting loop", projectFile = slot.spawnInfo.entryPoint
@@ -352,11 +354,14 @@ proc processNimsuggestQueries*(
       else:
         if not originalQuery.responseFuture.finished:
           originalQuery.responseFuture.cancel()
+
         pool.removeSlot(slot.spawnInfo.entryPoint)
         pool.crashedSlots.incl(slot.spawnInfo.entryPoint)
+
         if pool.notifyProc != nil:
           pool.notifyProc("window/logMessage",
             %*{"type": 1, "message": fmt"Nimsuggest for {slot.spawnInfo.entryPoint} permanently failed. Save the file to restart."})
+
         while slot.queryMailbox.len > 0:
           let drainedQuery = slot.queryMailbox.popFirstNoWait()
           if not drainedQuery.responseFuture.finished:
@@ -396,10 +401,15 @@ proc processNimsuggestQueries*(
       )
 
       # === CACHE UPDATE ===
+      if originalQuery.responseFuture.cancelled():
+        debug "processNimsuggestQueries: future cancelled, bailing on request", uri = originalQuery.uri
+        continue
+
       let response = originalQuery.responseFuture.read()
       case originalQuery.kind
       of NimsuggestQueryKind.HOVER:
         if response.len > 0:
+          debug "processNimsuggestQueries: updating hover cache", uri = originalQuery.uri
           hoverCache[originalQuery.uri] = (pos: originalQuery.position, response: response)
       of NimsuggestQueryKind.DOCUMENT_HIGHLIGHT:
         if response.len > 0:

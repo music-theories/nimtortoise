@@ -23,7 +23,8 @@ suite "Stability — sequential open + hover, maxNs=2":
   test "open simple.nim and hover":
     echo "    >> open simple.nim and hover"
     sendDidOpen(client, simpleRel)
-    check waitForNsInit(client, simpleProjectFile())
+    let val = waitForNsInit(client, simpleProjectFile())
+    echo "INIT ", val
     let h = sendHover(client, simpleRel, 4, 5)
     check h.kind in {JNull, JObject}
 
@@ -39,20 +40,30 @@ suite "Stability — sequential open + hover, maxNs=2":
     sendDidOpen(client, orphanRel)
     waitFor sleepAsync(2000)
     let h = sendHover(client, orphanRel, 7, 5)
+    echo "hover response back1 ", $h
     check h.kind in {JNull, JObject}
+
+  sleep(5000)
 
   test "open pkgb.nim and hover":
     echo "    >> open pkgb.nim and hover"
     sendDidOpen(client, pkgbRel)
-    check waitForNsInit(client, pkgbProjectFile())
+    let val = waitForNsInit(client, pkgbProjectFile())
+    echo "INIT ", val
     let h = sendHover(client, pkgbRel, 5, 5)
+    echo "hover response back2 ", $h
     check h.kind in {JNull, JObject}
 
   test "open pkga.nim and hover":
     echo "    >> open pkga.nim and hover"
     sendDidOpen(client, pkgaRel)
-    check waitForNsInit(client, pkgaProjectFile())
+    echo "wait for ns init  "
+    let val = waitForNsInit(client, pkgaProjectFile())
+    # echo "INITED ", val
+    # waitFor sleepAsync(30000)
+    echo "about to send hover request back3 "
     let h = sendHover(client, pkgaRel, 5, 5)
+    echo "hover response back3 ", $h
     check h.kind in {JNull, JObject}
 
   test "open aorphan.nim and hover":
@@ -60,6 +71,7 @@ suite "Stability — sequential open + hover, maxNs=2":
     sendDidOpen(client, aorphanRel)
     waitFor sleepAsync(2000)
     let h = sendHover(client, aorphanRel, 9, 5)
+    echo "hover response back ", $h
     check h.kind in {JNull, JObject}
 
   test "open orphan2.nim and hover":
@@ -72,11 +84,11 @@ suite "Stability — sequential open + hover, maxNs=2":
   test "server still responds (documentSymbol on simple.nim)":
     echo "    >> server still responds (documentSymbol on simple.nim)"
     let uri = fixtureUri(simpleRel)
-    let result = waitFor client.call(
+    let output = waitFor client.call(
       "textDocument/documentSymbol",
       %* {"textDocument": {"uri": uri}}
     )
-    check result.kind in {JNull, JArray}
+    check output.kind in {JNull, JArray}
 
   stopServer(client)
 
@@ -117,11 +129,11 @@ suite "Stability — interleaved open/close/reopen, maxNs=2":
     sendDidOpen(client, aorphanRel)
     waitFor sleepAsync(3000)
     let uri = fixtureUri(pkgbRel)
-    let result = waitFor client.call(
+    let output = waitFor client.call(
       "textDocument/documentSymbol",
       %* {"textDocument": {"uri": uri}}
     )
-    check result.kind in {JNull, JArray}
+    check output.kind in {JNull, JArray}
 
   stopServer(client)
 

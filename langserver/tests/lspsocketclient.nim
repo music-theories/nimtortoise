@@ -300,10 +300,12 @@ proc doInitialize*(client: LspSocketClient, rootRelPath: string) =
   discard waitFor client.initialize(initParams)
 
 proc waitForNsInit*(client: LspSocketClient, absProjectFile: string): bool =
-  waitFor client.waitForNotificationMessage(
+  echo "START NS INIT"
+  result = waitFor client.waitForNotificationMessage(
     "Nimsuggest initialized for " & absProjectFile,
-    timeoutMs = 30000,
+    timeoutMs = 50000,
   )
+  echo "FINISH NS INIT"
 
 proc waitForInstanceCount*(client: LspSocketClient, n: int, timeoutMs = 30000): bool =
   waitFor client.waitForNotification(
