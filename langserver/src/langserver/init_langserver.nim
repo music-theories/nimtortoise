@@ -75,12 +75,6 @@ proc tick*(ls: LanguageServer): Future[void] {.async.} =
     error "Error in tick", msg = ex.msg
     writeStacktrace(ex)
 
-
-# initialize = capability exchange
-# initialized = startup work begins
-
-
-
 # === initialize ===
 proc initialize*(
   p: tuple[ls: LanguageServer, onExit: OnExitCallback], 

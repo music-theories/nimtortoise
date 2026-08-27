@@ -59,11 +59,11 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
       return 
 
     of LangserverQueryKind.RESTART:
-      await ls.pool.stopAllNimsuggestSlotsInPool()
+      await ls.pool.stopAllNimsuggestSlotsAndRemoveFromPool()
       ls.pool.crashedSlots.clear()
+      ls.dependencies = await initForest(ls.files.rootPath)
       query.restart.complete(true)
-      # ls.isShutdown = true
-      return 
+
 
     of LangserverQueryKind.NIMSUGGEST:
       let q = query.nimsuggest

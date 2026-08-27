@@ -9,6 +9,10 @@ import ../protocol/types
 
 import ./[suggestapi_types, nimsuggest_types]
 
+
+func `==`*(a, b: LspFilePosition): bool =
+  a.line.int == b.line.int and a.character.int == b.character.int
+
 proc mailboxHasQueryOfKind*(
   slot: NimsuggestSlot, 
   queryKind: NimsuggestQueryKind,

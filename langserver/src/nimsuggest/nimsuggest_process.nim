@@ -266,6 +266,11 @@ proc processNimsuggestQueries*(
 ) {.async.} =
   debug "processNimsuggestQueries: starting", projectFile = slot.spawnInfo.entryPoint
   var shutdownFut: Future[void] = nil
+  # Position-based result cache: last (position, response) per URI.
+  # Eliminates redundant nimsuggest round-trips when the cursor returns to
+  # the same symbol position. Invalidated on any CHANGED for that URI.
+  var hoverCache = initTable[FileUri, tuple[pos: LspFilePosition, response: seq[Suggest]]]()
+  var docHighlightCache = initTable[FileUri, tuple[pos: LspFilePosition, response: seq[Suggest]]]()
   while true:
     debug "processNimsuggestQueries: waiting for query", projectFile = slot.spawnInfo.entryPoint, mailboxLen = slot.queryMailbox.len
 
@@ -328,7 +333,7 @@ proc processNimsuggestQueries*(
 
       slot.crashedUris.incl(originalQuery.uri)
 
-      let respawnWasSuccessful = await pool.attemptCrashRespawn(slot, config)
+      let respawnWasSuccessful = await pool.attemptCrashRespawn(slot, dependencies, config)
 
       if respawnWasSuccessful:
         slot.crashedUris.excl(originalQuery.uri)
@@ -351,12 +356,42 @@ proc processNimsuggestQueries*(
       
     let convertedQuery = toNimsuggestQuery(originalQuery, openFiles)
     if convertedQuery.isSome():
+      # === POSITION CACHE CHECK ===
+      if originalQuery.kind == NimsuggestQueryKind.HOVER and
+          originalQuery.uri in hoverCache and
+          hoverCache[originalQuery.uri].pos == originalQuery.position:
+        debug "processNimsuggestQueries: hover cache hit", uri = originalQuery.uri
+        originalQuery.responseFuture.complete(hoverCache[originalQuery.uri].response)
+        continue
+
+      if originalQuery.kind == NimsuggestQueryKind.DOCUMENT_HIGHLIGHT and
+          originalQuery.uri in docHighlightCache and
+          docHighlightCache[originalQuery.uri].pos == originalQuery.position:
+        debug "processNimsuggestQueries: documentHighlight cache hit", uri = originalQuery.uri
+        originalQuery.responseFuture.complete(docHighlightCache[originalQuery.uri].response)
+        continue
+
       # === RUNNING NIMSUGGEST QUERY ===
       let q = convertedQuery.get()
       await slot.processNimsuggestQuery(
         q, openFiles, dependencies, storageDir, config, notifyProc
       )
-    else: 
+
+      # === CACHE UPDATE ===
+      let response = originalQuery.responseFuture.read()
+      case originalQuery.kind
+      of NimsuggestQueryKind.HOVER:
+        if response.len > 0:
+          hoverCache[originalQuery.uri] = (pos: originalQuery.position, response: response)
+      of NimsuggestQueryKind.DOCUMENT_HIGHLIGHT:
+        if response.len > 0:
+          docHighlightCache[originalQuery.uri] = (pos: originalQuery.position, response: response)
+      of NimsuggestQueryKind.CHANGED:
+        hoverCache.del(originalQuery.uri)
+        docHighlightCache.del(originalQuery.uri)
+      else:
+        discard
+    else:
       originalQuery.responseFuture.complete(@[])
 
   # --- Shutdown: kill the OS process now that the queue is drained ---

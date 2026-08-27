@@ -215,6 +215,8 @@ proc processDidOpenQuery*(
     let filePath = toFilePathAbs(uri)
     if not string(filePath).endsWith(".nim"):
       debug "didOpen: Non-.nim file, skipping nimsuggest spawn", uri = uri
+      if uri notin ls.files.openFiles:
+        ls.files.openFiles[uri] = initNlsFileInfo(q.didOpen.textDocument)
       return
 
     debug "didOpen: Check if it has a projectFile/entryPoint.  i.e. Is a true orphan?", uri = uri, filePath = filePath
