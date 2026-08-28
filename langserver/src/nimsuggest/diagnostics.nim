@@ -6,26 +6,53 @@ import ../utils/type_mismatch_format
 import ./[suggestapi_types, nimsuggest_types]
 import ../protocol/[types, enums]
 
+proc getLspFilePositionByOpeningFile*(
+  filepath: FilePathAbs,
+  position: NimsuggestFilePosition
+): LspFilePosition =
+  ## Convert a nimsuggest UTF-8 column to a UTF-16 column by reading the file from disk.
+  ## Falls back to utf8Col unchanged on any I/O error.
+  try:
+    let content = readFile(string(filepath))
+    let lines = content.splitLines()
+    let asLspLine = position.line - 1
+    if asLspLine >= 0 and asLspLine < lines.len:
+      let colValue = lines[asLspLine].createUTFMapping().utf8to16(position.col)
+      return LspFilePosition(
+        line: Line0Based(asLspLine),
+        character: Utf16Int(colValue)
+      )
+  except IOError, OSError:
+    discard
+
+  return LspFilePosition(
+    line: Line0Based(position.line - 1),
+    character: Utf16Int(position.col)
+  )
+
 proc toLspFilePosition*(
   position: NimsuggestFilePosition,
   uri: FileUri,
   openFiles: TableRef[FileUri, NlsFileInfo], 
-): Option[LspFilePosition] =
+): LspFilePosition =
   if uri in openFiles:
     let lspLine = position.line - 1 # Convert to 0-based from 1-based
     if position.line >= 0 and position.line < openFiles[uri].fingerTable.len:
       let utf8Col = position.col
       let lspChar = openFiles[uri].fingerTable[lspLine].utf8to16(utf8Col)
-      return some(LspFilePosition(
+      return LspFilePosition(
         line: Line0Based(lspLine),
         character: Utf16Int(lspChar)
-      ))
+      )
 
-  return none(LspFilePosition)
+  else:
+    return getLspFilePositionByOpeningFile(
+      toFilePathAbs(uri), position, 
+    )
 
-func toLspFilePosition(
+proc toLspFilePosition(
   suggest: Suggest, uri: FileUri, openFiles: TableRef[FileUri, NlsFileInfo], 
-): Option[tuple[start, finish: LspFilePosition]] =
+): tuple[start, finish: LspFilePosition] =
   let textStart = suggest.doc.find('\'')
   let textEnd = suggest.doc.rfind('\'')
   var startCharacter = 0
@@ -40,66 +67,60 @@ func toLspFilePosition(
     startingNimsuggestFilePosition, uri, openFiles
   )
 
-  if asLspFilePosition.isSome:
-    var textLength = 1
-    if textStart >= 0 and textEnd > textStart:
-      textLength = utf16Len(suggest.doc[textStart + 1 ..< textEnd])
-    
-    let startPos = asLspFilePosition.get()
-    return some((
-      start: startPos,
-      finish: LspFilePosition(
-        line: Line0Based(startPos.line),
-        character: Utf16Int(int(startPos.character) + textLength)
-      )
-    ))
-
-  else:
-    return none(tuple[start, finish: LspFilePosition]) 
+  # if asLspFilePosition.isSome:
+  var textLength = 1
+  if textStart >= 0 and textEnd > textStart:
+    textLength = utf16Len(suggest.doc[textStart + 1 ..< textEnd])
+  
+  # let startPos = asLspFilePosition.get()
+  return (
+    start: asLspFilePosition,
+    finish: LspFilePosition(
+      line: Line0Based(asLspFilePosition.line),
+      character: Utf16Int(int(asLspFilePosition.character) + textLength)
+    )
+  )
 
 proc toDiagnosticJson*(
   suggest: Suggest, 
   uri: FileUri, 
   openFiles: TableRef[FileUri, NlsFileInfo]
-): Option[JsonNode] =
-  let asLspFilePosition = toLspFilePosition(suggest, uri, openFiles)
-  if asLspFilePosition.isSome:
-    let positions = asLspFilePosition.get()
+): JsonNode =
+  # let asLspFilePosition = toLspFilePosition(suggest, uri, openFiles)
+  let positions = toLspFilePosition(suggest, uri, openFiles)
 
-    let jsonToSend = %*{
-      "uri": toUri(suggest.filePath),
-      "range": %*{
-        "start": %*{
-          "line": int(positions.start.line), 
-          "character": int(positions.start.character)
-        },
-        "end": %*{
-          "line": int(positions.finish.line), 
-          "character": int(positions.finish.character)
-        },
+  let jsonToSend = %*{
+    "uri": toUri(suggest.filePath),
+    "range": %*{
+      "start": %*{
+        "line": int(positions.start.line), 
+        "character": int(positions.start.character)
       },
-      "severity":
-        case suggest.forth
-        of "Error": DiagnosticSeverity.Error.int
-        of "Hint": DiagnosticSeverity.Hint.int
-        of "Warning": DiagnosticSeverity.Warning.int
-        else: DiagnosticSeverity.Error.int
-      ,
-      "message": block:
-        let base = formatTypeMismatch(suggest.doc)
-        if isSplitIdentityTypeMismatch(suggest.doc):
-          base & "\nNote: nimsuggest may be registering the same type as two distinct " &
-            "types due to an internal module graph inconsistency. " &
-            "Consider restarting nimsuggest."
-        else:
-          base
-      ,
-      "source": "nim",
-      "code": "nimsuggest chk",
-    }
-    return some(jsonToSend)
-  else:
-    return none(JsonNode)
+      "end": %*{
+        "line": int(positions.finish.line), 
+        "character": int(positions.finish.character)
+      },
+    },
+    "severity":
+      case suggest.forth
+      of "Error": DiagnosticSeverity.Error.int
+      of "Hint": DiagnosticSeverity.Hint.int
+      of "Warning": DiagnosticSeverity.Warning.int
+      else: DiagnosticSeverity.Error.int
+    ,
+    "message": block:
+      let base = formatTypeMismatch(suggest.doc)
+      if isSplitIdentityTypeMismatch(suggest.doc):
+        base & "\nNote: nimsuggest may be registering the same type as two distinct " &
+          "types due to an internal module graph inconsistency. " &
+          "Consider restarting nimsuggest."
+      else:
+        base
+    ,
+    "source": "nim",
+    "code": "nimsuggest chk",
+  }
+  return jsonToSend
 
 proc convertNimSuggestResponseToDiagnostics*(
   suggestResponses: seq[Suggest], 
@@ -110,8 +131,7 @@ proc convertNimSuggestResponseToDiagnostics*(
   var diagnosticJson = newJArray()
   for d in filteredResponses:
     let converted = toDiagnosticJson(d, uri, openFiles)
-    if converted.isSome:
-      diagnosticJson.add(converted.get())
+    diagnosticJson.add(converted)
 
   let jsonToSend = %*{"uri": uri, "diagnostics": diagnosticJson }
   return jsonToSend

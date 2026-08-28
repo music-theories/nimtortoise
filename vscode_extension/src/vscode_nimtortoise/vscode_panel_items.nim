@@ -117,19 +117,6 @@ proc newPerformanceItem*(): LspItem =
 
 # === NIMSUGGEST ITEMS ===
 
-# proc newRestartItem(title: string, pathToFile: string, action: static string): LspItem =
-#   # path to file * == restart all
-#   let restartItem = cast[LspItem](vscode.newTreeItem(title.cstring, TreeItemCollapsibleState_None))
-#   restartItem.command = newJsObject()
-#   restartItem.command.command = "nimTortoise.nimsuggestRestart".cstring
-#   restartItem.command.title = title.cstring
-#   #Notice the actions here corresponds to SuggestAction in the lsp rather than capabilities
-#   restartItem.command.arguments = @[cstring(action), pathToFile.cstring]
-#   restartItem.iconPath = vscode.themeIcon(
-#     "debug-restart", vscode.themeColor("notificationsWarningIcon.foreground")
-#   )
-#   return restartItem
-
 proc newCheckProjectItem*(entryPoint: string): LspItem =
   let item = cast[LspItem](vscode.newTreeItem("Check Project", TreeItemCollapsibleState_None))
   item.tooltip = "Restart nimsuggest and run a full compile check for the active file's project"
@@ -137,6 +124,16 @@ proc newCheckProjectItem*(entryPoint: string): LspItem =
   item.command = newJsObject()
   item.command.command = "nimTortoise.nimsuggestCheckProject".cstring
   item.command.title = "Check Project".cstring
+  item.command.arguments = @[entryPoint.cstring.toJs()]
+  return item
+
+proc newRecompileItem*(entryPoint: string): LspItem =
+  let item = cast[LspItem](vscode.newTreeItem("Recompile Project", TreeItemCollapsibleState_None))
+  item.tooltip = "Recompile the project"
+  item.iconPath = vscode.themeIcon("refresh", vscode.themeColor("terminal.ansiGreen"))
+  item.command = newJsObject()
+  item.command.command = "nimTortoise.nimsuggestRecompile".cstring
+  item.command.title = "Recompile Project".cstring
   item.command.arguments = @[entryPoint.cstring.toJs()]
   return item
 
@@ -179,7 +176,6 @@ proc newNotificationItem*(notification: Notification): LspItem =
   item.iconPath = vscode.themeIcon(notification.kind, vscode.themeColor(color))
   return item
 
-
 proc isNotificationItem*(item: LspItem): bool =
   not item.notification.isUndefined and item.notification.isSome
 
@@ -193,7 +189,7 @@ proc notificationActionItems*(lspItem: LspItem): seq[LspItem] =
   item.command.arguments = @[notification.message.toJs(), notification.detail.toJs()]
   item.iconPath =
     vscode.themeIcon("selection", vscode.themeColor("notificationsInfoIcon.foreground"))
-  result.add item
+  result.add(item)
 
   let item2 = cast[LspItem](vscode.newTreeItem("Delete", TreeItemCollapsibleState_None))
   item2.command = newJsObject()
@@ -202,4 +198,4 @@ proc notificationActionItems*(lspItem: LspItem): seq[LspItem] =
   item2.iconPath =
     vscode.themeIcon("trash", vscode.themeColor("notificationsErrorIcon.foreground"))
   item2.command.arguments = @[notification.id.toJs()]
-  result.add item2
+  result.add(item2)

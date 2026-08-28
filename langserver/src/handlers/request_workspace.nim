@@ -41,7 +41,8 @@ proc workspaceSymbol*(
   await allFutures(futures)
   var merged: seq[Suggest]
   for f in futures:
-    merged.add(f.read())
+    if not f.cancelled:
+      merged.add(f.read())
 
   return processWorkspaceSymbolResponses(
     ls, merged, params

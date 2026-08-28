@@ -67,23 +67,23 @@ proc parseNimbleFile*(nimbleFile: FilePathAbs): NimbleDumpInfo =
 
 proc getEntryPoints*(
   nimbleFiles: Table[FilePathAbs, NimbleDumpInfo]
-): seq[FilePathAbs] =
-  result = @[]
+): tuple[found: seq[FilePathAbs], missing: seq[FilePathAbs]] =
   for k, nimbleFile in nimbleFiles:
     let nimbleDir = parentDir(k)
     for ep in nimbleFile.entryPoints:
       let abs = FilePathAbs((string(nimbleDir) / string(ep)).absolutePath.normalizedPath)
       if fileExists(string(abs)):
-        result.add(abs)
+        result.found.add(abs)
       else:
         warn "entry point not found, skipping", path = $abs
+        result.missing.add(abs)
 
     if string(nimbleFile.testEntryPoint).len > 0:
       let abs = FilePathAbs((string(nimbleDir) / string(nimbleFile.testEntryPoint)).absolutePath.normalizedPath)
       if fileExists(string(abs)):
-        result.add(abs)
+        result.found.add(abs)
 
-  result = deduplicate(result)
+  result.found = deduplicate(result.found)
 
 proc initNimbleInfo*(
   rootPath: DirPathAbs
@@ -92,9 +92,10 @@ proc initNimbleInfo*(
   var nimbleDumpTable = initTable[FilePathAbs, NimbleDumpInfo]()
   for nimbleFile in allNimbleFiles:
     nimbleDumpTable[nimbleFile] = parseNimbleFile(nimbleFile)
-  let allEntryPoints = getEntryPoints(nimbleDumpTable)
+  let (found, missing) = getEntryPoints(nimbleDumpTable)
   return NimbleInfo(
     # files: allNimbleFiles,
     dump: nimbleDumpTable,
-    entryPoints: allEntryPoints
+    entryPoints: found,
+    missingEntryPoints: missing
   )

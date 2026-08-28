@@ -29,8 +29,11 @@ proc consolidateNimsuggestInstances(
   newSlot: NimsuggestSlot,
 ): Future[seq[FilePathAbs]] {.async.} =
   # Consolidation: for each other slot, check if the new slot subsumes it.
+  # Snapshot the slots table before iterating: asyncSpawn'd stopNimsuggestSlotAndRemoveFromPool
+  # calls pool.slots.del during await knownQuery.responseFuture, which would mutate the table
+  # mid-iteration and trigger "table changed while iterating" AssertionDefect.
   var slotsToRemove: seq[FilePathAbs] = @[]
-  for projectPath, oldSlot in ls.pool.slots:
+  for oldSlot in ls.pool.slots.values.toSeq():
     if oldSlot.spawnInfo.entryPoint == newSlot.spawnInfo.entryPoint: continue
     
     let knownQuery = NimsuggestQuery[LspFilePosition](
@@ -70,15 +73,15 @@ proc consolidateNimsuggestInstances(
             responseFuture: newFuture[seq[Suggest]]("consolidateChanged"),
           ))
 
+      slotsToRemove.add(oldSlot.spawnInfo.entryPoint)
       asyncSpawn ls.pool.stopNimsuggestSlotAndRemoveFromPool(oldSlot)
 
-      # slotsToRemove.add(oldSlot.spawnInfo.entryPoint)
     else:
       debug "consolidateNimsuggestInstances: new slot does not know old slot", newSlotProjectFile = newSlot.spawnInfo.entryPoint, oldSlotProjectFile = oldSlot.spawnInfo.entryPoint
 
   debug "consolidateNimsuggestInstances: remove slots", slotsToRemove = slotsToRemove
-  for s in slotsToRemove:
-    ls.pool.removeSlot(s)
+  # for s in slotsToRemove:
+  #   ls.pool.removeSlot(s)
   
   return slotsToRemove
 
@@ -215,6 +218,8 @@ proc processDidOpenQuery*(
     let filePath = toFilePathAbs(uri)
     if not string(filePath).endsWith(".nim"):
       debug "didOpen: Non-.nim file, skipping nimsuggest spawn", uri = uri
+      if uri notin ls.files.openFiles:
+        ls.files.openFiles[uri] = initNlsFileInfo(q.didOpen.textDocument)
       return
 
     debug "didOpen: Check if it has a projectFile/entryPoint.  i.e. Is a true orphan?", uri = uri, filePath = filePath

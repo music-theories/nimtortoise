@@ -51,6 +51,7 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
     await ls.waitForLsInitialized()
     # TODO: Check all paths through the dispatcher result in any pending futures being completed.
     debug "processLangserverQueue: dequeued item", kind = $query.kind
+    
     case query.kind
     of LangserverQueryKind.SHUTDOWN:
       await ls.pool.stopAllNimsuggestSlotsInPool()
@@ -59,11 +60,11 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
       return 
 
     of LangserverQueryKind.RESTART:
-      await ls.pool.stopAllNimsuggestSlotsInPool()
+      await ls.pool.stopAllNimsuggestSlotsAndRemoveFromPool()
       ls.pool.crashedSlots.clear()
+      ls.dependencies = await initForest(ls.files.rootPath)
       query.restart.complete(true)
-      # ls.isShutdown = true
-      return 
+
 
     of LangserverQueryKind.NIMSUGGEST:
       let q = query.nimsuggest
@@ -73,8 +74,19 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
       # if q.kind == NimsuggestQueryKind.CHANGED and q.saved:
       #   q.dirtyFile = FilePathAbs("")
       # else:
-      q.dirtyFile = uriToStashFilePath(ls.files.storageDir, q.uri)
 
+      # if q.uri in ls.files.openFiles:
+      #   q.dirtyFile = uriToStashFilePath(ls.files.storageDir, q.uri)
+      # else:
+      #   q.dirtyFile = FilePathAbs("")
+
+      if q.kind == NimsuggestQueryKind.CHECK_PROJECT:
+        q.dirtyFile = FilePathAbs("")
+      else:
+        q.dirtyFile = uriToStashFilePath(ls.files.storageDir, q.uri)
+
+
+      debug "processLangserverQueue: in nimsuggest loop", kind = $q.kind
       # First, check if the current file is owned by a nimsuggest instance
       let path = toFilePathAbs(q.uri)
       if q.uri in ls.files.openFiles:
@@ -95,14 +107,14 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
           of SlotState.STOPPING, SlotState.STOPPED, SlotState.CRASHED:
             debug "processLangserverQueue: slot is inactive", uri = q.uri, state = slotThatOwnsUri.state
             if not q.responseFuture.finished:
-              q.responseFuture.complete(@[])
+              q.responseFuture.cancel()
             continue
 
         else:
           # File is open but no slot owns it (e.g. the slot was evicted from the pool).
           debug "processLangserverQueue: file is open but no slot owns it", uri = q.uri
           if not q.responseFuture.finished:
-            q.responseFuture.complete(@[])
+            q.responseFuture.cancel()
 
       elif path in ls.pool.slots:
         let slot = ls.pool.slots[path]
@@ -112,14 +124,15 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
           ls.pool.slots[path].queryMailbox.addLastNoWait(q)
         else:
           debug "processLangserverQueue: Could not add path-level message to mailbox. Slot is not live.", uri = q.uri, kind = $q.kind
-          q.responseFuture.complete(@[])
+          q.responseFuture.cancel()
 
       else:
         debug "processLangserverQueue: Could not add message to mailbox", uri = q.uri, kind = $q.kind
-        q.responseFuture.complete(@[])
+        q.responseFuture.cancel()
 
     of LangserverQueryKind.FILE_ACCESS:
       let q = query.fileAccess
+      debug "processLangserverQueue: in file access loop", kind = $q.kind
       case q.kind
       of FileAccessQueryKind.DID_OPEN:
         await ls.processDidOpenQuery(q)

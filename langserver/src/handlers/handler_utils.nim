@@ -75,18 +75,15 @@ proc initLabelRangeForOpenFiles*(
     uri,
     ls.files.openFiles
   )
-  if asLspFilePositionStart.isSome:
-    let startPos = asLspFilePositionStart.get()
-    var textLength = getTokenLength(response.qualifiedPath[^1])
+  let startPos = asLspFilePositionStart
+  var textLength = getTokenLength(response.qualifiedPath[^1])
 
-    let rangeOutput = initJsonRange(
-      int(startPos.line), int(startPos.character),
-      int(startPos.line), int(startPos.character) + textLength,
-    )
-    return some(rangeOutput)
-  else:
-    return none(Range)
-
+  let rangeOutput = initJsonRange(
+    int(startPos.line), int(startPos.character),
+    int(startPos.line), int(startPos.character) + textLength,
+  )
+  return some(rangeOutput)
+  
 proc toLocationJsonForOpenFiles*(
   response: Suggest,
   ls: LanguageServer,
@@ -103,29 +100,29 @@ proc toLocationJsonForOpenFiles*(
   else:
     return none(Location)
 
-proc getLspFilePositionByOpeningFile*(
-  filepath: FilePathAbs,
-  position: NimsuggestFilePosition
-): LspFilePosition =
-  ## Convert a nimsuggest UTF-8 column to a UTF-16 column by reading the file from disk.
-  ## Falls back to utf8Col unchanged on any I/O error.
-  try:
-    let content = readFile(string(filepath))
-    let lines = content.splitLines()
-    let asLspLine = position.line - 1
-    if asLspLine >= 0 and asLspLine < lines.len:
-      let colValue = lines[asLspLine].createUTFMapping().utf8to16(position.col)
-      return LspFilePosition(
-        line: Line0Based(asLspLine),
-        character: Utf16Int(colValue)
-      )
-  except IOError, OSError:
-    discard
+# proc getLspFilePositionByOpeningFile*(
+#   filepath: FilePathAbs,
+#   position: NimsuggestFilePosition
+# ): LspFilePosition =
+#   ## Convert a nimsuggest UTF-8 column to a UTF-16 column by reading the file from disk.
+#   ## Falls back to utf8Col unchanged on any I/O error.
+#   try:
+#     let content = readFile(string(filepath))
+#     let lines = content.splitLines()
+#     let asLspLine = position.line - 1
+#     if asLspLine >= 0 and asLspLine < lines.len:
+#       let colValue = lines[asLspLine].createUTFMapping().utf8to16(position.col)
+#       return LspFilePosition(
+#         line: Line0Based(asLspLine),
+#         character: Utf16Int(colValue)
+#       )
+#   except IOError, OSError:
+#     discard
 
-  return LspFilePosition(
-    line: Line0Based(position.line - 1),
-    character: Utf16Int(position.col)
-  )
+#   return LspFilePosition(
+#     line: Line0Based(position.line - 1),
+#     character: Utf16Int(position.col)
+#   )
 
 proc initLabelRangeForAnyFile*(
   response: Suggest, ls: LanguageServer,

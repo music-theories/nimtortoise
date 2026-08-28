@@ -53,7 +53,7 @@ proc initDefaultNlsConfig*(): NlsConfig =
     performance: performanceSettings[PerformanceSettingKind.LOW],
     # -- Nimsuggest Settings ---
     maxNimsuggestProcesses: 2, # max number of nimsuggest processes to keep alive. 0 means unlimited.
-    maxNimsuggestCrashRetries: 3, # auto-restart attempts before giving up on a crashed slot
+    # maxNimsuggestCrashRetries: 3, # auto-restart attempts before giving up on a crashed slot
     nimsuggestPath: FilePathAbs(""), # OR should it be "nimsuggest"?
     nimsuggestIdleTimeout: initDuration(seconds = 1800), 
     nimsuggestRequestTimeout: initDuration(seconds = 30), 
@@ -98,8 +98,6 @@ proc nlsConfigFromJson*(json: JsonNode): NlsConfig =
 
   if json.hasKey("maxNimsuggestProcesses"):
     result.maxNimsuggestProcesses = json["maxNimsuggestProcesses"].getInt()
-  if json.hasKey("maxNimsuggestCrashRetries"):
-    result.maxNimsuggestCrashRetries = json["maxNimsuggestCrashRetries"].getInt()
   if json.hasKey("nimsuggestPath"):
     result.nimsuggestPath = FilePathAbs(json["nimsuggestPath"].getStr())
   if json.hasKey("nimsuggestIdleTimeout"):

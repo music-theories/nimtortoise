@@ -49,49 +49,6 @@ proc resolvedNs*(slot: NimsuggestSlot): Option[NimSuggest] =
     return some(slot.ns.read)
   none(NimSuggest)
 
-proc attemptCrashRespawn*(
-  pool: NimsuggestPool,
-  slot: NimsuggestSlot,
-  config: NlsConfig
-): Future[bool] {.async.} =
-  slot.state = SlotState.CRASHED
-  slot.ns = newFuture[NimSuggest]("attemptCrashRespawn")
-
-  let currentCrashedUris = slot.crashedUris
-
-  let spawnTimeoutMs = int(inMilliseconds(config.nimsuggestSpawnTimeout))
-
-  try:
-    slot.crashedUris.clear() # explicit restart = clean slate
-    let ns = await createNimsuggest(
-      slot.spawninfo,
-      pool.nimsuggest,
-      spawnTimeoutMs,
-      config.logNimsuggest,
-    )
-
-    debug "attemptCrashRespawn: createNimsuggest succeeded", 
-      entryPoint = slot.spawnInfo.entryPoint, port = ns.port
-
-    slot.ns.complete(ns)
-    slot.state = SlotState.READY
-
-    if pool.statusChangedProc != nil:
-      pool.statusChangedProc()
-
-    if pool.notifyProc != nil:
-      pool.notifyProc("window/logMessage",
-        %*{"type": 3, "message": fmt"Nimsuggest restarted from crashed for {slot.spawnInfo.entryPoint}"}
-      )
-    return true
-
-  except CatchableError as ex:
-    slot.state = SlotState.CRASHED
-    slot.crashedUris = currentCrashedUris
-    error "attemptCrashRespawn: spawn attempt failed",
-      entryPoint = slot.spawnInfo.entryPoint, msg = ex.msg
-    return false
-
 # === EXECS ===
 
 proc publishNimCheckDiagnostics*(
@@ -231,7 +188,6 @@ proc spawnNewNimsuggestSlot*(
   # Use a longer timeout for spawn than for queries: cold compilation of large
   # projects (chronos, chronicles, etc.) can legitimately take > 30s.
   # NimsuggestSpawnTimeoutError still surfaces immediately so infinite-loop bugs
-  # (e.g. flatty/fieldPairs on recursive types) escape in ≤ spawnTimeoutMs.
   let spawnTimeoutMs = int(inMilliseconds(config.nimsuggestSpawnTimeout))
   try:
     let ns = await createNimsuggest(
@@ -276,14 +232,13 @@ proc spawnNewNimsuggestSlot*(
       projectFile = newSlot.spawnInfo.entryPoint, 
       msg = ex.msg
 
-    if pool.notifyProc != nil and ex.msg.len > 0:
-      debug "SHOW MESSAGE RUNNING"
+    if pool.notifyProc != nil:
       let crashDetail = "Project: " & string(newSlot.spawnInfo.entryPoint) &
         "\nError: " & ex.msg &
         "\n\nNimsuggest crashed catastrophically while spawning. This is probably due to your code generating a SIGSEGV or similar error, meaning nimsuggest is unable to compile it. As a fall-back, the language server will now try to run `nim check` to generate diagnostics while you fix this error."
 
       pool.notifyProc("window/showMessage",
-        %*{"type": 1, "message": "Nimsuggest crashed.", "detail": crashDetail}
+        %*{ "type": 1, "message": "Nimsuggest crashed", "detail": crashDetail }
       )
 
     let nimCheckResponse = await runNimCheckAfterCrash(
@@ -316,6 +271,67 @@ proc spawnNewNimsuggestSlot*(
     pool, spawningInfo, 
     nimsuggestSettings, dependencies, config
   )
+
+proc attemptCrashRespawn*(
+  pool: NimsuggestPool,
+  slot: NimsuggestSlot,
+  dependencies: Forest,
+  config: NlsConfig
+): Future[bool] {.async.} =
+  slot.state = SlotState.CRASHED
+  slot.ns = newFuture[NimSuggest]("attemptCrashRespawn")
+
+  let currentCrashedUris = slot.crashedUris
+
+  let spawnTimeoutMs = int(inMilliseconds(config.nimsuggestSpawnTimeout))
+
+  try:
+    slot.crashedUris.clear() # explicit restart = clean slate
+    let ns = await createNimsuggest(
+      slot.spawninfo,
+      pool.nimsuggest,
+      spawnTimeoutMs,
+      config.logNimsuggest,
+    )
+
+    debug "attemptCrashRespawn: re-spawning nimsuggest  succeeded", 
+      entryPoint = slot.spawnInfo.entryPoint, port = ns.port
+
+    slot.ns.complete(ns)
+    slot.state = SlotState.READY
+
+    if pool.statusChangedProc != nil:
+      pool.statusChangedProc()
+
+    if pool.notifyProc != nil:
+      pool.notifyProc("window/logMessage",
+        %*{"type": 3, "message": fmt"Nimsuggest restarted from crashed for {slot.spawnInfo.entryPoint}"}
+      )
+    return true
+
+  except CatchableError as ex:
+    slot.state = SlotState.CRASHED
+    slot.crashedUris = currentCrashedUris
+    error "attemptCrashRespawn: spawn attempt failed",
+      entryPoint = slot.spawnInfo.entryPoint, msg = ex.msg
+
+    if pool.notifyProc != nil:
+      let crashDetail = "Project: " & string(slot.spawnInfo.entryPoint) &
+        "\nError: " & ex.msg &
+        "\n\nNimsuggest crashed catastrophically while spawning. This is probably due to your code generating a SIGSEGV or similar error, meaning nimsuggest is unable to compile it. As a fall-back, the language server will now try to run `nim check` to generate diagnostics while you fix this error."
+
+      pool.notifyProc("window/showMessage",
+        %*{ "type": 1, "message": "Nimsuggest crashed", "detail": crashDetail }
+      )
+
+    let nimCheckResponse = await runNimCheckAfterCrash(
+      dependencies.nim.nimExe,
+      slot.spawnInfo.entryPoint,
+      paths = @[],
+    )
+    debug "nimCheckResponse", response = nimCheckResponse
+    publishNimCheckDiagnostics(nimCheckResponse, pool.notifyProc)
+    return false
 
 proc stopNimsuggestSlot*(
   pool: NimsuggestPool, slot: NimsuggestSlot
@@ -378,8 +394,18 @@ proc stopNimsuggestSlotAndRemoveFromPool*(
 
 proc stopAllNimsuggestSlotsInPool*(pool: NimsuggestPool) {.async.} =
   debug "stopping child nimsuggest processes"
-  for slot in pool.slots.values.toSeq:
+  for slot in pool.slots.values.toSeq():
     discard await pool.stopNimsuggestSlot(slot)
+
+proc stopAllNimsuggestSlotsAndRemoveFromPool*(pool: NimsuggestPool) {.async.} =
+  debug "stopping all child nimsuggest processes"
+  
+  for slot in pool.slots.values.toSeq():
+    discard await pool.stopNimsuggestSlot(slot)
+  
+  for entryPoint in pool.slots.keys.toSeq():
+    pool.slots.del(entryPoint)
+
 
 proc stopAllNimsuggestSlotsInPoolP*(pool: NimsuggestPool) =
   waitFor pool.stopAllNimsuggestSlotsInPool()

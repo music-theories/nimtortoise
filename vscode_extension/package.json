@@ -2,7 +2,7 @@
     "name": "vscode-nim-tortoise",
     "displayName": "Nim Tortoise",
     "description": "Fork and rewrite of nimlangserver.",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "publisher": "YOUR_PUBLISHER_ID",
     "author": {
         "name": "David Pocknee"
@@ -166,7 +166,6 @@
                 "title": "Debug selected Nim file",
                 "category": "Nim Tortoise",
                 "icon": "$(debug-alt)"
-
             },
             {
                 "command": "nimTortoise.check",
@@ -274,7 +273,7 @@
         },
         "keybindings": [
             {
-                "key": "F6",
+                "key": "ctrl+alt+b",
                 "command": "nimTortoise.run.file",
                 "when": "editorLangId == 'nim'"
             },
@@ -284,8 +283,8 @@
                 "when": "editorLangId == 'nim'"
             },
             {
-                "key": "ctrl+alt+b",
-                "command": "nimTortoise.check",
+                "key": "ctrl+alt+s",
+                "command": "nimTortoise.nimsuggestCheckProject",
                 "when": "editorLangId == 'nim'"
             },
             {
@@ -336,11 +335,6 @@
                     "type": "integer",
                     "default": 2,
                     "description": "Maximum number of nimsuggest processes to keep alive. 0 means unlimited."
-                },
-                "nimTortoise.maxNimsuggestCrashRetries": {
-                    "type": "integer",
-                    "default": 3,
-                    "description": "Number of times the language server will automatically restart a crashed nimsuggest before giving up."
                 },
                 "nimTortoise.nimsuggestPath": {
                     "type": "string",
@@ -411,7 +405,7 @@
                 },
                 "nimTortoise.nimbleAutoSetup": {
                     "type": "boolean",
-                    "default": true,
+                    "default": false,
                     "description": "Automatically run 'nimble setup' when a .nimble file is detected, to generate nimble.paths."
                 },
                 "nimTortoise.buildCommand": {

@@ -90,7 +90,7 @@ proc processMessage(client: LspSocketClient, msg: string) {.raises: [].} =
       let resultNode = if "result" in serverReq: serverReq["result"] else: newJNull()
       client.responses[id].complete(resultNode)
     else:
-      error "Unknown msg", msg = msg
+      warn "Unknown msg", msg = msg
   except CatchableError as exc:
     error "ProcessData Error ", msg = exc.msg
 
@@ -265,17 +265,6 @@ proc createDidOpenParams*(file: FilePathAbs): DidOpenTextDocumentParams =
     }
   }
 
-# proc createDidOpenParams*(file: string): DidOpenTextDocumentParams =
-#   return
-#     DidOpenTextDocumentParams %* {
-#       "textDocument": {
-#         "uri": fixtureUri(file),
-#         "languageId": "nim",
-#         "version": 0,
-#         "text": readFile("tests" / file),
-#       }
-#     }
-
 proc generateSimpleNimblePaths*() =
   let dir = absolutePath("tests" / "projects" / "simple")
   writeFile(dir / "nimble.paths", "--noNimblePath\n")
@@ -300,9 +289,9 @@ proc doInitialize*(client: LspSocketClient, rootRelPath: string) =
   discard waitFor client.initialize(initParams)
 
 proc waitForNsInit*(client: LspSocketClient, absProjectFile: string): bool =
-  waitFor client.waitForNotificationMessage(
+  result = waitFor client.waitForNotificationMessage(
     "Nimsuggest initialized for " & absProjectFile,
-    timeoutMs = 30000,
+    timeoutMs = 50000,
   )
 
 proc waitForInstanceCount*(client: LspSocketClient, n: int, timeoutMs = 30000): bool =

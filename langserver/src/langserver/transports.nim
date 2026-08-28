@@ -214,6 +214,12 @@ proc runRpc(ls: LanguageServer, req: RequestRx, rpc: RpcProc): Future[void] {.as
     ls.writeOutput(json)
   except CancelledError as ex:
     debug "[RunRPC]Request cancelled", meth = req.meth
+    if req.id.kind == riNumber:
+      ls.writeOutput(%*{
+        "jsonrpc": "2.0",
+        "id": req.id.num,
+        "error": {"code": -32800, "message": "Request cancelled"},
+      })
   except CatchableError as ex:
     error "[RunRPC] ", msg = ex.msg, req = req.`method`
     writeStackTrace(ex = ex)

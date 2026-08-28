@@ -45,8 +45,8 @@ suite "Fix #17 — in-flight commands complete with [] not error":
   doInitialize(client, "tests/projects/simple")
   client.notify("initialized", newJObject())
 
-  test "documentSymbol returns [] not an error when nimsuggest is killed mid-flight":
-    echo "    >> documentSymbol returns [] not an error when nimsuggest is killed mid-flight"
+  test "documentSymbol returns an error when nimsuggest is killed mid-flight":
+    echo "    >> documentSymbol returns an error when nimsuggest is killed mid-flight"
     sendDidOpen(client, "tests/projects/simple/src/simple.nim")
     check waitForNsInit(client, simpleProjectFile())
 
@@ -56,7 +56,7 @@ suite "Fix #17 — in-flight commands complete with [] not error":
       "textDocument/documentSymbol",
       %* {"textDocument": {"uri": symbolUri}}
     )
-    check symbolResult.kind == JArray
+    check symbolResult.kind == JNull
     check not waitFor client.waitForNotification(
       "window/showMessage",
       proc(j: JsonNode): bool =
@@ -64,7 +64,7 @@ suite "Fix #17 — in-flight commands complete with [] not error":
         "Missing" in msg or ("Error" in msg and "nimsuggest" notin msg),
       500
     )
-    echo "    >> DONE: documentSymbol returns [] not an error when nimsuggest is killed mid-flight"
+    echo "    >> DONE: documentSymbol returns an error when nimsuggest is killed mid-flight"
 
   stopServer(client)
 

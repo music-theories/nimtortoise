@@ -60,7 +60,9 @@ proc activate*(ctx: VscodeExtensionContext): void {.async.} =
   )
   vscode.commands.registerCommand("nimTortoise.nimsuggestCheckProject",
     proc (entryPoint: cstring) {.async.} =
-      await sendNimsuggestCheckProjectRequest(state, $entryPoint)
+      let ep = if entryPoint.isNil: vscode.window.activeTextEditor.document.fileName
+               else: entryPoint
+      await sendNimsuggestCheckProjectRequest(state, $ep)
   )
   vscode.commands.registerCommand("nimTortoise.nimsuggestRecompile",
     proc (entryPoint: cstring) {.async.} =

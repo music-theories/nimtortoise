@@ -1,4 +1,4 @@
-import std/[sugar, sequtils, tables, strformat, strscans, json, strutils, parsejson, sets, options]
+import std/[sugar, sequtils, tables, algorithm, strformat, strscans, json, strutils, parsejson, sets, options]
 import chronos
 import chronos/asyncproc
 import chronicles
@@ -29,19 +29,6 @@ proc supportSignatureHelp*(cc: LspClientCapabilities): bool =
     return false
   let caps = cc.textDocument
   return caps.isSome() and caps.get.signatureHelp.isSome()
-
-
-# proc nsCapabilities*(ls: LanguageServer, uri: FileUri): set[NimSuggestCapability] =
-#   ## Returns the live nimsuggest capabilities for the slot serving `uri`.
-#   ## Safe to call synchronously after queryAt/queryFile returns — by that point
-#   ## processQueries has already awaited slot.ns.get so the slot is READY.
-#   let slotOpt = resolvedSlot(ls.pool, ls.files.openFiles, uri)
-#   if slotOpt.isNone:
-#     return {}
-#   let nsOpt = slotOpt.get.resolvedNs
-#   if nsOpt.isNone:
-#     return {}
-#   nsOpt.get.capabilities
 
 proc processCompletionQuery(
   ls: LanguageServer, 
@@ -323,7 +310,7 @@ proc processDocumentSymbolResponses*(
     let uri = toUri(response.filepath)
     let labelRange = initLabelRangeForAnyFile(response, ls)
     let locationJson = Location %* {
-      "uri": uri, 
+      "uri": uri,
       "range": labelRange
     }
     let symbolInformationJson = SymbolInformation %* {
@@ -331,18 +318,77 @@ proc processDocumentSymbolResponses*(
       "kind": nimSymToLSPSymbolKind(response.symKind).int,
       "name": response.name,
     }
-    result.add(symbolInformationJson)  
+    result.add(symbolInformationJson)
+
+proc clientSupportsHierarchicalDocumentSymbols(ls: LanguageServer): bool =
+  let caps = ls.capabilities.lspClientCapabilities
+  caps.textDocument.isSome and
+  caps.textDocument.get().documentSymbol.isSome and
+  caps.textDocument.get().documentSymbol.get()
+    .hierarchicalDocumentSymbolSupport.get(false)
+
+proc makeDocumentSymbol(ls: LanguageServer, sug: Suggest): DocumentSymbol =
+  let selRange = initLabelRangeForAnyFile(sug, ls)
+  let fullRange =
+    if sug.endLine > 0:
+      let endPos = getLspFilePositionByOpeningFile(
+        sug.filePath,
+        NimsuggestFilePosition(line: sug.endLine, col: sug.endCol)
+      )
+      initJsonRange(
+        int(selRange.start.line), int(selRange.start.character),
+        int(endPos.line), int(endPos.character)
+      )
+    else:
+      selRange
+  DocumentSymbol(
+    name: sug.name,
+    detail: sug.forth,
+    kind: nimSymToLSPSymbolKind(sug.symKind).int,
+    `range`: fullRange,
+    selectionRange: selRange,
+    children: @[]
+  )
+
+proc buildDocumentSymbolTree(
+  ls: LanguageServer,
+  suggests: seq[Suggest]
+): seq[DocumentSymbol] =
+  var symbolMap: Table[seq[string], DocumentSymbol]
+  result = @[]
+  for sug in suggests.sortedByIt(it.qualifiedPath.len):
+    let sym = ls.makeDocumentSymbol(sug)
+    let parentPath = sug.qualifiedPath[0 ..< sug.qualifiedPath.high]
+    if parentPath.len <= 1 or parentPath notin symbolMap:
+      result.add(sym)
+    else:
+      symbolMap[parentPath].children.add(sym)
+    symbolMap[sug.qualifiedPath] = sym
+
+proc toDocumentSymbolsJson(
+  ls: LanguageServer,
+  response: seq[Suggest]
+): JsonNode {.gcsafe.} =
+  try:
+    {.cast(gcsafe).}:
+      if ls.clientSupportsHierarchicalDocumentSymbols():
+        return %* ls.buildDocumentSymbolTree(response)
+      else:
+        return %* processDocumentSymbolResponses(ls, response)
+  except Exception as e:
+    debug "toDocumentSymbolsJson: exception building response", msg = e.msg
+    return newJArray()
 
 proc documentSymbols*(
     ls: LanguageServer, params: DocumentSymbolParams, id: int
-): Future[seq[SymbolInformation]] {.async.} =
+): Future[JsonNode] {.async.} =
   let query = ls.initNimsuggestFileQuery(
     id,
     params.textDocument.uri,
     NimsuggestQueryKind.DOCUMENT_SYMBOLS
   )
   let response = await ls.addQueryToQueue(query)
-  return processDocumentSymbolResponses(ls, response)
+  return ls.toDocumentSymbolsJson(response)
 
 # === textDocument/prepareRename ===
 proc processPrepareRenameQuery(
@@ -459,33 +505,33 @@ proc processInlayHintResponses(
         ls.files.openFiles
       )
 
-      if asLspFilePosition.isSome:
-        let pos = asLspFilePosition.get()
-        let label = getInlayHintLabel(response.inlayHintInfo.label, response.inlayHintInfo.kind, inlayHintsCfg)
-        if label != "":
-          var outputHint = InlayHint(
-            position: Position(line: int(pos.line), character: int(pos.character)),
-            label: label,
-            kind: some(convertInlayHintKind(response.inlayHintInfo.kind)),
-            tooltip: if response.inlayHintInfo.tooltip != "": some(response.inlayHintInfo.tooltip) else: some(""),
-            paddingLeft: some(response.inlayHintInfo.paddingLeft),
-            paddingRight: some(response.inlayHintInfo.paddingRight), 
-            textEdits: none(seq[TextEdit])
-          )
+      # if asLspFilePosition.isSome:
+      let pos = asLspFilePosition
+      let label = getInlayHintLabel(response.inlayHintInfo.label, response.inlayHintInfo.kind, inlayHintsCfg)
+      if label != "":
+        var outputHint = InlayHint(
+          position: Position(line: int(pos.line), character: int(pos.character)),
+          label: label,
+          kind: some(convertInlayHintKind(response.inlayHintInfo.kind)),
+          tooltip: if response.inlayHintInfo.tooltip != "": some(response.inlayHintInfo.tooltip) else: some(""),
+          paddingLeft: some(response.inlayHintInfo.paddingLeft),
+          paddingRight: some(response.inlayHintInfo.paddingRight), 
+          textEdits: none(seq[TextEdit])
+        )
 
-          if response.inlayHintInfo.allowInsert:
-            outputHint.textEdits = some(
-              @[
-                TextEdit(
-                  newText: response.inlayHintInfo.label,
-                  `range`: Range(
-                    start: Position(line: int(pos.line), character: int(pos.character)),
-                    `end`: Position(line: int(pos.line), character: int(pos.character)),
-                  ),
-                )
-              ]
-            )
-          result.add(outputHint)
+        if response.inlayHintInfo.allowInsert:
+          outputHint.textEdits = some(
+            @[
+              TextEdit(
+                newText: response.inlayHintInfo.label,
+                `range`: Range(
+                  start: Position(line: int(pos.line), character: int(pos.character)),
+                  `end`: Position(line: int(pos.line), character: int(pos.character)),
+                ),
+              )
+            ]
+          )
+        result.add(outputHint)
 
 proc inlayHint*(
   ls: LanguageServer, 

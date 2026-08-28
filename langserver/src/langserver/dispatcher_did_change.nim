@@ -116,7 +116,7 @@ proc processDidChangeQuery*(
       debug "processDidChangeQuery: file is open but no slot owns it, stash updated but no CHANGED enqueued", uri = uri
 
   else:
-    debug "processDidChangeQuery: DID_CHANGE file is NOT in openFiles.  Sending synthetic DID_OPEN message. ", uri = uri, openFiles = openFiles
+    debug "processDidChangeQuery: DID_CHANGE file is NOT in openFiles.  Sending synthetic DID_OPEN message. ", uri = uri
     let changedQuery = NimsuggestQuery[LspFilePosition](
       id: 0,
       kind: NimsuggestQueryKind.CHANGED,

@@ -1,4 +1,4 @@
-import std/[options, deques]
+import std/[options, deques, tables]
 
 import chronos
 import chronos/asyncproc
@@ -8,7 +8,7 @@ import api
 
 import ../protocol/types
 
-const REQUEST_TIMEOUT* = 120000
+# const REQUEST_TIMEOUT* = 120000
 const HighestSupportedNimSuggestProtocolVersion* = 4
 
 # copied from Nim repo
@@ -105,10 +105,3 @@ type
     nimbleFile*: Option[FilePathAbs]
     paths*:      seq[DirPathAbs]
     extraArgs*:  seq[string]
-
-type 
-  SpecialKind* = enum
-    HELLO, 
-    GOODBYE,
-    SOMETHING_ELSE
-    

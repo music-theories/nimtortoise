@@ -206,6 +206,14 @@ type
     location*: Location
     containerName*: Option[string]
 
+  DocumentSymbol* = ref object of RootObj
+    name*: string
+    detail*: string
+    kind*: int
+    `range`*: Range
+    selectionRange*: Range
+    children*: seq[DocumentSymbol]
+
   CodeActionContext* = ref object of RootObj
     diagnostics*: OptionalSeq[Diagnostic]
 

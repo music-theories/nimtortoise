@@ -16,7 +16,6 @@ type
     line*: Line0Based # 0-based (VS Code/LSP convention)
     character*: Utf16Int  # UTF-16 byte column (VS Code/LSP convention)
 
-# Nimsuggest File Position
   NimsuggestFilePosition* = object
     line*: int  ## 1-based (nimsuggest convention)
     col*: int   ## UTF-8 byte column

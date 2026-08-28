@@ -75,12 +75,6 @@ proc tick*(ls: LanguageServer): Future[void] {.async.} =
     error "Error in tick", msg = ex.msg
     writeStacktrace(ex)
 
-
-# initialize = capability exchange
-# initialized = startup work begins
-
-
-
 # === initialize ===
 proc initialize*(
   p: tuple[ls: LanguageServer, onExit: OnExitCallback], 
@@ -246,6 +240,12 @@ proc initialized*(ls: LanguageServer, _: JsonNode): Future[void] {.async.} =
 
   # Get all nimble information and build dependency tree
   ls.dependencies = await initForest(ls.files.rootPath)
+  for missingPath in ls.dependencies.nimble.missingEntryPoints:
+    ls.showMessage(
+      "Missing .nimble entry point",
+      ".nimble entry point does not exist on disk: " & string(missingPath),
+      MessageType.Error
+    )
   let nimsuggestPath = await getNimSuggestPath(
     ls.dependencies.nim, config
   )
