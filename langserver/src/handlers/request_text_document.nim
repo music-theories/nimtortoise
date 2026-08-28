@@ -505,33 +505,33 @@ proc processInlayHintResponses(
         ls.files.openFiles
       )
 
-      if asLspFilePosition.isSome:
-        let pos = asLspFilePosition.get()
-        let label = getInlayHintLabel(response.inlayHintInfo.label, response.inlayHintInfo.kind, inlayHintsCfg)
-        if label != "":
-          var outputHint = InlayHint(
-            position: Position(line: int(pos.line), character: int(pos.character)),
-            label: label,
-            kind: some(convertInlayHintKind(response.inlayHintInfo.kind)),
-            tooltip: if response.inlayHintInfo.tooltip != "": some(response.inlayHintInfo.tooltip) else: some(""),
-            paddingLeft: some(response.inlayHintInfo.paddingLeft),
-            paddingRight: some(response.inlayHintInfo.paddingRight), 
-            textEdits: none(seq[TextEdit])
-          )
+      # if asLspFilePosition.isSome:
+      let pos = asLspFilePosition
+      let label = getInlayHintLabel(response.inlayHintInfo.label, response.inlayHintInfo.kind, inlayHintsCfg)
+      if label != "":
+        var outputHint = InlayHint(
+          position: Position(line: int(pos.line), character: int(pos.character)),
+          label: label,
+          kind: some(convertInlayHintKind(response.inlayHintInfo.kind)),
+          tooltip: if response.inlayHintInfo.tooltip != "": some(response.inlayHintInfo.tooltip) else: some(""),
+          paddingLeft: some(response.inlayHintInfo.paddingLeft),
+          paddingRight: some(response.inlayHintInfo.paddingRight), 
+          textEdits: none(seq[TextEdit])
+        )
 
-          if response.inlayHintInfo.allowInsert:
-            outputHint.textEdits = some(
-              @[
-                TextEdit(
-                  newText: response.inlayHintInfo.label,
-                  `range`: Range(
-                    start: Position(line: int(pos.line), character: int(pos.character)),
-                    `end`: Position(line: int(pos.line), character: int(pos.character)),
-                  ),
-                )
-              ]
-            )
-          result.add(outputHint)
+        if response.inlayHintInfo.allowInsert:
+          outputHint.textEdits = some(
+            @[
+              TextEdit(
+                newText: response.inlayHintInfo.label,
+                `range`: Range(
+                  start: Position(line: int(pos.line), character: int(pos.character)),
+                  `end`: Position(line: int(pos.line), character: int(pos.character)),
+                ),
+              )
+            ]
+          )
+        result.add(outputHint)
 
 proc inlayHint*(
   ls: LanguageServer, 

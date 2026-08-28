@@ -136,8 +136,9 @@ proc processNimsuggestQuery*(
     of NimsuggestQueryKind.CHECK_PROJECT, NimsuggestQueryKind.RECOMPILE:
       let timeNow = now()
       for uri, file in openFiles:
-        openFiles[uri].lastChecked = timeNow
+        openFiles[uri].lastChecked = timeNow # Is this correct?
 
+      debug "processNimsuggestQueries: check project/recompile response", uri = q.uri, length = queryResponse.len
       var filesWithDiagnostics: HashSet[FileUri]
       for (path, groupedSuggests) in groupBy(queryResponse, getFilepath):
         let uri = toUri(path)
@@ -146,7 +147,7 @@ proc processNimsuggestQuery*(
         let diagnosticsJson = convertNimSuggestResponseToDiagnostics(
           groupedSuggests, uri, openFiles
         )
-
+        debug "processNimsuggestQueries: diagnostics sent to", uri = uri, length = groupedSuggests.len
         notifyProc("textDocument/publishDiagnostics", diagnosticsJson)
 
     else:

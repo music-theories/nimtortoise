@@ -127,6 +127,16 @@ proc newCheckProjectItem*(entryPoint: string): LspItem =
   item.command.arguments = @[entryPoint.cstring.toJs()]
   return item
 
+proc newRecompileItem*(entryPoint: string): LspItem =
+  let item = cast[LspItem](vscode.newTreeItem("Recompile Project", TreeItemCollapsibleState_None))
+  item.tooltip = "Recompile the project"
+  item.iconPath = vscode.themeIcon("refresh", vscode.themeColor("terminal.ansiGreen"))
+  item.command = newJsObject()
+  item.command.command = "nimTortoise.nimsuggestRecompile".cstring
+  item.command.title = "Recompile Project".cstring
+  item.command.arguments = @[entryPoint.cstring.toJs()]
+  return item
+
 proc newNimsuggestStopItem*(entryPoint: string): LspItem =
   let item = cast[LspItem](vscode.newTreeItem("Stop", TreeItemCollapsibleState_None))
   item.tooltip = "Stop this nimsuggest instance"

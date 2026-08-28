@@ -63,13 +63,16 @@ proc initRootItems(
 proc initNimsuggestInstanceItem(
   state: ExtensionState, instance: NimsuggestStatus
 ): seq[LspItem] =
-  # let errorCount = status.projectErrors.filterIt(it.entryPoint == instance.entryPoint).len
-  # let errorLabel =
-  #   if errorCount > 0: &"Project Errors ({errorCount})"
-  #   else: "Project Errors"
   let openFileCount = if instance.openFiles.len == 0: "" else: $(instance.openFiles.len)
   var nsItems = @[
     newCheckProjectItem($(instance.entryPoint)),
+  ]  
+  if NIMSUGGEST_RECOMPILE in state.lspExtensionCapabilities:
+    nsItems.add(newRecompileItem($(instance.entryPoint)))
+  if NIMSUGGEST_STOP in state.lspExtensionCapabilities:
+    nsItems.add(newNimsuggestStopItem($(instance.entryPoint)))
+  
+  let moreItems = @[  
     newLspItem(state, "Path", instance.path),
     newLspItem(state, "Version", $instance.version),
     newLspItem(state, "Protocol", $instance.protocol),
@@ -77,11 +80,7 @@ proc initNimsuggestInstanceItem(
     newLspItem(state, "Open Files", openFileCount, "", TreeItemCollapsibleState_Collapsed, instance = some(instance)),
     # newLspItem(state, errorLabel, "", "", TreeItemCollapsibleState_Collapsed, instance = instance),
   ]
-  # if NIMSUGGEST_RESTART in state.lspExtensionCapabilities:
-  #   nsItems.insert(newRestartItem("Restart", $(instance.entryPoint), "restart"), 1)
-  if NIMSUGGEST_STOP in state.lspExtensionCapabilities:
-    nsItems.add(newNimsuggestStopItem($(instance.entryPoint)))
-  return nsItems
+  return concat(nsItems, moreItems)
 
 proc getChildrenImpl(
   state: ExtensionState, element: LspItem = nil

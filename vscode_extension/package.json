@@ -274,7 +274,7 @@
         },
         "keybindings": [
             {
-                "key": "F6",
+                "key": "ctrl+alt+b",
                 "command": "nimTortoise.run.file",
                 "when": "editorLangId == 'nim'"
             },
@@ -284,8 +284,8 @@
                 "when": "editorLangId == 'nim'"
             },
             {
-                "key": "ctrl+alt+b",
-                "command": "nimTortoise.check",
+                "key": "F6",
+                "command": "nimTortoise.nimsuggestCheckProject",
                 "when": "editorLangId == 'nim'"
             },
             {
