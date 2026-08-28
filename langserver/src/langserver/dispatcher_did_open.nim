@@ -100,6 +100,13 @@ proc startSlotConsumer(
     ls.notify,
   )
   discard await ls.consolidateNimsuggestInstances(slot)
+  slot.queryMailbox.addLastNoWait(NimsuggestQuery[LspFilePosition](
+    id: 0,
+    kind: NimsuggestQueryKind.CHECK_PROJECT,
+    uri: toUri(slot.spawnInfo.entryPoint),
+    dirtyFile: FilePathAbs(""),
+    responseFuture: newFuture[seq[Suggest]]("checkProject"),
+  ))
 
 proc createSlotWithFallback(
   ls: LanguageServer,
