@@ -12,5 +12,5 @@
       }
     ]
   },
-  "nimTortoise.performance": "HIGH"
+  "nimTortoise.performance": "LOWEST"
 }
