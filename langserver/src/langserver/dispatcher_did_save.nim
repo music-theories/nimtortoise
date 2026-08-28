@@ -49,6 +49,19 @@ proc processDidSaveQuery*(
           file.writeLine(line)
         file.close()
 
+      # Clear this file's module entry point from crashedSlots.
+      let savedFilePath = toFilePathAbs(uri)
+      let savedSpawnInfo = getNimsuggestSpawnInfo(
+        savedFilePath, ls.files.rootPath, ls.dependencies
+      )
+
+      debug "didSave: clearing crashedSlots for module entry point",
+        entryPoint = savedSpawnInfo.entryPoint,
+        savedFile = savedFilePath
+
+      ls.pool.crashedSlots.excl(savedSpawnInfo.entryPoint)
+      ls.pool.crashedSlots.excl(savedFilePath)
+
       # Directly query nimsuggest
       case slotThatOwnsUri.state
       of SlotState.READY, SlotState.SPAWNING:
@@ -64,19 +77,18 @@ proc processDidSaveQuery*(
           responseFuture: newFuture[seq[Suggest]]("nimsuggestQuery"),
         )
         slotThatOwnsUri.queryMailbox.addLastNoWait(changedQuery)
+
+        if ls.configurations.currentConfig.performance.updateOnChange:
+          # If you are on a HIGH performance setting, we also run CHECK_PROJECT to get the extra diagnostics.
+          let checkQuery = NimsuggestQuery[LspFilePosition](
+            id: 0,
+            kind: NimsuggestQueryKind.CHECK_PROJECT,
+            uri: toUri(savedSpawnInfo.entryPoint),
+            dirtyFile: FilePathAbs(""),
+            responseFuture: newFuture[seq[Suggest]]("nimsuggestQuery"),
+          )
+          slotThatOwnsUri.queryMailbox.addLastNoWait(checkQuery)
         
       of SlotState.STOPPING, SlotState.STOPPED, SlotState.CRASHED:
         discard
 
-      # Clear this file's module entry point from crashedSlots.
-      let savedFilePath = toFilePathAbs(uri)
-      let savedSpawnInfo = getNimsuggestSpawnInfo(
-        savedFilePath, ls.files.rootPath, ls.dependencies
-      )
-
-      debug "didSave: clearing crashedSlots for module entry point",
-        entryPoint = savedSpawnInfo.entryPoint,
-        savedFile = savedFilePath
-
-      ls.pool.crashedSlots.excl(savedSpawnInfo.entryPoint)
-      ls.pool.crashedSlots.excl(savedFilePath)

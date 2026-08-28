@@ -314,6 +314,13 @@ proc processNimsuggestQueries*(
 
       if respawnWasSuccessful:
         slot.crashedUris.excl(originalQuery.uri)
+        slot.queryMailbox.addLastNoWait(NimsuggestQuery[LspFilePosition](
+          id: 0,
+          kind: NimsuggestQueryKind.CHECK_PROJECT,
+          uri: toUri(slot.spawnInfo.entryPoint),
+          dirtyFile: FilePathAbs(""),
+          responseFuture: newFuture[seq[Suggest]]("checkProject"),
+        ))
       else:
         if not originalQuery.responseFuture.finished:
           originalQuery.responseFuture.cancel()

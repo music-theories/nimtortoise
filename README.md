@@ -7,8 +7,6 @@
 
 *NOTE: This repo is in active, heavy development.*
 
-*NOTE: All other READMEs are a work in progress*
-
 ## What is it?
 
 A fork and rewrite of [`nimlangserver`](https://github.com/nim-lang/langserver) and [`vscode-nim`](https://github.com/nim-lang/vscode-nim).
@@ -105,10 +103,26 @@ This is done by having a strict First-In-First-Out queuing system for any reques
 
 I am now using this tool daily and I hope it is helpful for other `nim` users. 
 
+![Nim Tortoise in action](langserver/img/interface.jpg "Nim Tortoise in action")
+
 ---
+## v0.3.2
+
+- Small fix to when chk (CHECK_PROJECT) requests are spawned.  This now occurs on every save on HIGH or HIGHEST performance settings, and when pressing "ctrl+alt+s" or pressing the "Check Project" button in the VS Code status panel.
+
 ## v0.3.1
 
 - "ctrl+alt+s" now triggers `check project`.  This will generate diagnostics for all files in the folder.
+- Fix server restart bug. When the language server restarted (e.g. on config change), nimsuggest slots weren't properly cleaned up and new ones couldn't be spawned.
+- Surface missing .nimble entry points as errors.
+- `documentSymbol` supports hierarchical responses.
+- Implement response caches for hover, documentHighlight, and documentSymbol.
+- Fix diagnostics for `check_project` requests.
+- Fix `CHECK_PROJECT` errors.
+- Test and tooling improvements.  `nimble test` now runs all test files.
+- Added benchmarking website for analysing debug outputs from the language server (in `langserver/tests/benchmarking/timeline.html`). It logs `nimsuggest` processing time for each request.
+
+![Benchmarking website](langserver/img/benchmarking-website.jpg "Benchmarking website for trace files")
 
 ## v0.3.0
 
@@ -485,7 +499,6 @@ Key settings at a glance:
 | `nimTortoise.nimsuggestPath` | `"nimsuggest"` | Path to the nimsuggest binary |
 | `nimTortoise.nimsuggestSpawnTimeout` | `60` | Timeout in seconds before stopping a nimsuggest process if it is spawning. |
 | `nimTortoise.maxNimsuggestProcesses` | `2` | Max nimsuggest processes (0 = unlimited) |
-| `nimTortoise.maxNimsuggestCrashRetries` | `3` | Restart attempts before a crashed nimsuggest is abandoned |
 | `nimTortoise.nimsuggestIdleTimeout` | `1800` | Idle timeout in ms before stopping a nimsuggest process |
 | `nimTortoise.inlayHints.typeHints.enable` | `false` | Show inferred type annotations |
 | `nimTortoise.inlayHints.parameterHints.enable` | `false` | Show parameter name hints |
