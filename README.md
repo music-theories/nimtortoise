@@ -106,6 +106,10 @@ This is done by having a strict First-In-First-Out queuing system for any reques
 I am now using this tool daily and I hope it is helpful for other `nim` users. 
 
 ---
+## v0.3.1
+
+- "ctrl+alt+s" now triggers `check project`.  This will generate diagnostics for all files in the folder.
+
 ## v0.3.0
 
 ### nim check as fallback

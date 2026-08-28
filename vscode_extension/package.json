@@ -166,7 +166,6 @@
                 "title": "Debug selected Nim file",
                 "category": "Nim Tortoise",
                 "icon": "$(debug-alt)"
-
             },
             {
                 "command": "nimTortoise.check",
@@ -284,7 +283,7 @@
                 "when": "editorLangId == 'nim'"
             },
             {
-                "key": "F6",
+                "key": "ctrl+alt+s",
                 "command": "nimTortoise.nimsuggestCheckProject",
                 "when": "editorLangId == 'nim'"
             },

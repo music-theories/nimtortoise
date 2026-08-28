@@ -1,4 +1,4 @@
-import std/[json, tables]
+import std/[json, tables, sets]
 import chronos
 import chronicles
 import forest
@@ -82,7 +82,7 @@ proc processExtensionCommandRequest(
     )
   of NIMSUGGEST_CHECK_PROJECT:
     let slotName = request.slot
-    debug "Recompile Nimsuggest instance ", slot = slotName
+    debug "Check project", slot = slotName
     if slotName in ls.pool.slots:
       let slot = ls.pool.slots[slotName]
       ls.langserverQueue.addLastNoWait(LangserverQuery(
@@ -95,6 +95,21 @@ proc processExtensionCommandRequest(
           responseFuture: newFuture[seq[Suggest]]("checkProject"),
         )
       ))
+    else:
+      let fileNameAsUri = toUri(slotName)
+      for entryPoint, slot in ls.pool.slots:
+        if fileNameAsUri in slot.ownedUris:
+          ls.langserverQueue.addLastNoWait(LangserverQuery(
+            kind: LangserverQueryKind.NIMSUGGEST,
+            nimsuggest: NimsuggestQuery[LspFilePosition](
+              id: 0,
+              kind: NimsuggestQueryKind.CHECK_PROJECT,
+              uri: toUri(entryPoint),
+              dirtyFile: FilePathAbs(""),
+              responseFuture: newFuture[seq[Suggest]]("checkProject"),
+            )
+          ))
+
     return ExtensionCommandResponse(
       kind: NIMSUGGEST_CHECK_PROJECT
     )

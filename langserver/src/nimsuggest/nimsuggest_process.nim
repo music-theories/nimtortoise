@@ -12,30 +12,6 @@ import ../protocol/types
 
 import ./[suggestapi, suggestapi_types, nimsuggest_types, nimsuggest_slots, diagnostics, nimsuggest_utils, nimsuggest_dependencies]
 
-# Interactive queries that take longer than this with an empty result indicate
-# nimsuggest is spinning in unbounded generic instantiation that terminates via
-# stack overflow before the per-request TCP timeout fires.  One such response
-# is enough to call markFailed and trigger crash-recovery — healthy nimsuggest
-# always returns quickly on these query kinds after the first CHANGED compiles
-# the module graph.
-# const SlowEmptyThresholdMs = 10_000
-
-# Claude thinks (I'm sceptical):
-# Pass "-" as the file path to chk so the nimsuggest v4 shared preamble does
-# not touch any real file's stash. Specifically:
-# - chk(path, ...) would call msgs.setDirtyFile(conf, path_idx, ""), clearing
-#   the stash that `changed "X";"stash"` just registered.
-# - chk("-", ...) targets the "-" sentinel; setDirtyFile for a non-module is
-#   harmless. The stash for the changed file remains registered.
-# - ideChk then calls graph.needsCompilation() (global, not per-file), which
-#   returns true because changed + stash markDirtyIfNeeded marked the file dirty.
-# - graph.recompilePartially() uses toFullPathConsiderDirty, so the changed file
-#   is compiled from the stash (new content), and transitive dependents cascade.
-# recompile() (ideRecompile) was tried but calls recompileFullProject() which
-# rebuilds from disk, ignoring stash content.
-# return await ns.chk(path, q.dirtyFile)
-# return await ns.recompile()
-
 # === PROCESSING ===
 proc runNimsuggestQuery*(
   ns: Nimsuggest, 
@@ -80,10 +56,7 @@ proc runNimsuggestQuery*(
   of NimsuggestQueryKind.CHECK_FILE:
     return await ns.chkFile(path, q.dirtyFile)
   of NimsuggestQueryKind.CHECK_PROJECT:
-
     return await ns.chk(path, q.dirtyFile)
-    # Claude thinks "passing "-" as the file path to chk so the nimsuggest v4 shared preamble does not touch any real file's stash.  I'm not so sure this is a good idea.
-    # return await ns.chk(FilePathAbs("-"), FilePathAbs(""))
   of NimsuggestQueryKind.RECOMPILE:
     return await ns.recompile()
   of NimsuggestQueryKind.KNOWN:
@@ -361,7 +334,7 @@ proc processNimsuggestQueries*(
     of SlotState.READY:
       discard
       
-    let convertedQuery = toNimsuggestQuery(originalQuery, openFiles)
+    let convertedQuery = toNimsuggestQuery(originalQuery, pool, openFiles)
     if convertedQuery.isSome():
       # === POSITION CACHE CHECK ===
       if originalQuery.kind == NimsuggestQueryKind.HOVER and

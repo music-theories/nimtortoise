@@ -58,8 +58,17 @@ proc toNimsuggestFilePosition*(
     debug "toNimsuggestFilePosition: uri is not in openFiles", uri = uri
     return none(NimsuggestFilePosition)
 
+proc getSlotThatOwnsUri*(
+  pool: NimsuggestPool, uriToCheck: FileUri
+): Option[NimsuggestSlot] = 
+  for entryPoint, s in pool.slots:
+    if uriToCheck in s.ownedUris:
+      return some(s)
+  return none(NimsuggestSlot)
+
 proc toNimsuggestQuery*(
   q: NimsuggestQuery[LspFilePosition],
+  pool: NimsuggestPool,
   openFiles: TableRef[FileUri, NlsFileInfo]
 ): Option[NimsuggestQuery[NimsuggestFilePosition]] =
   ## Converts a LSP-space query to a nimsuggest-space query, translating
@@ -133,6 +142,7 @@ proc toNimsuggestQuery*(
       responseFuture: q.responseFuture, cancelled: q.cancelled,
       kind: q.kind,
     ))
+   
   of NimsuggestQueryKind.CHECK_FILE:
     return some(NimsuggestQuery[NimsuggestFilePosition](
       id: q.id, 
@@ -192,11 +202,3 @@ proc initNlsFileInfo*(
     lastUserInteraction: times.now(),
     lastSaved: times.now()
   )
-
-proc getSlotThatOwnsUri*(
-  pool: NimsuggestPool, uriToCheck: FileUri
-): Option[NimsuggestSlot] = 
-  for entryPoint, s in pool.slots:
-    if uriToCheck in s.ownedUris:
-      return some(s)
-  return none(NimsuggestSlot)

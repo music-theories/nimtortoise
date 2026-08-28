@@ -74,7 +74,18 @@ proc processLangserverQueue*(ls: LanguageServer): Future[void] {.async.} =
       # if q.kind == NimsuggestQueryKind.CHANGED and q.saved:
       #   q.dirtyFile = FilePathAbs("")
       # else:
-      q.dirtyFile = uriToStashFilePath(ls.files.storageDir, q.uri)
+
+      # if q.uri in ls.files.openFiles:
+      #   q.dirtyFile = uriToStashFilePath(ls.files.storageDir, q.uri)
+      # else:
+      #   q.dirtyFile = FilePathAbs("")
+
+      if q.kind == NimsuggestQueryKind.CHECK_PROJECT:
+        q.dirtyFile = FilePathAbs("")
+      else:
+        q.dirtyFile = uriToStashFilePath(ls.files.storageDir, q.uri)
+
+
       debug "processLangserverQueue: in nimsuggest loop", kind = $q.kind
       # First, check if the current file is owned by a nimsuggest instance
       let path = toFilePathAbs(q.uri)
